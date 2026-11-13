@@ -537,6 +537,9 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 200 && r.body.includes('Try Studio free for 7 days') && r.body.includes('<dd>$0</dd>') && r.body.includes('Not now, continue on the free plan') && r.body.includes('name="from" value="start"'), 'start page shows the trial, today and the first charge');
   const billingLib = require('../api/_lib/billing');
   const store = require('../api/_lib/store');
+  process.env.ENGINES = 'none';
+  assert(!(await billingLib.canCheckout(getJ('user:user_1'))), 'no checkout while no AI engine can answer');
+  delete process.env.ENGINES;
   {
     const coId = '3f1c9a52-0d7e-4c55-9e57-2b6f4d1a8c11';
     const trialEnd = new Date(Date.now() + 7 * 86400000).toISOString();

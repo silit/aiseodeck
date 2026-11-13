@@ -19,6 +19,8 @@ function sign(userId) {
 const polar = require('./polar')({ PLANS, ACTIVE, sign, isTester, kv });
 
 async function canCheckout(user) {
+  // Nothing to sell until at least one AI engine can answer: a trial would start and then charge for no checks
+  if (!require('./engines').enabled().length) return false;
   const m = await polar.mode();
   return m === 'live' || (m === 'test' && isTester(user));
 }
