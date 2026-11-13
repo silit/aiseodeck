@@ -1,5 +1,5 @@
 'use strict';
-// Server-rendered pages, in the same look as the home page: Archivo and Martian Mono, dark by default with a
+// Server-rendered pages, in the same look as the home page: Montserrat and Martian Mono, dark by default with a
 // light theme. Colours carry meaning everywhere: marker yellow = the brand was named, blue = the brand's site was
 // cited, rose = a rival took the place.
 const { PLANS, FREE, QUESTIONS } = require('./plans');
@@ -44,25 +44,25 @@ const kwHref = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.
 const CSS = `
 :root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#8087A6;
 --mark:#F3D46E;--mark-ink:#2A2200;--mark-ring:transparent;--mark-text:#F3D46E;--cite:#93B3F2;--cite-soft:rgba(147,179,242,.15);--rival:#EE9DB0;--good:#74D3AA;--good-soft:rgba(116,211,170,.14);--bad:#EE8C8C;--bad-soft:rgba(238,140,140,.14);--warn:#EDC57A;--warn-soft:rgba(237,197,122,.14);
---shadow:0 24px 60px -36px rgba(8,10,25,.6);--sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
+--shadow:0 24px 60px -36px rgba(8,10,25,.6);--sans:"Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
 @media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#868CAE;
 --mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#8F6E00;--cite:#2F5BFF;--cite-soft:#E6ECFF;--rival:#C2335A;--good:#138A5A;--good-soft:#E2F5EB;--bad:#C93C34;--bad-soft:#FBE8E6;--warn:#9A6400;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:56px}
+body{margin:0;background:var(--bg);color:var(--ink);font:450 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:56px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 a{color:var(--cite);text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:6px}
 h1,h2,h3{margin:0;line-height:1.1;text-wrap:balance;font-stretch:110%}
-h1{font-size:clamp(28px,3.4vw,40px);font-weight:800;letter-spacing:-.03em}
-h2{font-size:20px;font-weight:760;letter-spacing:-.02em}
+h1{font-size:clamp(28px,3.4vw,40px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:20px;font-weight:760;letter-spacing:-.014em}
 h3{font-size:16px;font-weight:700;letter-spacing:-.01em;font-stretch:104%}
 p{margin:0}
 .muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:13.5px}.tiny{font-size:12.5px}
 .mono{font-family:var(--mono);font-stretch:87.5%;font-size:.88em;letter-spacing:-.01em}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line2);margin-bottom:30px}
 .top .wrap{display:flex;justify-content:space-between;align-items:center;gap:14px;padding-top:12px;padding-bottom:12px}
-.brand{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
+.brand{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.014em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
 .logo{width:26px;height:26px;flex:none}
 .top nav{display:flex;gap:20px;font-size:14.5px;font-weight:600;align-items:center}.top nav a{color:var(--muted);text-decoration:none;white-space:nowrap}.top nav a:hover,.top nav a[aria-current=page]{color:var(--ink)}
 .btn{font:inherit;font-weight:700;font-size:14.5px;border-radius:11px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);text-decoration:none;display:inline-flex;gap:8px;align-items:center;justify-content:center;line-height:1.2;transition:background .15s,border-color .15s}
@@ -105,7 +105,7 @@ footer a{color:var(--muted)}
 .stat{padding:18px 20px;display:grid;gap:6px;align-content:start;border-left:1px solid var(--line2);min-width:0}
 .stat:first-child{border-left:0}
 .stat .k{font-size:13px;color:var(--muted);font-weight:600}
-.stat .v{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1;font-stretch:115%;font-variant-numeric:tabular-nums}
+.stat .v{font-size:34px;font-weight:800;letter-spacing:-.024em;line-height:1;font-stretch:115%;font-variant-numeric:tabular-nums}
 .stat .v small{font-size:17px;color:var(--faint);font-weight:700;letter-spacing:-.01em}
 .stat .s{font-size:13px;color:var(--muted)}
 .stat .s b{font-weight:700}
@@ -179,7 +179,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:860px;font-variant-numeri
 /* keyword page */
 .verdict{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(220px,340px);gap:18px 28px;align-items:center;padding:22px;margin-bottom:22px}
 .big{font-size:64px;line-height:.9;font-weight:820;letter-spacing:-.045em;font-stretch:118%;font-variant-numeric:tabular-nums}
-.big small{font-size:28px;color:var(--faint);font-weight:700;letter-spacing:-.02em}
+.big small{font-size:28px;color:var(--faint);font-weight:700;letter-spacing:-.014em}
 .verdict.yes .big{color:var(--mark-text)}
 .vt{display:grid;gap:8px;min-width:0}
 .vt strong{font-size:20px;font-weight:750;letter-spacing:-.015em;font-stretch:106%}
@@ -291,7 +291,7 @@ svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:no
 .site .nm{display:grid;gap:6px;min-width:0}
 .site .nm h2{font-size:19px}
 .site .num{text-align:right}
-.site .num b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;font-stretch:115%}
+.site .num b{display:block;font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-stretch:115%}
 .engs{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px}
 .engs span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:600}
 .engs .c{width:10px;height:10px}.engs .c.st-b{box-shadow:0 0 0 2px var(--panel),0 0 0 3.5px var(--cite)}
@@ -310,7 +310,7 @@ svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:no
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
 .plan{border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;background:var(--bg2)}
 .plan.current{border-color:var(--mark);box-shadow:inset 0 0 0 1px var(--mark)}
-.plan .price{font-size:28px;font-weight:800;letter-spacing:-.03em;font-stretch:112%}
+.plan .price{font-size:28px;font-weight:800;letter-spacing:-.02em;font-stretch:112%}
 .plan form{margin-top:auto;padding-top:6px}
 .plan .tnote{font-size:12.5px;color:var(--muted)}
 /* trial */
@@ -324,7 +324,7 @@ svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:no
 .bill{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}
 .bill div{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--bg2);min-width:0}
 .bill dt{font-size:13px;color:var(--muted);font-weight:600}
-.bill dd{margin:4px 0 0;font-size:28px;font-weight:800;letter-spacing:-.03em;font-stretch:112%;font-variant-numeric:tabular-nums}
+.bill dd{margin:4px 0 0;font-size:28px;font-weight:800;letter-spacing:-.02em;font-stretch:112%;font-variant-numeric:tabular-nums}
 .bill dd small{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0;font-stretch:100%}
 .bill .now dd{color:var(--mark-text)}
 .wait{max-width:520px;margin:40px auto;text-align:center;display:grid;gap:14px;justify-items:center}
@@ -349,7 +349,7 @@ const LOGO = `<svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect wid
 const SEARCH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 const LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="4" y="10" width="16" height="11" rx="3" fill="currentColor"/></svg>';
 const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">';
+const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">';
 
 function layout(title, body, opts) {
   opts = opts || {};

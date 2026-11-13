@@ -11,7 +11,7 @@
 <meta property="og:image" content="/og.png">
 <meta name="theme-color" content="#222B5E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
 <style>
 :root{
   --bg:#222B5E;--bg2:#262F66;--panel:#2B3571;--panel2:#313C7C;--lift:#3A4689;
@@ -19,19 +19,19 @@
   --ink:#F0F2FF;--muted:#BCC1E6;--faint:#9AA1D1;
   --mark:#FFE45C;--mark-ink:#1B1600;--cite:#86AEFF;--cite-soft:rgba(134,174,255,.14);
   --rival:#FF93A8;--good:#5DE3A9;--bad:#FF8080;
-  --sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --sans:"Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   --mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{margin:0;background:var(--bg);color:var(--ink);font:450 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .wrap{max-width:1200px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
 a{color:var(--cite);text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--mark);outline-offset:3px;border-radius:6px}
 h1,h2,h3{margin:0;text-wrap:balance;font-stretch:112%}
-h1{font-size:clamp(44px,6.6vw,92px);line-height:.95;font-weight:820;letter-spacing:-.04em;font-stretch:114%}
-h2{font-size:clamp(31px,4.2vw,52px);line-height:1.02;font-weight:780;letter-spacing:-.03em}
+h1{font-size:clamp(44px,6.6vw,92px);line-height:.95;font-weight:820;letter-spacing:-.026em;font-stretch:114%}
+h2{font-size:clamp(31px,4.2vw,52px);line-height:1.02;font-weight:780;letter-spacing:-.02em}
 h3{font-size:19px;line-height:1.25;font-weight:700;letter-spacing:-.01em;font-stretch:104%}
 p{margin:0}
 .muted{color:var(--muted)}
@@ -42,7 +42,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
 .top.scrolled{border-bottom-color:var(--line2)}
 .top .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:14px;padding-bottom:14px}
-.brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
+.brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:18px;letter-spacing:-.014em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
 .top nav{display:flex;gap:24px;align-items:center;font-weight:600;font-size:15px}
 .top nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
 .top nav a:hover{color:var(--ink)}
@@ -107,8 +107,8 @@ mark{color:inherit;padding:0 2px;border-radius:3px;background:linear-gradient(va
 .fresh mark{animation:sweep .7s .1s cubic-bezier(.3,.7,.2,1) both}
 @keyframes sweep{from{background-size:0 80%}to{background-size:100% 80%}}
 .verdict{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 28px;align-items:center;padding:20px;border-top:1px solid var(--line);background:var(--shade);border-radius:0 0 21px 21px}
-.vnum{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.04em;font-stretch:118%;font-variant-numeric:tabular-nums}
-.vnum small{font-size:22px;color:var(--faint);font-weight:700;letter-spacing:-.02em}
+.vnum{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.026em;font-stretch:118%;font-variant-numeric:tabular-nums}
+.vnum small{font-size:22px;color:var(--faint);font-weight:700;letter-spacing:-.014em}
 .vtext{display:grid;gap:4px;min-width:0}
 .vtext strong{font-size:18px;font-weight:700}
 .vtext span{font-size:14px;color:var(--muted)}
@@ -125,7 +125,7 @@ section{padding:112px 0;border-top:1px solid var(--line2)}
 .stage{position:relative;padding:24px 22px 26px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-content:start;border-left:1px solid var(--line2)}
 .stage:first-child{border-left:0}
 .stage:not(:last-child)::after{content:"";position:absolute;right:-7px;top:50%;width:12px;height:12px;background:var(--panel);border-top:1px solid var(--line);border-right:1px solid var(--line);transform:translateY(-50%) rotate(45deg);z-index:1}
-.stage h3{font-size:15px;color:var(--muted);font-weight:600;font-stretch:100%}
+.stage h3{font-size:16px;color:var(--ink);font-weight:750;letter-spacing:-.01em}
 .chipkw{display:inline-flex;align-items:flex-start;gap:8px;font-weight:700;font-size:16px;line-height:1.35;max-width:100%;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;justify-self:start}
 .chipkw svg{flex:none;margin-top:2px}
 .bubbles{display:grid;gap:8px}
@@ -135,7 +135,7 @@ section{padding:112px 0;border-top:1px solid var(--line2)}
 .engs{display:flex;flex-wrap:wrap;gap:6px}
 .engs span{font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--bg)}
 .score{display:grid;gap:6px}
-.score .big{font-size:56px;line-height:1;font-weight:800;letter-spacing:-.04em;font-stretch:118%;color:var(--mark)}
+.score .big{font-size:56px;line-height:1;font-weight:800;letter-spacing:-.026em;font-stretch:118%;color:var(--mark)}
 .score span{font-size:14px;color:var(--muted)}
 .why{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin-top:36px}
 .why p{color:var(--muted);font-size:15.5px}
@@ -232,7 +232,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeri
 .plan{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:14px}
 .plan.pick{border-color:var(--mark);box-shadow:0 0 0 1px var(--mark) inset}
 .plan h3{font-size:18px}
-.price{font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1;font-stretch:115%}
+.price{font-size:40px;font-weight:800;letter-spacing:-.024em;line-height:1;font-stretch:115%}
 .price .per{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;font-stretch:100%}
 .kwcount{font-size:15px;font-weight:700}
 .kwcount b{font-size:22px;font-weight:800;color:var(--mark);font-stretch:112%}
@@ -287,7 +287,7 @@ details p{color:var(--muted);margin-top:12px;max-width:72ch}
 .bars li.us b{color:var(--mark)}
 
 .cta{text-align:left;display:grid;gap:26px;justify-items:start}
-.cta h2{font-size:clamp(40px,6vw,80px);font-stretch:118%;letter-spacing:-.04em}
+.cta h2{font-size:clamp(40px,6vw,80px);font-stretch:118%;letter-spacing:-.026em}
 footer{border-top:1px solid var(--line2);padding:28px 0 44px;font-size:14px;color:var(--faint)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:8px 22px}
 footer a{color:var(--muted)}
