@@ -82,6 +82,7 @@ const customer = http.createServer((req, res) => {
 /* ---- mock AI engines and text generation ---- */
 const engineCalls = [];
 let perplexityFailOnce = true;
+let sonarGone = false;
 function answerFor(prompt) {
   if (/veneer/i.test(prompt)) return { text: 'For veneers in Antalya, patients often choose Lumen Dental, then Bright Smile Clinic. Lumen Dental uses digital smile design.', sources: ['https://www.lumendental.com/veneers', 'https://www.trustpilot.com/review/lumendental.com'] };
   if (/implant/i.test(prompt)) return { text: 'Bright Smile Clinic is a popular choice for implants in Antalya.', sources: ['https://brightsmile.com/implants', 'https://www.whatclinic.com/x'] };
@@ -108,7 +109,19 @@ const ai = http.createServer(async (req, res) => {
       { type: 'web_search_call', id: 'ws1', status: 'completed', action: { type: 'search', query: 'antalya dental clinic reviews', sources: a.sources.map((s) => ({ type: 'url', url: s })) } },
       { type: 'message', content: [{ type: 'output_text', text: a.text, annotations: a.sources.map((s) => ({ type: 'url_citation', url: s, title: 'T', start_index: 0, end_index: 1 })) }] }] });
   }
+  if (u.pathname === '/v1/agent') {
+    engineCalls.push({ e: 'perplexity-agent', p: body.input, effort: body.effort, country: body.tools && body.tools[0] && body.tools[0].user_location && body.tools[0].user_location.country });
+    const a = answerFor(body.input);
+    const results = a.sources.map((s, i) => ({ id: i + 1, title: 'T' + (i + 1), url: s, snippet: 'x', date: null, source: 'web' }));
+    results.push({ id: results.length + 1, title: 'Uncited', url: 'https://uncited.example/page', snippet: 'y', date: null, source: 'web' });
+    const cites = a.sources.map((s, i) => '[' + (i + 1) + ']').join('');
+    return json(res, 200, { id: 'r1', object: 'response', model: 'perplexity/sonar', status: 'completed', output: [
+      { type: 'search_results', queries: ['veneers antalya clinics', 'antalya dental reviews'], results },
+      { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: a.text + ' ' + cites, annotations: [] }] }],
+      usage: { input_tokens: 900, output_tokens: 200, total_tokens: 1100, cost: { currency: 'USD', total_cost: 0.004, tool_calls_cost: 0.0025 } } });
+  }
   if (u.pathname === '/v1/sonar') {
+    if (sonarGone) return json(res, 410, { error: { message: 'Sonar chat completions moved to the Agent API' } });
     engineCalls.push({ e: 'perplexity', p: body.messages[0].content });
     if (perplexityFailOnce) { perplexityFailOnce = false; return json(res, 429, { error: { message: 'rate limited' } }); }
     const a = answerFor(body.messages[0].content);
@@ -423,6 +436,23 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(out.status === 200 && getJ('user:user_1').plan === 'solo', 'signed Polar webhook upgrades the plan');
   const bad = await billingLib.handleWebhook(raw, Object.assign({}, hdrs, { 'webhook-signature': 'v1,AAAA' }), { getUser: store.getUser, saveUser: store.saveUser });
   assert(bad.status === 401, 'bad webhook signature refused');
+
+  console.log('perplexity agent api');
+  {
+    const engines = require('../api/_lib/engines');
+    const q = 'Best clinic for veneers in Antalya?';
+    process.env.PERPLEXITY_API = 'agent';
+    let ans = await engines.ask('perplexity', q, { country: 'GB', timeoutMs: 5000 });
+    const call = engineCalls.filter((c) => c.e === 'perplexity-agent').pop();
+    assert(call && call.effort === 'fast' && call.country === 'GB', 'Agent API asked with effort fast and the country');
+    assert(ans.text && ans.queries.length === 2 && ans.sources.length >= 1 && !ans.sources.some((s) => /uncited/.test(s.url)) && ans.consulted.some((s) => /uncited/.test(s.url)), 'Agent API answer read: cited results are sources, the rest consulted, searches kept');
+    delete process.env.PERPLEXITY_API;
+    sonarGone = true;
+    const before = engineCalls.filter((c) => c.e === 'perplexity-agent').length;
+    ans = await engines.ask('perplexity', q, { country: 'GB', timeoutMs: 5000 });
+    assert(ans.text && engineCalls.filter((c) => c.e === 'perplexity-agent').length === before + 1, 'when Sonar is gone, Perplexity answers come from the Agent API');
+    sonarGone = false;
+  }
 
   console.log('cost guard');
   process.env.MAX_DAILY_CALLS = '1';

@@ -110,17 +110,53 @@ async function grok(prompt, opts) {
   return Object.assign(readResponses(d, { text: '', sources: [], consulted: [], queries: [] }), { model: d.model || model });
 }
 
-/* ---- Perplexity: Sonar ---- */
+/* ---- Perplexity: the Agent API (Perplexity's successor to Sonar chat completions) ---- */
+async function perplexityAgent(prompt, opts, root, headers) {
+  const body = { input: prompt, max_output_tokens: 1200 };
+  const m = env('PERPLEXITY_AGENT_MODEL');
+  if (m) body.model = m; else body.effort = env('PERPLEXITY_EFFORT', 'fast'); // "fast" is the documented stand-in for sonar
+  const tool = { type: 'web_search' };
+  if (opts.country && /^[A-Z]{2}$/.test(opts.country)) tool.user_location = { country: opts.country };
+  body.tools = [tool];
+  const d = await post(root + '/v1/agent', headers, body, opts.timeoutMs);
+  const out = { text: '', sources: [], consulted: [], queries: [], model: d.model || m || 'perplexity-agent' };
+  const byId = new Map();
+  for (const item of d.output || []) {
+    if (item.type === 'message') {
+      for (const c of item.content || []) {
+        if (typeof c.text !== 'string') continue;
+        out.text += (out.text ? '\n' : '') + c.text;
+        for (const a of c.annotations || []) if (a && a.url) addSource(out.sources, a.url, a.title);
+      }
+    } else if (item.type === 'search_results') {
+      for (const q of item.queries || []) addQuery(out.queries, q);
+      for (const r of item.results || []) if (r && r.url) { byId.set(String(r.id), r); addSource(out.consulted, r.url, r.title); }
+    }
+  }
+  if (!out.text && typeof d.output_text === 'string') out.text = d.output_text;
+  // [n] in the answer points to search result n: those are the sources it cites
+  for (const mk of out.text.match(/\[(\d{1,3})\]/g) || []) { const r = byId.get(mk.slice(1, -1)); if (r) addSource(out.sources, r.url, r.title); }
+  if (!out.sources.length) for (const s of out.consulted) addSource(out.sources, s.url, s.title);
+  return out;
+}
+
+/* ---- Perplexity: Sonar while it lasts, then the Agent API ---- */
 async function perplexity(prompt, opts) {
   const model = env('PERPLEXITY_MODEL', 'sonar');
   const root = base('PERPLEXITY_API_BASE', 'https://api.perplexity.ai');
   const headers = { Authorization: 'Bearer ' + env('PERPLEXITY_API_KEY') };
+  if (env('PERPLEXITY_API') === 'agent') return perplexityAgent(prompt, opts, root, headers);
   const body = { model, messages: [{ role: 'user', content: prompt }] };
   let d;
   try { d = await post(root + env('PERPLEXITY_PATH', '/v1/sonar'), headers, body, opts.timeoutMs); }
   catch (e) {
-    if (e.status !== 404 || env('PERPLEXITY_PATH')) throw e;
-    d = await post(root + '/chat/completions', headers, body, opts.timeoutMs); // older address
+    const gone = e.status === 404 || e.status === 410 || (e.status >= 400 && e.status < 500 && /deprecat|migrat|no longer|sunset/i.test(e.message || ''));
+    if (!gone || env('PERPLEXITY_PATH')) throw e;
+    try { return await perplexityAgent(prompt, opts, root, headers); }
+    catch (e2) {
+      if (e2.status !== 404) throw e2;
+      d = await post(root + '/chat/completions', headers, body, opts.timeoutMs); // older address
+    }
   }
   const ch = (d.choices && d.choices[0]) || {};
   const out = { text: String((ch.message && ch.message.content) || ''), sources: [], consulted: [], queries: [], model: d.model || model };

@@ -7,7 +7,7 @@ Live address (planned): https://aiseodeck.silitlabs.com
 ## How it works
 
 - `api/index.js`: one serverless entry point (pages, OAuth, fixes, cron). `vercel.json` rewrites every app path to it.
-- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API + web_search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Perplexity (Sonar), Claude (Messages API + web search tool), Grok (xAI Responses API + web_search). An engine is on when its key is set. Free plan: ChatGPT, AI Overviews, Perplexity; the others show as locked columns.
+- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API + web_search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Perplexity (Sonar, switching by itself to the Agent API that replaces it), Claude (Messages API + web search tool), Grok (xAI Responses API + web_search). An engine is on when its key is set. Free plan: ChatGPT, AI Overviews, Perplexity; the others show as locked columns.
 - `api/_lib/analyze.js`: brand and rival detection in answers (case, accents, dashes and Turkish letters ignored), citations, share of voice, score (50% named, 30% cited, 20% place).
 - `api/_lib/insights.js`: "Where rivals win" gaps and "How AI describes you" (sentiment, words, claims worth checking; one small LLM call per run).
 - `api/_lib/jobs.js`: runs are queues of `question x engine` tasks in Redis. The cron tick and the open site page both work through them; each engine has its own parallel limit; failed calls are retried up to 3 times.
