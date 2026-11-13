@@ -30,7 +30,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:450 16px/1.6 var(--sans
 a{color:var(--cite);text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--mark);outline-offset:3px;border-radius:6px}
 h1,h2,h3{margin:0;text-wrap:balance;font-stretch:112%}
-h1{font-size:clamp(44px,6.6vw,92px);line-height:.95;font-weight:820;letter-spacing:-.026em;font-stretch:114%}
+h1{font-size:clamp(38px,6.6vw,88px);line-height:.98;font-weight:820;letter-spacing:-.026em}
 h2{font-size:clamp(31px,4.2vw,52px);line-height:1.02;font-weight:780;letter-spacing:-.02em}
 h3{font-size:19px;line-height:1.25;font-weight:700;letter-spacing:-.01em;font-stretch:104%}
 p{margin:0}
@@ -143,12 +143,12 @@ section{padding:112px 0;border-top:1px solid var(--line2)}
 
 /* deck table */
 .tablecard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:8px 0 4px;overflow-x:auto}
-table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeric:tabular-nums}
-.kt th{font-size:12.5px;color:var(--faint);font-weight:600;text-align:center;padding:14px 8px 12px;white-space:nowrap}
-.kt th:first-child,.kt td:first-child{text-align:left;padding-left:22px}
-.kt th:last-child,.kt td:last-child{padding-right:22px}
-.kt td{border-top:1px solid var(--line2);padding:14px 8px;text-align:center;font-size:14.5px}
-.kt td.k{font-weight:700;font-size:15px;white-space:nowrap}
+table.kt{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.kt th{font-size:12px;line-height:1.25;color:var(--faint);font-weight:600;text-align:center;vertical-align:bottom;padding:14px 6px 12px}
+.kt th:first-child,.kt td:first-child{text-align:left;padding-left:20px}
+.kt th:last-child,.kt td:last-child{padding-right:20px}
+.kt td{border-top:1px solid var(--line2);padding:13px 6px;text-align:center;font-size:14px}
+.kt td.k{font-weight:700;font-size:14.5px;line-height:1.35;min-width:170px}
 .kt td.v{color:var(--muted);text-align:right}
 .kt th.v{text-align:right}
 .c{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:middle}
@@ -157,8 +157,8 @@ table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeri
 .c.ci{box-shadow:inset 0 0 0 2.5px var(--cite)}
 .c.o{width:6px;height:6px;background:var(--faint);opacity:.7}
 .c.x{width:12px;height:2px;border-radius:2px;background:var(--line)}
-.vis{display:flex;align-items:center;gap:10px;justify-content:flex-end}
-.vis i{display:block;width:64px;height:6px;border-radius:999px;background:var(--line2);overflow:hidden;position:relative}
+.vis{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.vis i{display:block;width:46px;height:6px;border-radius:999px;background:var(--line2);overflow:hidden;position:relative}
 .vis i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--mark);border-radius:inherit}
 .trend{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
 .trend svg{display:block}
@@ -204,7 +204,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeri
 .rk{list-style:none;margin:0;padding:0}
 .rk li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line2);font-variant-numeric:tabular-nums}
 .rk li:first-child{border-top:0}
-.rk .kwt{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .kwt{font-weight:600;min-width:0;overflow-wrap:anywhere;line-height:1.35}
 .rk .vol{color:var(--muted);font-size:14px;text-align:right}
 .track{font:inherit;font-size:13.5px;font-weight:700;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px 12px;cursor:pointer;min-width:92px}
 .track[aria-pressed=true]{background:var(--mark);border-color:var(--mark);color:var(--mark-ink)}
@@ -335,6 +335,9 @@ footer a{color:var(--muted)}
   .rk .vol{grid-column:1;grid-row:2;text-align:left}
   .rk .track{grid-column:2;grid-row:1 / span 2}
   .example{margin-left:0;width:100%}
+}
+/* the keyword table turns into cards below 1060px, so it never needs a sideways scroll */
+@media (max-width:1060px){
   .tablecard{padding:0;overflow:visible}
   table.kt{min-width:0}
   .kt thead{display:none}
