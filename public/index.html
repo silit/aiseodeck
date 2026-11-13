@@ -20,11 +20,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
 <style>
 :root{
-  --bg:#222B5E;--bg2:#262F66;--panel:#2B3571;--panel2:#313C7C;--lift:#3A4689;
-  --line:#434F93;--line2:#36417F;--grid:rgba(160,172,255,.08);--shade:rgba(14,18,52,.28);
-  --ink:#F0F2FF;--muted:#BCC1E6;--faint:#9AA1D1;
-  --mark:#FFE45C;--mark-ink:#1B1600;--cite:#86AEFF;--cite-soft:rgba(134,174,255,.14);
-  --rival:#FF93A8;--good:#5DE3A9;--bad:#FF8080;
+  --bg:#222B5E;--bg2:#262F66;--bg-deep:#1D2554;--band:#29336F;--panel:#2C3673;--panel2:#333E80;--lift:#3C488C;
+  --line:#4A5699;--line2:#36417F;--grid:rgba(160,172,255,.08);--shade:rgba(14,18,52,.28);
+  --ink:#F2F4FF;--muted:#C0C5EA;--faint:#9CA3D3;
+  --mark:#FFE45C;--mark-ink:#1B1600;--cite:#8DB4FF;--cite-soft:rgba(141,180,255,.15);
+  --rival:#FF9DB1;--good:#5DE3A9;--bad:#FF8A8A;--violet:#B9A4FF;
+  --paper:#F5F6FD;--paper-ink:#161C47;--paper-muted:#4C538A;--paper-line:#E1E4F4;
+  --edge:linear-gradient(135deg,rgba(255,228,92,.6),rgba(141,180,255,.5) 35%,rgba(185,164,255,.45) 70%,rgba(255,157,177,.45));
   --sans:"Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   --mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color-scheme:dark}
@@ -62,7 +64,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* hero */
 .hero{position:relative;overflow:hidden}
 .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:56px 56px;background-position:-1px -1px;-webkit-mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 55%,transparent 100%);mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 55%,transparent 100%);pointer-events:none}
-.hero::after{content:"";position:absolute;left:50%;top:44%;width:min(1100px,120vw);height:640px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(120,150,255,.20),transparent);pointer-events:none}
+.hero::after{content:"";position:absolute;inset:0;background:radial-gradient(38% 46% at 16% 24%,rgba(141,180,255,.24),transparent 70%),radial-gradient(34% 42% at 90% 12%,rgba(185,164,255,.24),transparent 70%),radial-gradient(42% 38% at 62% 96%,rgba(255,228,92,.12),transparent 70%);pointer-events:none}
 .hero .wrap{position:relative;z-index:1}
 .hero-text{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:28px 56px;align-items:end;padding:72px 0 44px}
 .hero-text .lede{font-size:clamp(17px,1.5vw,19.5px);line-height:1.6;color:var(--muted);max-width:46ch}
@@ -72,7 +74,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .note{font-size:14px;color:var(--faint)}
 
 /* the deck (live demo) */
-.deck{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel) 120px);border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 50px 120px -40px rgba(10,14,46,.7);margin-bottom:96px;min-width:0}
+.deck{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel) 120px) padding-box,var(--edge) border-box;border:1px solid transparent;border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 50px 120px -40px rgba(10,14,46,.7);margin-bottom:96px;min-width:0}
 .deck-bar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line2)}
 .kw{flex:1 1 360px;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 16px;min-width:0}
 .kw:focus-within{border-color:var(--cite)}
@@ -178,7 +180,7 @@ table.kt{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
 .fixgrid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:56px;align-items:start}
 .fixgrid .points{display:grid;gap:26px}
 .fixgrid .points p{color:var(--muted)}
-.plan-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.plan-card{background:linear-gradient(180deg,var(--panel2),var(--panel) 140px) padding-box,linear-gradient(135deg,rgba(93,227,169,.55),rgba(141,180,255,.45) 50%,rgba(185,164,255,.35)) border-box;border:1px solid transparent;border-radius:20px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(10,14,46,.8)}
 .plan-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line2)}
 .plan-head strong{font-size:17px}
 .plan-head .muted{font-size:14px}
@@ -292,11 +294,104 @@ details p{color:var(--muted);margin-top:12px;max-width:72ch}
 .bars li.us i::after{background:var(--mark)}
 .bars li.us b{color:var(--mark)}
 
+
+/* bands: the page alternates tones so sections read as separate rooms */
+.band-deep{background:var(--bg-deep)}
+.band-raised{background:linear-gradient(180deg,var(--band),var(--bg) 75%)}
+
+/* stage and card icons: one tint per meaning */
+.stage h3,.ins h3{display:flex;align-items:center;gap:10px}
+.si{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;color:var(--c);background:color-mix(in srgb,var(--c) 17%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent)}
+.why > div{border-top:2px solid var(--c,var(--line));padding-top:18px}
+
+/* weekly trend */
+.trendcard{background:linear-gradient(180deg,var(--panel2),var(--panel) 160px);border:1px solid var(--line);border-radius:20px;padding:24px 26px 18px;margin-bottom:34px;display:grid;gap:12px}
+.tc-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px 24px}
+.tc-top > div{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.tc-k{font-size:14px;color:var(--muted);font-weight:600;flex-basis:100%}
+.tc-v{font-size:52px;font-weight:820;line-height:1;letter-spacing:-.026em;color:var(--mark)}
+.tc-v small{font-size:24px;color:var(--faint)}
+.tc-ex{font-size:12.5px;color:var(--faint)}
+.tc-chart{display:block;width:100%;height:auto}
+.tc-chart .gl{stroke:var(--line2);stroke-width:1}
+.tc-chart .ln{fill:none;stroke:var(--mark);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.tc-chart .pt{fill:var(--bg-deep);stroke:var(--mark);stroke-width:3}
+.tc-chart .pt.last{fill:var(--mark);stroke:rgba(255,228,92,.3);stroke-width:8}
+.tc-x{display:flex;justify-content:space-between;font-size:12.5px;color:var(--faint)}
+
+/* light band: ten links against one answer */
+.paper{background:var(--paper);color:var(--paper-ink);border-top:0}
+.paper + section{border-top:0}
+.whygrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.paper h2{max-width:20ch;font-size:clamp(30px,3.6vw,48px)}
+.paper .whycols{grid-template-columns:1fr;gap:16px;margin-top:26px}
+.paper .whycols p{color:var(--paper-muted);font-size:17.5px}
+.vs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.vs > div{background:#fff;border:1px solid var(--paper-line);border-radius:18px;padding:18px;display:grid;gap:12px;align-content:start;box-shadow:0 30px 60px -45px rgba(22,28,71,.45)}
+.vs-k{font-size:12.5px;font-weight:700;color:var(--paper-muted)}
+.vs ol{list-style:none;margin:0;padding:0;display:grid;gap:11px}
+.vs ol li{display:grid;gap:5px}
+.vs ol b{font-size:13px;font-weight:700;color:#3A4FD8}
+.vs ol i{display:block;height:6px;border-radius:999px;background:#DDE1F3;width:var(--w,90%)}
+.vs ol li:nth-child(n+4){opacity:.55}
+.vs-ans p{font-size:15.5px;line-height:1.55;color:var(--paper-ink)}
+.vs-ans mark{background:linear-gradient(var(--mark),var(--mark)) no-repeat 0 62%/100% 82%;color:var(--mark-ink);padding:0 2px}
+.vs-bubble{background:#EEF0FB;border-radius:14px 14px 14px 4px;padding:9px 12px;font-size:13.5px;font-weight:600;color:var(--paper-ink)}
+.vs-tag{justify-self:start;font-size:12.5px;font-weight:700;color:var(--mark-ink);background:var(--mark);border-radius:999px;padding:4px 10px}
+
+/* pricing extras */
+.plan h3{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.free7{font-size:11.5px;font-weight:700;letter-spacing:.01em;color:var(--mark);border-radius:999px;padding:3px 9px;box-shadow:inset 0 0 0 1px rgba(255,228,92,.55);white-space:nowrap}
+.plan.pick .free7{background:var(--mark);color:var(--mark-ink);box-shadow:none}
+.plan.pick{box-shadow:0 0 0 1px var(--mark) inset,0 34px 80px -44px rgba(255,228,92,.5)}
+
+/* questions in two columns */
+.faqgrid{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:56px;align-items:start}
+.faqside{position:sticky;top:100px;display:grid;gap:16px;justify-items:start}
+.faqside p{color:var(--muted);font-size:16.5px}
+.faqgrid .faq details{max-width:none}
+
+/* closing card */
+.ctacard{position:relative;overflow:hidden;border-radius:28px;padding:clamp(36px,6vw,72px) clamp(24px,5vw,64px);border:1px solid rgba(255,255,255,.14);
+  background:radial-gradient(60% 90% at 0% 0%,rgba(141,180,255,.38),transparent 60%),radial-gradient(55% 80% at 100% 100%,rgba(185,164,255,.40),transparent 62%),linear-gradient(135deg,#2F3B8C,#352F82);
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:center}
+.ctacard .cta{gap:22px}
+.dotgrid{display:grid;grid-template-columns:repeat(7,26px);gap:12px;padding:20px;border-radius:20px;background:rgba(15,19,56,.28);border:1px solid rgba(255,255,255,.1)}
+.dotgrid i{width:26px;height:26px;border-radius:50%;display:block}
+.dotgrid .n{background:var(--mark)}
+.dotgrid .b{background:var(--mark);box-shadow:0 0 0 3px #2F3A86,0 0 0 5px var(--cite)}
+.dotgrid .o{width:8px;height:8px;margin:9px;background:var(--faint);opacity:.75}
+.dotgrid .c{box-shadow:inset 0 0 0 3px var(--cite)}
+
+/* footer */
+footer.foot{background:var(--bg-deep);padding:48px 0 40px;border-top:1px solid var(--line2)}
+.footgrid{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(2,minmax(0,1fr));gap:32px}
+.fbrand{display:grid;gap:12px;align-content:start}
+.fbrand p{color:var(--muted);max-width:40ch;font-size:14.5px}
+.fcol{display:grid;gap:10px;align-content:start;font-size:14.5px}
+.fcol b{color:var(--ink);font-size:14px}
+.fcol a,.fcol span{color:var(--muted);text-decoration:none}
+.fcol a:hover{color:var(--ink)}
+.fnote{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:32px;padding-top:22px;border-top:1px solid var(--line2);font-size:13px;color:var(--faint)}
+
+@media (max-width:1020px){
+  .whygrid,.faqgrid{grid-template-columns:1fr;gap:32px}
+  .faqside{position:static}
+  .ctacard{grid-template-columns:1fr}
+  .dotgrid{display:none}
+  .footgrid{grid-template-columns:1fr 1fr}
+  .fbrand{grid-column:1 / -1}
+}
+@media (max-width:640px){
+  .vs{grid-template-columns:1fr}
+  .trendcard{padding:18px 16px 14px}
+  .tc-v{font-size:42px}
+  .footgrid{grid-template-columns:1fr}
+}
+
 .cta{text-align:left;display:grid;gap:26px;justify-items:start}
 .cta h2{font-size:clamp(40px,6vw,80px);font-stretch:118%;letter-spacing:-.026em}
-footer{border-top:1px solid var(--line2);padding:28px 0 44px;font-size:14px;color:var(--faint)}
-footer .wrap{display:flex;flex-wrap:wrap;gap:8px 22px}
-footer a{color:var(--muted)}
+footer{font-size:14px;color:var(--faint)}
 
 @media (max-width:1020px){
   .hero-text{grid-template-columns:1fr;gap:26px;padding-top:48px}
@@ -424,20 +519,20 @@ footer a{color:var(--muted)}
   </div>
 </div>
 
-<section id="how">
+<section id="how" class="band-deep">
   <div class="wrap">
     <div class="sec-head"><h2>One keyword, every way people ask</h2><p>AI answers change with every question, so one prompt tells you very little. AI SEO Deck turns each keyword into the questions your customers really ask, sends them to seven engines and adds the answers up into one score you can track week by week.</p></div>
     <div class="flow">
-      <div class="stage"><h3>Your keyword</h3><span class="chipkw"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>bookkeeping app for freelancers</span><p class="muted" style="font-size:14px">Pick it yourself, or from the keywords where AI already cites you.</p></div>
-      <div class="stage"><h3>Asked the way people ask</h3>
+      <div class="stage"><h3><span class="si" style="--c:var(--cite)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Your keyword</h3><span class="chipkw"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>bookkeeping app for freelancers</span><p class="muted" style="font-size:14px">Pick it yourself, or from the keywords where AI already cites you.</p></div>
+      <div class="stage"><h3><span class="si" style="--c:var(--violet)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg></span>Asked the way people ask</h3>
         <div class="bubbles"><div class="bubble">Which bookkeeping app is best for freelancers?</div><div class="bubble">How much does bookkeeping software cost for a freelancer?</div><div class="bubble g">Google AI Overviews and AI Mode get the search itself: <b>bookkeeping app for freelancers</b></div></div></div>
-      <div class="stage"><h3>Seven AI engines, live web search on</h3><div class="engs"><span>ChatGPT</span><span>AI Overviews</span><span>AI Mode</span><span>Gemini</span><span>Perplexity</span><span>Claude</span><span>Grok</span></div><p class="muted" style="font-size:14px">12 answers for every keyword, every week.</p></div>
-      <div class="stage score"><h3>One score</h3><div class="big">67%</div><span>Named in 8 of 12 answers, your site cited in 5</span></div>
+      <div class="stage"><h3><span class="si" style="--c:var(--good)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg></span>Seven AI engines, live web search on</h3><div class="engs"><span>ChatGPT</span><span>AI Overviews</span><span>AI Mode</span><span>Gemini</span><span>Perplexity</span><span>Claude</span><span>Grok</span></div><p class="muted" style="font-size:14px">12 answers for every keyword, every week.</p></div>
+      <div class="stage score"><h3><span class="si" style="--c:var(--mark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 18 4-6"/></svg></span>One score</h3><div class="big">67%</div><span>Named in 8 of 12 answers, your site cited in 5</span></div>
     </div>
     <div class="why">
-      <div><h3>Many answers, not one</h3><p>A single answer can be luck. Twelve answers a week show a pattern, so a change in your score means something changed.</p></div>
-      <div><h3>The searches behind the answer</h3><p>Before they answer, the engines run their own web searches. We keep them: they are the keywords that decide which sites get read and cited.</p></div>
-      <div><h3>Questions you can edit</h3><p>Every keyword comes with the questions we ask for it, in your language. Read the full answers, and change the questions whenever you like.</p></div>
+      <div style="--c:var(--mark)"><h3>Many answers, not one</h3><p>A single answer can be luck. Twelve answers a week show a pattern, so a change in your score means something changed.</p></div>
+      <div style="--c:var(--cite)"><h3>The searches behind the answer</h3><p>Before they answer, the engines run their own web searches. We keep them: they are the keywords that decide which sites get read and cited.</p></div>
+      <div style="--c:var(--violet)"><h3>Questions you can edit</h3><p>Every keyword comes with the questions we ask for it, in your language. Read the full answers, and change the questions whenever you like.</p></div>
     </div>
   </div>
 </section>
@@ -455,7 +550,7 @@ footer a{color:var(--muted)}
   </div>
 </section>
 
-<section id="fix">
+<section id="fix" class="band-raised">
   <div class="wrap fixgrid">
     <div>
       <div class="sec-head" style="margin-bottom:30px"><h2>Know exactly what to fix next</h2><p>AI SEO Deck puts your biggest gaps first, finds the page that should win, writes what is missing and applies it to Webflow when you say so.</p></div>
@@ -492,23 +587,30 @@ footer a{color:var(--muted)}
   </div>
 </section>
 
-<section>
+<section id="weekly" class="band-deep">
   <div class="wrap">
     <div class="sec-head"><h2>Checked every week, so you see it move</h2><p>Every keyword is asked again each week. You get an email with what changed, a trend for every keyword, a report link your clients can open, and three short lists you can act on.</p></div>
+    <div class="trendcard"><div class="tc-top"><div><span class="tc-k">Visible in AI answers, all keywords</span><span class="tc-v">45<small>%</small></span><span class="up">+21 in 6 weeks</span></div><span class="tc-ex">Example data</span></div><svg class="tc-chart" viewBox="0 0 1000 200" role="img" aria-label="Visible in AI answers grew from 24% to 45% over six weekly checks"><defs><linearGradient id="tcg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8DB4FF" stop-opacity=".3"/><stop offset=".9" stop-color="#8DB4FF" stop-opacity="0"/></linearGradient></defs><line class="gl" x1="0" x2="1000" y1="40" y2="40"/><line class="gl" x1="0" x2="1000" y1="100" y2="100"/><line class="gl" x1="0" x2="1000" y1="160" y2="160"/><path d="M24 114 L214 99 L404 93 L594 78 L784 69 L974 51 L974 200 L24 200 Z" fill="url(#tcg)"/><path class="ln" d="M24 114 L214 99 L404 93 L594 78 L784 69 L974 51"/><circle class="pt" cx="24" cy="114" r="5"/><circle class="pt" cx="214" cy="99" r="5"/><circle class="pt" cx="404" cy="93" r="5"/><circle class="pt" cx="594" cy="78" r="5"/><circle class="pt" cx="784" cy="69" r="5"/><circle class="pt last" cx="974" cy="51" r="7"/></svg><div class="tc-x"><span>6 weeks ago</span><span>This week</span></div></div>
     <div class="ins">
-      <div><h3>How AI describes you</h3><div class="sent" role="img" aria-label="14 positive, 5 neutral, 1 negative"><i class="pos" style="width:70%"></i><i class="neu" style="width:25%"></i><i class="neg" style="width:5%"></i></div><div class="chips"><span class="chip">simple mobile app</span><span class="chip">tax-ready reports</span><span class="chip">good for sole traders</span></div><p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
-      <div><h3>Where rivals win</h3><div class="gapline"><b>invoicing software for small business</b><span class="muted" style="font-size:14px"><span class="rival">Ledgerbird</span> is named by ChatGPT, AI Mode and Claude, you are not.</span></div><p>Keywords where an engine recommends a rival instead of you, widest gaps first.</p></div>
-      <div><h3>Sites the AI trusts</h3><ul class="hosts"><li><span>g2.com</span><span>31 answers</span></li><li><span>reddit.com</span><span>22 answers</span></li><li><span>capterra.com</span><span>14 answers</span></li></ul><p>The places to be listed, reviewed or mentioned, counted across all your keywords.</p></div>
+      <div><h3><span class="si" style="--c:var(--mark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span>How AI describes you</h3><div class="sent" role="img" aria-label="14 positive, 5 neutral, 1 negative"><i class="pos" style="width:70%"></i><i class="neu" style="width:25%"></i><i class="neg" style="width:5%"></i></div><div class="chips"><span class="chip">simple mobile app</span><span class="chip">tax-ready reports</span><span class="chip">good for sole traders</span></div><p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
+      <div><h3><span class="si" style="--c:var(--rival)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-2 4 2 4H5"/></svg></span>Where rivals win</h3><div class="gapline"><b>invoicing software for small business</b><span class="muted" style="font-size:14px"><span class="rival">Ledgerbird</span> is named by ChatGPT, AI Mode and Claude, you are not.</span></div><p>Keywords where an engine recommends a rival instead of you, widest gaps first.</p></div>
+      <div><h3><span class="si" style="--c:var(--cite)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span>Sites the AI trusts</h3><ul class="hosts"><li><span>g2.com</span><span>31 answers</span></li><li><span>reddit.com</span><span>22 answers</span></li><li><span>capterra.com</span><span>14 answers</span></li></ul><p>The places to be listed, reviewed or mentioned, counted across all your keywords.</p></div>
     </div>
   </div>
 </section>
 
-<section class="whyband">
-  <div class="wrap">
-    <h2>Rankings show where you are on Google. AI SEO Deck shows whether AI recommends you.</h2>
-    <div class="whycols">
-      <p>People now ask ChatGPT, Gemini and Google's AI which business to choose, and they get one answer instead of ten links. If that answer names a rival, your ranking does not help.</p>
-      <p>AI SEO Deck reads those answers for your keywords every week, tells you plainly where you are missing, and fixes the pages that should win, right in Webflow.</p>
+<section class="paper">
+  <div class="wrap whygrid">
+    <div>
+      <h2>Rankings show where you are on Google. AI SEO Deck shows whether AI recommends you.</h2>
+      <div class="whycols">
+        <p>People now ask ChatGPT, Gemini and Google's AI which business to choose, and they get one answer instead of ten links. If that answer names a rival, your ranking does not help.</p>
+        <p>AI SEO Deck reads those answers for your keywords every week, tells you plainly where you are missing, and fixes the pages that should win, right in Webflow.</p>
+      </div>
+    </div>
+    <div class="vs" aria-label="Example: ten links on Google against one AI answer">
+      <div><span class="vs-k">Google results</span><ol><li><b>tallyhawk.com</b><i style="--w:92%"></i></li><li><b>ledgerbird.io</b><i style="--w:84%"></i></li><li><b>sumwise.co</b><i style="--w:88%"></i></li><li><b>freelancerbooks.net</b><i style="--w:76%"></i></li><li><b>bestapps.review</b><i style="--w:81%"></i></li><li><b>reddit.com</b><i style="--w:70%"></i></li></ol></div>
+      <div class="vs-ans"><span class="vs-k">AI answer</span><span class="vs-bubble">Best bookkeeping app for freelancers?</span><p>Most freelancers pick <mark>Tallyhawk</mark> for its tax-ready reports and simple mobile app.</p><span class="vs-tag">One answer, one pick</span></div>
     </div>
   </div>
 </section>
@@ -521,9 +623,9 @@ footer a{color:var(--muted)}
     </div>
     <div class="plans">
       <div class="plan"><h3>Free</h3><p class="price">$0</p><p class="kwcount"><b>3</b> keywords</p><ul><li>1 site</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked every month</li><li>Site audit and fix suggestions</li></ul><a class="btn sm" href="/auth">Start free, no card</a><p class="tnote">Free for as long as you like</p></div>
-      <div class="plan pick" data-plan="solo" data-m="19" data-y="190"><h3>Solo</h3><p class="price"><span class="amt">$19</span><span class="per"> /month</span></p><p class="kwcount"><b>10</b> keywords</p><ul><li>1 site</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>10 keyword re-checks a month</li></ul><a class="btn sm mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $19 a month</p></div>
-      <div class="plan" data-plan="studio" data-m="49" data-y="490"><h3>Studio</h3><p class="price"><span class="amt">$49</span><span class="per"> /month</span></p><p class="kwcount"><b>30</b> keywords</p><ul><li>5 sites</li><li>Everything in Solo</li><li>Client report links with your agency name</li><li>30 keyword re-checks a month</li></ul><a class="btn sm" href="/auth?plan=studio&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $49 a month</p></div>
-      <div class="plan" data-plan="agency" data-m="149" data-y="1490"><h3>Agency</h3><p class="price"><span class="amt">$149</span><span class="per"> /month</span></p><p class="kwcount"><b>100</b> keywords</p><ul><li>20 sites</li><li>Everything in Studio</li><li>100 keyword re-checks a month</li><li>Priority support</li></ul><a class="btn sm" href="/auth?plan=agency&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $149 a month</p></div>
+      <div class="plan pick" data-plan="solo" data-m="19" data-y="190"><h3>Solo<span class="free7">7 days free</span></h3><p class="price"><span class="amt">$19</span><span class="per"> /month</span></p><p class="kwcount"><b>10</b> keywords</p><ul><li>1 site</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>10 keyword re-checks a month</li></ul><a class="btn sm mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $19 a month</p></div>
+      <div class="plan" data-plan="studio" data-m="49" data-y="490"><h3>Studio<span class="free7">7 days free</span></h3><p class="price"><span class="amt">$49</span><span class="per"> /month</span></p><p class="kwcount"><b>30</b> keywords</p><ul><li>5 sites</li><li>Everything in Solo</li><li>Client report links with your agency name</li><li>30 keyword re-checks a month</li></ul><a class="btn sm" href="/auth?plan=studio&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $49 a month</p></div>
+      <div class="plan" data-plan="agency" data-m="149" data-y="1490"><h3>Agency<span class="free7">7 days free</span></h3><p class="price"><span class="amt">$149</span><span class="per"> /month</span></p><p class="kwcount"><b>100</b> keywords</p><ul><li>20 sites</li><li>Everything in Studio</li><li>100 keyword re-checks a month</li><li>Priority support</li></ul><a class="btn sm" href="/auth?plan=agency&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $149 a month</p></div>
     </div>
     <p class="fine">US dollars. On paid plans each keyword gets 12 AI answers a week: two questions on ChatGPT, Gemini, Perplexity, Claude and Grok, and the keyword itself on Google AI Overviews and AI Mode. Keywords you only look at, such as ideas and keywords found in AI Overviews, do not count until you track them. One free trial per customer.</p>
 
@@ -540,9 +642,10 @@ footer a{color:var(--muted)}
   </div>
 </section>
 
-<section>
-  <div class="wrap faq">
-    <div class="sec-head"><h2>Questions</h2></div>
+<section class="band-deep">
+  <div class="wrap faqgrid">
+    <div class="faqside"><h2>Questions</h2><p>Anything else? Write to info@silitlabs.com and we answer within one business day.</p><a class="btn sm" href="/docs">Read the docs</a></div>
+    <div class="faq">
     <details><summary>How does the free trial work?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Pick a plan and connect Webflow. Polar, our payment provider, asks for a card but charges nothing for 7 days, and every feature of the plan is open from the first minute. Cancel any time in those 7 days from Settings and you pay nothing; otherwise the plan starts on day 8. Polar emails you a reminder before the trial ends. One trial per customer.</p></details>
     <details><summary>How is this different from an SEO tool?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>SEO tools track where your pages rank in Google's list of links. AI SEO Deck tracks whether AI answers name you and link to you, keyword by keyword and engine by engine, and fixes the page that should win. Many teams use both.</p></details>
     <details><summary>Why keywords and not prompts?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Keywords are how you already plan SEO and content, and they are what the AI searches for before it answers. Each keyword is checked with the questions people really ask, so you get a steady score instead of one lucky or unlucky answer. You can read and edit those questions at any time.</p></details>
@@ -553,19 +656,20 @@ footer a{color:var(--muted)}
     <details><summary>Which Webflow plans does it work with?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Any Webflow plan. Titles, descriptions and schema are written to static pages; for CMS template pages you get the change to make in the collection, and answers and new pages are added to your CMS as drafts.</p></details>
     <details><summary>Will it slow down my site?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>No. AI SEO Deck adds no tracking code or widgets to your site. Fixes are page text and structured data, and they wait in Webflow until you publish.</p></details>
     <details><summary>Can I cancel any time?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Yes, during the trial and after it. Paid plans run through Polar and can be cancelled from Settings; a cancelled plan stays on until the end of the period you paid for. Deleting your account removes all stored data and revokes Webflow access.</p></details>
+    </div>
   </div>
 </section>
 
 <section>
-  <div class="wrap cta">
+  <div class="wrap"><div class="ctacard"><div class="cta">
     <h2>Every AI.<br>One deck.</h2>
     <div class="actions"><a class="btn mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><a class="btn" href="/auth">Start on the free plan</a></div>
     <p class="note">Connect Webflow in a minute. Works on every Webflow plan.</p>
-  </div>
+  </div><div class="dotgrid" aria-hidden="true"><i class="b"></i><i class="n"></i><i class="o"></i><i class="n"></i><i class="b"></i><i class="n"></i><i class="o"></i><i class="n"></i><i class="o"></i><i class="b"></i><i class="n"></i><i class="n"></i><i class="o"></i><i class="c"></i><i class="o"></i><i class="n"></i><i class="n"></i><i class="b"></i><i class="o"></i><i class="n"></i><i class="n"></i></div></div></div>
 </section>
 </main>
 
-<footer><div class="wrap"><span>AI SEO Deck by Silit Labs</span><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span><span>Brands in the examples are made up.</span><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span></div></footer>
+<footer class="foot"><div class="wrap"><div class="footgrid"><div class="fbrand"><a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#F1F2FF"/><circle cx="11" cy="11" r="4" fill="#E8C300"/><circle cx="21" cy="11" r="4" fill="none" stroke="#2F5BFF" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="#8A93B8"/><circle cx="21" cy="21" r="4" fill="#E8C300" stroke="#2F5BFF" stroke-width="2.4"/></svg>AI SEO Deck</a><p>Keyword by keyword, see whether ChatGPT, Google AI, Gemini, Perplexity, Claude and Grok recommend you, then fix your Webflow site. Made by Silit Labs.</p></div><nav class="fcol" aria-label="Product"><b>Product</b><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="/docs">Docs</a><a href="/login">Sign in</a></nav><nav class="fcol" aria-label="Company"><b>Company</b><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span></nav></div><div class="fnote"><span>Brands in the examples are made up.</span><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span></div></div></footer>
 
 <script>
 (function () {
