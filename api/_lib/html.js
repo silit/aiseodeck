@@ -34,9 +34,9 @@ const siteHref = (site, extra) => '/app/site?id=' + encodeURIComponent(site.id) 
 const kwHref = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(k.id) + (extra ? '&' + extra : '');
 
 const CSS = `
-:root{--bg:#0D1130;--bg2:#10153A;--panel:#141A45;--panel2:#1A2153;--lift:#212A63;--line:#283070;--line2:#1E2560;--ink:#F1F2FF;--muted:#A6ABD4;--faint:#6F76AE;
---mark:#FFE45C;--mark-ink:#1B1600;--mark-ring:transparent;--mark-text:#FFE45C;--cite:#86AEFF;--cite-soft:rgba(134,174,255,.14);--rival:#FF93A8;--good:#5DE3A9;--good-soft:rgba(93,227,169,.13);--bad:#FF8080;--bad-soft:rgba(255,128,128,.13);--warn:#FFC25C;--warn-soft:rgba(255,194,92,.13);
---shadow:0 30px 80px -40px rgba(3,6,30,.9);--sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
+:root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#8087A6;
+--mark:#F3D46E;--mark-ink:#2A2200;--mark-ring:transparent;--mark-text:#F3D46E;--cite:#93B3F2;--cite-soft:rgba(147,179,242,.15);--rival:#EE9DB0;--good:#74D3AA;--good-soft:rgba(116,211,170,.14);--bad:#EE8C8C;--bad-soft:rgba(238,140,140,.14);--warn:#EDC57A;--warn-soft:rgba(237,197,122,.14);
+--shadow:0 24px 60px -36px rgba(8,10,25,.6);--sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
 @media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#868CAE;
 --mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#8F6E00;--cite:#2F5BFF;--cite-soft:#E6ECFF;--rival:#C2335A;--good:#138A5A;--good-soft:#E2F5EB;--bad:#C93C34;--bad-soft:#FBE8E6;--warn:#9A6400;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
 *{box-sizing:border-box}
@@ -184,7 +184,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:860px;font-variant-numeri
 .lane .lh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .lane .lh b{font-size:15px;min-width:110px}
 .sig{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
-.sig.st-b,.sig.st-n{background:var(--mark);box-shadow:0 0 0 4px rgba(255,228,92,.16)}
+.sig.st-b,.sig.st-n{background:var(--mark);box-shadow:0 0 0 4px rgba(243,212,110,.14)}
 .sig.st-i{background:transparent;box-shadow:inset 0 0 0 2.5px var(--cite)}
 .sig.st-o{background:transparent;box-shadow:inset 0 0 0 2px var(--faint)}
 .answer{display:grid;gap:7px;padding:10px 0 10px 20px;border-left:2px solid var(--line2);margin-left:4px}
@@ -272,7 +272,6 @@ svg.chart{width:100%;height:auto;display:block}
 svg.chart .gl{stroke:var(--line2);stroke-width:1}
 svg.chart .ax{font-size:11px;fill:var(--faint);font-family:var(--sans)}
 svg.chart .ln{fill:none;stroke:var(--mark);stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
-svg.chart .ar{fill:var(--mark);opacity:.12}
 svg.chart .pt{fill:var(--panel);stroke:var(--mark);stroke-width:1.8}
 svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:none}
 .progress{height:6px;border-radius:999px;background:var(--line2);overflow:hidden;margin-top:10px}
@@ -321,7 +320,7 @@ function layout(title, body, opts) {
     ? `<nav aria-label="Main"><a href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Settings</a><a href="/logout">Sign out</a></nav>`
     : `<nav aria-label="Main"><a href="/">Home</a><a href="/docs">Docs</a><a href="/login">Sign in</a></nav>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(title)}</title>
-<meta name="theme-color" content="#0D1130"><link rel="icon" href="/favicon.png">${FONTS}
+<meta name="theme-color" content="#1E2336"><link rel="icon" href="/favicon.png">${FONTS}
 <style>${CSS}</style></head><body>
 <header class="top"><div class="wrap"><a class="brand" href="${opts.user ? '/app' : (opts.brandName ? '#' : '/')}">${opts.brandName ? '' : LOGO}<span>${opts.brandName ? esc(opts.brandName) : 'AI SEO Deck'}</span></a>${opts.plain ? '' : nav}</div></header>
 <main class="wrap">${body}
@@ -374,7 +373,7 @@ function delta(trend) {
 function lineChart(points, opts) {
   opts = opts || {};
   const pts = (points || []).filter((p) => typeof p[1] === 'number').slice(-12);
-  const W = opts.w || 520, H = opts.h || 150, L = 34, R = 12, T = 12, B = 24;
+  const W = opts.w || 520, H = opts.h || 150, L = 42, R = 12, T = 12, B = 24;
   const y = (v) => T + ((100 - v) * (H - T - B)) / 100;
   const day = (t) => new Date(t).toISOString().slice(5, 10).replace('-', '/');
   const grid = [0, 50, 100].map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="ax">${v}%</text>`).join('');
@@ -387,7 +386,8 @@ function lineChart(points, opts) {
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
   const area = d + ` L${x(pts.length - 1).toFixed(1)} ${H - B} L${x(0).toFixed(1)} ${H - B} Z`;
   const dots = pts.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="${i === pts.length - 1 ? 4.5 : 3}" class="pt"><title>${esc(day(p[0]))}: ${p[1]}%</title></circle>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of answers that name you, from ${pts[0][1]}% to ${pts[pts.length - 1][1]}% over ${pts.length} checks">${grid}<path d="${area}" class="ar"/><path d="${d}" class="ln"/>${dots}<text x="${L}" y="${H - 6}" class="ax">${esc(day(pts[0][0]))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="ax">${esc(day(pts[pts.length - 1][0]))}</text></svg>`;
+  const gid = 'g' + Math.random().toString(36).slice(2, 8);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of answers that name you, from ${pts[0][1]}% to ${pts[pts.length - 1][1]}% over ${pts.length} checks"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--mark);stop-opacity:.32"/><stop offset="1" style="stop-color:var(--mark);stop-opacity:0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${gid})"/><path d="${d}" class="ln"/>${dots}<text x="${L}" y="${H - 6}" class="ax">${esc(day(pts[0][0]))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="ax">${esc(day(pts[pts.length - 1][0]))}</text></svg>`;
 }
 function verdictText(sum, brand) {
   const k = engineCounts(sum);
