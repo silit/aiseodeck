@@ -16,7 +16,10 @@ const auditLib = require('./_lib/audit');
 const fetcher = require('./_lib/fetcher');
 const billing = require('./_lib/billing');
 const email = require('./_lib/email');
-const { limitsFor } = require('./_lib/plans');
+const kwLib = require('./_lib/keywords');
+const analyze = require('./_lib/analyze');
+const insights = require('./_lib/insights');
+const { limitsFor, QUESTIONS } = require('./_lib/plans');
 const { seal, open, random, timingEqual } = require('./_lib/crypto');
 const crypto = require('crypto');
 const net = require('net');
@@ -127,11 +130,16 @@ async function currentUser(req) {
 }
 const sessionCookie = (userId) => cookie(COOKIE, seal({ u: userId, exp: Date.now() + SESSION_TTL * 1000 }), SESSION_TTL);
 
+// /auth?kw=... comes from the keyword box on the home page: the keyword waits in a cookie until the site is set up.
 async function handleAuth(req, res) {
   const env = ENV();
+  const kw = kwLib.clean(queryOf(req).kw || '');
+  if (kw && (await currentUser(req))) return redirect(res, '/app?kw=' + encodeURIComponent(kw));
   if (!env.clientId || !env.appUrl) return send(res, 500, html.errorPage('Not configured', 'WEBFLOW_CLIENT_ID and APP_URL must be set.', '/'));
   const state = random(16);
-  redirect(res, wf.authorizeUrl({ clientId: env.clientId, redirectUri: env.appUrl + '/callback', state }), { 'Set-Cookie': cookie('ad_state', state, 600) });
+  const cookies = [cookie('ad_state', state, 600)];
+  if (kw) cookies.push(cookie('ad_kw', kw, 3600));
+  redirect(res, wf.authorizeUrl({ clientId: env.clientId, redirectUri: env.appUrl + '/callback', state }), { 'Set-Cookie': cookies });
 }
 
 async function handleCallback(req, res) {
@@ -175,12 +183,14 @@ async function handleCallback(req, res) {
     if (!still) { const removed = await store.removeConnection(user, old.id); if (removed) await wf.revokeToken({ clientId: env.clientId, clientSecret: env.clientSecret, token: store.tokenOf(removed) }); }
   }
   await store.saveUser(user);
-  res.setHeader('Set-Cookie', [sessionCookie(user.id), cookie('ad_state', '', 0)]);
+  const kw = kwLib.clean(c.ad_kw || '');
+  res.setHeader('Set-Cookie', [sessionCookie(user.id), cookie('ad_state', '', 0), cookie('ad_kw', '', 0)]);
+  const kwq = kw ? '&kw=' + encodeURIComponent(kw) : '';
   // One new site and nothing set up yet: go straight to its setup
   const sites = await store.getSites(user.siteIds);
   const notReady = sites.filter((s) => !s.project.ready);
-  if (!notices.length && sites.length === 1 && notReady.length === 1) return redirect(res, '/app/setup?id=' + encodeURIComponent(notReady[0].id));
-  redirect(res, '/app' + (notices.length ? '?' + noticeQuery(user, notices.join(' ')) : added ? '?added=' + added : ''));
+  if (!notices.length && sites.length === 1 && notReady.length === 1) return redirect(res, '/app/setup?id=' + encodeURIComponent(notReady[0].id) + kwq);
+  redirect(res, '/app?' + (notices.length ? noticeQuery(user, notices.join(' ')) : added ? 'added=' + added : '') + kwq);
 }
 
 /* ---------- helpers for site pages ---------- */
@@ -206,14 +216,6 @@ function parseRivals(text) {
   }
   return out;
 }
-function cleanPrompts(lines) {
-  const out = [];
-  for (const l of lines) {
-    const t = String(l || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-    if (t.length >= 8 && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
-  }
-  return out;
-}
 function applyProjectFields(site, b) {
   const p = site.project;
   const brand = String(b.brand || '').trim().slice(0, 80);
@@ -225,35 +227,89 @@ function applyProjectFields(site, b) {
   p.country = /^[A-Z]{2}$/.test(String(b.country || '')) ? String(b.country) : '';
   p.language = /^[a-z]{2}$/.test(String(b.language || '')) ? String(b.language) : (p.language || 'en');
 }
+const KW_SOURCES = ['manual', 'idea', 'aio', 'search'];
+const newKeyword = (text, source) => ({ id: random(6).replace(/[^A-Za-z0-9]/g, 'x'), text, questions: [], volume: null, source: KW_SOURCES.includes(source) ? source : 'manual', page: '', at: Date.now(), fixedAt: null });
+const kwInput = (v) => kwLib.cleanList(String(v || '').split(/[\n,]/), 60);
 
-const monthOf = (t) => new Date(t || Date.now()).toISOString().slice(0, 7);
-function manualUsed(site, now) { const m = site.sched && site.sched.manual; return m && m.month === monthOf(now) ? m.n || 0 : 0; }
-function canRun(site, limits, now) {
-  if (site.sched && site.sched.runId) return { ok: false, why: '' };
-  if (!(site.prompts || []).length) return { ok: false, why: 'Add questions first.' };
-  if (!engines.enabled().length) return { ok: false, why: 'No AI engine is connected yet.' };
-  if (!site.tracked) return { ok: false, why: site.pausedByUser ? 'Tracking is paused. Resume it in Setup.' : 'Your plan has no free site slot for this site.' };
-  if (!site.sched.firstRunDone) return { ok: true };
-  if (!limits.manualPerMonth) return { ok: false, why: 'Checks on demand are part of the paid plans. The next automatic check runs on schedule.' };
-  const used = manualUsed(site, now);
-  if (used >= limits.manualPerMonth) return { ok: false, why: `You used this month's ${limits.manualPerMonth} extra checks. The weekly check still runs on schedule.` };
-  return { ok: true, left: limits.manualPerMonth - used };
+// Writes the questions and monthly searches of new keywords. Without an AI provider a keyword is asked as itself.
+async function prepareKeywords(siteId, user, ids) {
+  const site = await store.getSite(siteId);
+  if (!site) return;
+  const kws = (site.keywords || []).filter((k) => ids.includes(k.id));
+  if (!kws.length) return;
+  const qs = {};
+  if (llm.available()) {
+    for (let i = 0; i < kws.length; i += 20) {
+      try { Object.assign(qs, await fixes.questionsFor(site.project, kws.slice(i, i + 20).map((k) => k.text), QUESTIONS)); } catch (e) { console.error('[aiseodeck] questions', e.message); }
+    }
+  }
+  let vols = {};
+  const needVol = kws.filter((k) => k.volume == null).map((k) => k.text);
+  if (needVol.length && kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400))) {
+    try { vols = await kwLib.volumes(needVol, site.project.country, site.project.language); } catch (e) { console.error('[aiseodeck] volumes', e.message); }
+  }
+  await store.updateSite(siteId, (s) => {
+    for (const k of s.keywords || []) {
+      if (!ids.includes(k.id)) continue;
+      if (!(k.questions || []).length) k.questions = qs[k.text] && qs[k.text].length ? qs[k.text] : [k.text];
+      if (vols[k.text] && vols[k.text].volume != null) k.volume = vols[k.text].volume;
+    }
+  });
 }
 
-// The run whose answers we show: the one in progress when there is no finished run yet, else the latest finished one.
-async function shownRun(site) {
-  const activeId = site.sched && site.sched.runId;
-  if (!site.latest && activeId) {
-    const run = await store.getRun(activeId);
-    if (run) return { run, results: await store.results(activeId) };
+// The free first check of keywords just added, within the month's allowance; otherwise they wait for the schedule.
+async function checkNewKeywords(site, user, ids) {
+  const limits = user._limits || limitsFor(user);
+  if (!site.project.ready || !site.tracked || !site.sched.firstRunDone) return '';
+  const used = store.usageOf(user).newChecks;
+  if (used + ids.length > limits.newChecks) return 'New keywords this month are past your plan\'s allowance for instant checks, so they are checked with the next scheduled check.';
+  const r = await jobs.startRun(site, user, 'new', { keywordIds: ids });
+  if (r.error) return r.error;
+  await store.addUsage(user.id, 'newChecks', ids.length);
+  return '';
+}
+
+function canRun(site, limits, usage) {
+  if (site.sched && site.sched.runId) return { ok: false, why: '' };
+  const n = (site.keywords || []).length;
+  if (!n) return { ok: false, why: 'Add keywords first.' };
+  if (!engines.enabled().length) return { ok: false, why: 'No AI engine is connected yet.' };
+  if (!site.tracked) return { ok: false, why: site.pausedByUser ? 'Tracking is paused. Resume it in Settings.' : 'Your plan has no free site slot for this site.' };
+  if (!site.sched.firstRunDone) return { ok: true, cost: 0 };
+  if (!limits.rechecks) return { ok: false, why: 'Checks on demand are part of the paid plans. Every keyword is still checked on schedule.' };
+  const left = Math.max(0, limits.rechecks - ((usage && usage.rechecks) || 0));
+  if (left < n) return { ok: false, why: `Checking all ${n} keywords needs ${n} keyword checks; ${left} are left this month. Check single keywords from their page.` };
+  return { ok: true, cost: n, left };
+}
+function canCheckKeyword(site, limits, usage) {
+  if (site.sched && site.sched.runId) return { ok: false, why: 'A check is running. This keyword can be checked again when it is done.' };
+  if (!engines.enabled().length) return { ok: false, why: 'No AI engine is connected yet.' };
+  if (!site.tracked) return { ok: false, why: site.pausedByUser ? 'Tracking is paused. Resume it in Settings.' : 'Your plan has no free site slot for this site.' };
+  if (!limits.rechecks) return { ok: false, why: 'Checks on demand are part of the paid plans. This keyword is still checked on schedule.' };
+  const left = Math.max(0, limits.rechecks - ((usage && usage.rechecks) || 0));
+  if (!left) return { ok: false, why: `You used this month's ${limits.rechecks} keyword checks. The scheduled check still runs.` };
+  return { ok: true, left };
+}
+async function runProgress(site) {
+  if (!site.sched || !site.sched.runId) return { progress: null, running: [] };
+  const active = await store.getRun(site.sched.runId);
+  return { progress: { total: active ? active.total : 0, done: await store.resultCount(site.sched.runId) }, running: active ? (active.keywords || []).map((k) => k.id) : [] };
+}
+// The page a keyword should rank with: the one the user chose, or the best match among the audited pages.
+function targetFor(k, audit) {
+  if (!audit || k.page === 'new') return null;
+  const pages = audit.pages || [];
+  if (k.page) {
+    const row = pages.find((p) => p.path === k.page);
+    if (row) return { path: row.path, pageId: row.pageId || '', static: !!row.pageId, score: 1, row };
   }
-  if (site.latest && site.latest.runId) {
-    const run = await store.getRun(site.latest.runId);
-    const results = await store.results(site.latest.runId);
-    if (run) return { run, results };
-    return { run: { prompts: site.prompts || [], engines: site.latest.engines || [] }, results };
-  }
-  return { run: { prompts: site.prompts || [], engines: [] }, results: {} };
+  const m = kwLib.matchPage(k.text, pages);
+  return m ? Object.assign(m, { row: pages.find((p) => p.path === m.path) }) : null;
+}
+function backUrl(site, back, extra) {
+  const b = String(back || '');
+  if (b.startsWith('k:') && (site.keywords || []).some((k) => k.id === b.slice(2))) return '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(b.slice(2)) + (extra ? '&' + extra : '');
+  return siteUrl(site, 'tab=' + (['discover', 'keywords', 'insights', 'settings', 'audit'].includes(b) ? b : 'keywords') + (extra ? '&' + extra : ''));
 }
 
 /* ---------- app pages ---------- */
@@ -261,9 +317,17 @@ async function handleApp(req, res, user) {
   const q = queryOf(req);
   await store.enforceLimit(user);
   const sites = await store.getSites(user.siteIds || []);
+  const kw = kwLib.clean(q.kw || '');
+  if (kw) {
+    // a keyword from the home page: open the one site it can go to
+    const ready = sites.filter((s) => s.project.ready);
+    if (ready.length === 1) return redirect(res, siteUrl(ready[0], 'tab=keywords&kw=' + encodeURIComponent(kw)));
+    if (!ready.length && sites.length === 1) return redirect(res, '/app/setup?id=' + encodeURIComponent(sites[0].id) + '&kw=' + encodeURIComponent(kw));
+  }
   let notice = html.esc(noticeFrom(q, user));
   const added = parseInt(q.added, 10);
   if (added > 0) notice = `${added} site${added === 1 ? '' : 's'} connected. Set one up to start checking.`;
+  if (kw && !notice) notice = `Open a site to track "${html.esc(kw)}".`;
   if (user.notice) { notice = html.esc(user.notice); delete user.notice; await store.saveUser(user); }
   send(res, 200, html.dashboard(user, sites, user._limits, notice, { enginesOn: engines.enabled() }));
 }
@@ -276,26 +340,40 @@ async function handleSetupPage(req, res, user) {
     const r = await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 3500, maxBytes: 400000 });
     if (r.ok) { const lang = (auditLib.readPage(r.text).lang || '').slice(0, 2).toLowerCase(); if (/^[a-z]{2}$/.test(lang)) site.project.language = lang; }
   }
-  send(res, 200, html.setupPage(user, site, user._limits, { usedElsewhere: await store.promptCount(user, site.id), notice: html.esc(noticeFrom(q, user)) }));
+  send(res, 200, html.setupPage(user, site, user._limits, { usedElsewhere: await store.keywordCount(user, site.id), notice: html.esc(noticeFrom(q, user)), prefill: kwLib.clean(q.kw || '') }));
+}
+
+// Keyword ideas from the homepage and the keywords where Google's AI Overviews already cite the site, with volumes.
+async function discoverFor(site, user) {
+  const out = { at: Date.now(), cited: [], ideas: [], error: '' };
+  const p = site.project;
+  const labs = kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400));
+  if (labs) {
+    const dom = (p.domains || [])[0] || hostOfUrl(site.url);
+    try { out.cited = (await kwLib.inAiOverviews(dom, p.country, p.language, 40)).map((x) => ({ keyword: x.keyword, volume: x.volume })); }
+    catch (e) { out.error = 'Keyword data is not available right now (' + e.message + ').'; }
+  }
+  if (llm.available() && (await store.rateOk('suggest:' + user.id, 20, 3600))) {
+    const r = site.url ? await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 8000 }) : { ok: false };
+    const home = r.ok ? auditLib.readPage(r.text) : { title: site.name, description: '', text: '' };
+    try {
+      const ideas = await fixes.suggestKeywords(p, home, 12);
+      let vols = {};
+      if (labs && ideas.length) { try { vols = await kwLib.volumes(ideas, p.country, p.language); } catch (e) { vols = {}; } }
+      out.ideas = ideas.filter((k) => !out.cited.some((c) => c.keyword === k)).map((k) => ({ keyword: k, volume: vols[k] ? vols[k].volume : null }));
+    } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
+  }
+  return out;
 }
 
 async function handleSetupSuggest(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
-  if (!site) return json(res, 404, { prompts: [] });
-  const cached = await store.getDraft(site.id, 'prompts');
-  if (cached && cached.list && cached.list.length) return json(res, 200, { prompts: cached.list });
-  if (!llm.available() || !(await store.rateOk('suggest:' + user.id, 20, 3600))) return json(res, 200, { prompts: [] });
-  const r = site.url ? await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 8000 }) : { ok: false };
-  const home = r.ok ? auditLib.readPage(r.text) : { title: site.name, description: '', text: '' };
-  try {
-    const listOut = await fixes.suggestPrompts(site.project, home, 12);
-    await store.saveDraft(site.id, 'prompts', { list: listOut, at: Date.now() });
-    json(res, 200, { prompts: listOut });
-  } catch (e) {
-    console.error('[aiseodeck] suggest prompts', e.message);
-    json(res, 200, { prompts: [] });
-  }
+  if (!site) return json(res, 404, { ideas: [], cited: [] });
+  if (site.discover && site.discover.at > Date.now() - 7 * 86400000 && (site.discover.ideas || []).concat(site.discover.cited || []).length) return json(res, 200, { ideas: site.discover.ideas || [], cited: site.discover.cited || [] });
+  const d = await discoverFor(site, user);
+  await store.updateSite(site.id, (s) => { s.discover = d; });
+  json(res, 200, { ideas: d.ideas, cited: d.cited });
 }
 
 async function handleSetupSave(req, res, user) {
@@ -303,50 +381,52 @@ async function handleSetupSave(req, res, user) {
   const site = await ownedSite(user, b.id);
   if (!site) return notFound(res);
   const limits = user._limits;
-  const room = Math.max(0, limits.prompts - (await store.promptCount(user, site.id)));
-  const picked = cleanPrompts(list(b.pick).concat(String(b.own || '').split('\n')));
+  const room = Math.max(0, limits.keywords - (await store.keywordCount(user, site.id)));
+  const picked = kwLib.cleanList(list(b.pick).concat(String(b.own || '').split(/[\n,]/)), 200);
   const kept = picked.slice(0, room);
+  const disc = site.discover || {};
+  const sourceOf = (t) => ((disc.cited || []).some((x) => x.keyword === t) ? 'aio' : (disc.ideas || []).some((x) => x.keyword === t) ? 'idea' : 'manual');
+  const volOf = (t) => { const x = (disc.cited || []).concat(disc.ideas || []).find((y) => y.keyword === t); return x && x.volume != null ? x.volume : null; };
+  let fresh = [];
   let updated = await store.updateSite(site.id, (s) => {
     applyProjectFields(s, b);
-    const old = s.prompts || [];
-    s.prompts = kept.map((t) => old.find((o) => o.text === t) || { id: random(6), text: t, at: Date.now() });
+    const old = s.keywords || [];
+    s.keywords = kept.map((t) => old.find((o) => o.text === t) || Object.assign(newKeyword(t, sourceOf(t)), { volume: volOf(t) }));
+    fresh = s.keywords.filter((k) => !old.includes(k)).map((k) => k.id);
+    for (const id of Object.keys(s.kw || {})) if (!s.keywords.some((k) => k.id === id)) delete s.kw[id];
     s.project.ready = true;
     s.pausedByUser = false;
   });
   if (!updated) return notFound(res);
+  if (fresh.length) await prepareKeywords(site.id, user, fresh);
   await store.enforceLimit(user);
   updated = await store.getSite(site.id);
   const notes = [];
-  if (picked.length > kept.length) notes.push(`Your plan allows ${limits.prompts} questions across your sites, so ${picked.length - kept.length} were left out.`);
+  if (picked.length > kept.length) notes.push(`Your plan tracks ${limits.keywords} keywords across your sites, so ${picked.length - kept.length} were left out.`);
   if (!updated.tracked) notes.push(`Your plan tracks ${limits.sites} site${limits.sites === 1 ? '' : 's'}. Pause another site or upgrade to check this one.`);
-  else if (updated.prompts.length && !updated.sched.runId && !updated.sched.firstRunDone) {
+  else if (updated.keywords.length && !updated.sched.runId && !updated.sched.firstRunDone) {
     const r = await jobs.startRun(updated, user, 'first');
     if (r.error) notes.push(r.error);
   }
-  redirect(res, siteUrl(updated, notes.length ? noticeQuery(user, notes.join(' ')) : ''));
+  redirect(res, siteUrl(updated, 'tab=keywords' + (notes.length ? '&' + noticeQuery(user, notes.join(' ')) : '')));
 }
 
 async function handleSitePage(req, res, user) {
   const q = queryOf(req);
   const site = await ownedSite(user, q.id);
   if (!site) return notFound(res);
-  if (!site.project.ready) return redirect(res, '/app/setup?id=' + encodeURIComponent(site.id));
-  const tab = ['answers', 'transcripts', 'rivals', 'sources', 'audit', 'setup'].includes(q.tab) ? q.tab : 'answers';
-  const shown = await shownRun(site);
-  let progress = null;
-  if (site.sched.runId) {
-    const active = await store.getRun(site.sched.runId);
-    progress = { total: active ? active.total : 0, done: await store.resultCount(site.sched.runId) };
-  }
+  if (!site.project.ready) return redirect(res, '/app/setup?id=' + encodeURIComponent(site.id) + (q.kw ? '&kw=' + encodeURIComponent(kwLib.clean(q.kw)) : ''));
+  const tab = ['keywords', 'discover', 'insights', 'audit', 'settings'].includes(q.tab) ? q.tab : (q.tab === 'setup' ? 'settings' : q.tab === 'rivals' || q.tab === 'sources' ? 'insights' : 'keywords');
+  const limits = user._limits;
+  const { progress, running } = await runProgress(site);
   const hist = await store.history(site.id, 12);
-  const shownEngines = shown.run.engines || [];
-  const locked = engines.lockedFor(user._limits).filter((e) => !shownEngines.includes(e));
   const audit = tab === 'audit' ? await store.getAudit(site.id) : null;
   let notice = html.esc(noticeFrom(q, user));
   if (q.saved) notice = 'Saved.';
+  const room = Math.max(0, limits.keywords - (await store.keywordCount(user)));
   send(res, 200, html.sitePage(user, site, {
-    tab, limits: user._limits, prompts: shown.run.prompts || [], engines: shownEngines, results: shown.results, progress, locked, history: hist,
-    prev: hist[1] || null, audit, notice, canRun: canRun(site, user._limits, Date.now())
+    tab, limits, progress, running, history: hist, audit, notice, room, prefill: kwLib.clean(q.kw || ''),
+    engines: engines.forLimits(limits), locked: engines.lockedFor(limits), canRun: canRun(site, limits, store.usageOf(user))
   }));
 }
 
@@ -354,18 +434,14 @@ async function handleRun(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
   if (!site) return notFound(res);
-  const can = canRun(site, user._limits, Date.now());
+  const can = canRun(site, user._limits, store.usageOf(user));
   if (!can.ok) return redirect(res, siteUrl(site, can.why ? noticeQuery(user, can.why) : ''));
-  const manual = !!site.sched.firstRunDone;
-  const r = await jobs.startRun(site, user, manual ? 'manual' : 'first');
-  if (!r.error && manual) {
-    const now = Date.now();
-    await store.updateSite(site.id, (s) => { const n = manualUsed(s, now); s.sched.manual = { month: monthOf(now), n: n + 1 }; });
-  }
+  const r = await jobs.startRun(site, user, site.sched.firstRunDone ? 'manual' : 'first');
+  if (!r.error && can.cost) await store.addUsage(user.id, 'rechecks', can.cost);
   redirect(res, siteUrl(site, r.error ? noticeQuery(user, r.error) : ''));
 }
 
-// Called by the open site page while a run is going: does a slice of the work, reports progress.
+// Called by an open site or keyword page while a check is going: does a slice of the work, reports progress.
 async function handlePump(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
@@ -392,25 +468,262 @@ async function handleSiteSettings(req, res, user) {
     country: String(b.bcountry || '').trim().slice(0, 60)
   };
   await store.updateSite(site.id, (s) => { applyProjectFields(s, b); s.project.business = biz; });
-  redirect(res, siteUrl(site, 'tab=setup&saved=1'));
+  redirect(res, siteUrl(site, 'tab=settings&saved=1'));
 }
 
-async function handlePrompts(req, res, user) {
+/* ---------- keywords ---------- */
+async function handleKeywordsAdd(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
   if (!site) return notFound(res);
-  let note = '';
-  if (b.action === 'remove') {
-    await store.updateSite(site.id, (s) => { s.prompts = (s.prompts || []).filter((p) => p.id !== String(b.pid)); });
-  } else {
-    const room = Math.max(0, user._limits.prompts - (await store.promptCount(user)));
-    const existing = (site.prompts || []).map((p) => p.text.toLowerCase());
-    const fresh = cleanPrompts(String(b.text || '').split('\n')).filter((t) => !existing.includes(t.toLowerCase()));
-    const add = fresh.slice(0, room);
-    if (fresh.length > add.length) note = `Your plan allows ${user._limits.prompts} questions across your sites. ${fresh.length - add.length} were not added.`;
-    await store.updateSite(site.id, (s) => { s.prompts = (s.prompts || []).concat(add.map((t) => ({ id: random(6), text: t, at: Date.now() }))); });
+  const limits = user._limits;
+  const texts = kwInput(b.text);
+  const existing = (site.keywords || []).map((k) => k.text);
+  const fresh = texts.filter((t) => !existing.includes(t));
+  const room = Math.max(0, limits.keywords - (await store.keywordCount(user)));
+  const add = fresh.slice(0, room);
+  const notes = [];
+  if (texts.length && !fresh.length) notes.push(texts.length === 1 ? `"${texts[0]}" is already tracked.` : 'Those keywords are already tracked.');
+  if (fresh.length > add.length) notes.push(`Your plan tracks ${limits.keywords} keywords across your sites${add.length ? `, so ${fresh.length - add.length} were left out` : ''}. Remove a keyword or upgrade to add more.`);
+  if (!add.length) return redirect(res, backUrl(site, b.back, notes.length ? noticeQuery(user, notes.join(' ')) : ''));
+  const made = add.map((t) => newKeyword(t, b.source));
+  await store.updateSite(site.id, (s) => { s.keywords = (s.keywords || []).concat(made.filter((k) => !s.keywords.some((o) => o.text === k.text))); });
+  await prepareKeywords(site.id, user, made.map((k) => k.id));
+  const fresher = await store.getSite(site.id);
+  const why = await checkNewKeywords(fresher, user, made.map((k) => k.id));
+  if (why) notes.push(why);
+  // one keyword typed in: open it, the answers come in there
+  if (made.length === 1 && (b.back === 'keywords' || !b.back)) return redirect(res, '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(made[0].id) + (notes.length ? '&' + noticeQuery(user, notes.join(' ')) : ''));
+  notes.unshift(made.length === 1 ? `Tracking "${made[0].text}".` : `Tracking ${made.length} new keywords.`);
+  redirect(res, backUrl(site, b.back, noticeQuery(user, notes.join(' '))));
+}
+
+async function keywordContext(user, siteId, kid) {
+  const site = await ownedSite(user, siteId);
+  if (!site) return {};
+  const k = (site.keywords || []).find((x) => x.id === String(kid || ''));
+  return { site, k };
+}
+const kwUrl = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(k.id) + (extra ? '&' + extra : '');
+
+async function handleKeywordPage(req, res, user) {
+  const q = queryOf(req);
+  const { site, k } = await keywordContext(user, q.id, q.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords&' + noticeQuery(user, 'That keyword is no longer tracked.')));
+  const limits = user._limits;
+  const sum = site.kw && site.kw[k.id];
+  const { progress, running } = await runProgress(site);
+  let run = null, results = {};
+  const runId = running.includes(k.id) && !sum ? site.sched.runId : sum && sum.runId;
+  if (runId) { run = await store.getRun(runId); results = await store.results(runId); }
+  const audit = await store.getAudit(site.id);
+  const target = targetFor(k, audit);
+  const draft = (await store.getDraft(site.id, 'kwfix:' + k.id)) || {};
+  const related = await store.getDraft(site.id, 'rel:' + k.id);
+  let collections = [];
+  const token = store.tokenForSite(user, site);
+  if (token && (draft.at || k.page === 'new' || (audit && !target))) { try { collections = (await wf.listCollections(token, site.id)).slice(0, 30); } catch (e) { collections = []; } }
+  send(res, 200, html.keywordPage(user, site, k, {
+    notice: html.esc(noticeFrom(q, user)), limits, progress, running, run, results, target, draft, related: related ? related.list : null, collections,
+    pages: audit ? audit.pages : null, origin: audit ? audit.origin : (site.url || ''), engines: engines.forLimits(limits), locked: run ? [] : engines.lockedFor(limits),
+    labs: kwLib.available(), canCheck: canCheckKeyword(site, limits, store.usageOf(user))
+  }));
+}
+
+async function handleKeywordCheck(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  const can = canCheckKeyword(site, user._limits, store.usageOf(user));
+  if (!can.ok) return redirect(res, kwUrl(site, k, noticeQuery(user, can.why)));
+  const r = await jobs.startRun(site, user, 'recheck', { keywordIds: [k.id] });
+  if (r.error) return redirect(res, kwUrl(site, k, noticeQuery(user, r.error)));
+  await store.addUsage(user.id, 'rechecks', 1);
+  redirect(res, kwUrl(site, k));
+}
+
+async function handleKeywordQuestions(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  const qs = [];
+  for (const l of String(b.questions || '').split('\n')) { const t = l.replace(/\s+/g, ' ').trim().slice(0, 200); if (t.length >= 4 && !qs.includes(t)) qs.push(t); }
+  await store.updateSite(site.id, (s) => { const x = s.keywords.find((y) => y.id === k.id); if (x) x.questions = qs.slice(0, QUESTIONS).length ? qs.slice(0, QUESTIONS) : [x.text]; });
+  redirect(res, kwUrl(site, k, noticeQuery(user, qs.length > QUESTIONS ? `Saved the first ${QUESTIONS} questions. They are used from the next check.` : 'Questions saved. They are used from the next check.')));
+}
+
+async function handleKeywordRemove(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k || b.sure !== '1') return redirect(res, k ? kwUrl(site, k) : siteUrl(site, 'tab=keywords'));
+  await store.updateSite(site.id, (s) => {
+    s.keywords = (s.keywords || []).filter((x) => x.id !== k.id);
+    delete s.kw[k.id];
+    s.sched.pendingKw = (s.sched.pendingKw || []).filter((id) => id !== k.id);
+    if (s.latest) {
+      const sum = analyze.siteSummary(s.project, s.keywords, s.kw);
+      Object.assign(s.latest, sum, { gaps: insights.gaps(s.keywords, s.kw) });
+    }
+  });
+  redirect(res, siteUrl(site, 'tab=keywords&' + noticeQuery(user, `Stopped tracking "${k.text}".`)));
+}
+
+async function handleKeywordTarget(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  const audit = await store.getAudit(site.id);
+  const path = String(b.path || '');
+  const ok = path === 'new' || path === '' || ((audit && audit.pages) || []).some((p) => p.path === path);
+  if (!ok) return redirect(res, kwUrl(site, k));
+  await store.updateSite(site.id, (s) => { const x = s.keywords.find((y) => y.id === k.id); if (x) x.page = path; });
+  await store.saveDraft(site.id, 'kwfix:' + k.id, {});
+  redirect(res, kwUrl(site, k));
+}
+
+// Writes the fixes for a keyword from the page itself (or a new page from the site's own text).
+async function handleKeywordPlan(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  const back = (t) => redirect(res, kwUrl(site, k, noticeQuery(user, t)));
+  if (!llm.available()) return back('Writing fixes needs an AI provider, which is not connected yet.');
+  if (!(await store.rateOk('fixai:' + user.id, 30, 3600))) return back('That is a lot of suggestions for one hour. Try again a bit later.');
+  const audit = await store.getAudit(site.id);
+  if (!audit) return back('Run the site audit first, so we know your pages.');
+  const target = targetFor(k, audit);
+  const allowed = siteHosts(site).concat(hostOfUrl(audit.origin));
+  const draft = { at: Date.now() };
+  try {
+    if (!target) {
+      const paths = ['/'].concat((audit.pages || []).filter((p) => p.ok && p.path !== '/' && !p.noindex).slice(0, 3).map((p) => p.path));
+      let source = '';
+      for (const p of paths) { const r = await fetcher.getText(audit.origin + p, { allowedHosts: allowed, timeoutMs: 7000 }); if (r.ok) source += '\n' + auditLib.readPage(r.text).text.slice(0, 2500); }
+      if (source.trim().length < 200) return back('Your pages have too little text to draft from. Add content first.');
+      draft.newPage = await fixes.suggestNewPage(site.project, k.text, k.questions, source);
+    } else {
+      const r = await fetcher.getText(audit.origin + target.path, { allowedHosts: allowed, timeoutMs: 9000 });
+      if (!r.ok) return back('The page could not be read right now (' + (r.error || 'HTTP ' + r.status) + ').');
+      const page = Object.assign(auditLib.readPage(r.text), { path: target.path });
+      const qs = (k.questions || []).concat(((site.kw[k.id] || {}).queries || []).slice(0, 3));
+      const [meta, faq] = await Promise.all([fixes.suggestMeta(site.project, page, k.text), fixes.suggestFaq(site.project, page, qs).catch(() => [])]);
+      draft.meta = meta; draft.faq = faq; draft.path = target.path;
+    }
+  } catch (e) { return back('No suggestion this time: ' + e.message); }
+  await store.saveDraft(site.id, 'kwfix:' + k.id, draft);
+  redirect(res, kwUrl(site, k, noticeQuery(user, 'Fixes ready. Review them, change what you like, then apply.')));
+}
+
+async function addCmsItems(token, site, collectionId, items) {
+  const cols = await wf.listCollections(token, site.id);
+  const col = cols.find((c) => c.id === String(collectionId || ''));
+  if (!col) return { error: 'Pick one of this site\'s CMS collections.' };
+  const full = await wf.getCollection(token, col.id);
+  const fields = (full && full.fields) || [];
+  const textField = fields.find((f) => /answer|antwort|cevap|reponse|respuesta|body|content|post|text/i.test(f.displayName || f.slug || '') && ['RichText', 'PlainText'].includes(f.type) && !['name', 'slug'].includes(f.slug))
+    || fields.find((f) => f.type === 'RichText') || fields.find((f) => f.type === 'PlainText' && !['name', 'slug'].includes(f.slug));
+  if (!textField) return { error: `${col.displayName} has no text field. Add a Rich text field, then try again.` };
+  let made = 0;
+  for (const it of items) {
+    const slug = (it.slug || it.name).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) + '-' + random(3).toLowerCase().replace(/[^a-z0-9]/g, 'x');
+    await wf.createDraftItem(token, col.id, { name: it.name, slug, [textField.slug]: textField.type === 'RichText' ? it.html : it.text });
+    made++;
   }
-  redirect(res, siteUrl(site, 'tab=setup&' + (note ? noticeQuery(user, note) : 'saved=1')));
+  return { made, name: col.displayName };
+}
+
+// One click: the fixes the user kept go to Webflow as unpublished changes and CMS drafts.
+async function handleKeywordApply(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  const back = (t) => redirect(res, kwUrl(site, k, noticeQuery(user, t)));
+  if (!user._limits.canApply) return back('Applying to Webflow is part of the paid plans. Copy the text into Webflow instead.');
+  const token = store.tokenForSite(user, site);
+  if (!token) return back('The Webflow connection for this site is missing. Connect again.');
+  const draft = (await store.getDraft(site.id, 'kwfix:' + k.id)) || {};
+  const done = [];
+  try {
+    if (b.what === 'newpage') {
+      const np = draft.newPage;
+      if (!np) return back('Draft the page first.');
+      const htmlBody = '<p>' + html.esc(np.intro) + '</p>' + np.faq.map((x) => '<h3>' + html.esc(x.q) + '</h3><p>' + html.esc(x.a) + '</p>').join('');
+      const text = np.intro + '\n\n' + np.faq.map((x) => x.q + '\n' + x.a).join('\n\n');
+      const r = await addCmsItems(token, site, b.collection, [{ name: np.title, slug: np.slug, html: htmlBody, text }]);
+      if (r.error) return back(r.error);
+      done.push(`a draft page in ${r.name}`);
+    } else {
+      const audit = await store.getAudit(site.id);
+      const target = targetFor(k, audit);
+      if (!target) return back('Choose the page for this keyword first.');
+      const row = target.row;
+      const pairs = parseFaq(b.faq);
+      if (b.do_meta === '1') {
+        const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+        const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (title.length < 5 || description.length < 20) return back('Write a title of at least 5 characters and a description of at least 20.');
+        if (target.pageId) {
+          await wf.updatePageSeo(token, target.pageId, { title, description });
+          row.title = title; row.description = description;
+          row.issues = (row.issues || []).filter((x) => !/^(title|desc)_/.test(x));
+          done.push('the title and description');
+        }
+        draft.meta = { title, description };
+      }
+      if (b.do_schema === '1' && pairs.length && target.pageId) {
+        if (pairs.length < 2) return back('FAQ schema needs at least two questions and answers.');
+        let existing = null;
+        try { const s = await wf.getSchema(token, target.pageId); existing = s && (s.jsonLdSchema || null); } catch (e) { existing = null; }
+        await wf.putSchema(token, target.pageId, fixes.mergeSchema(existing, [fixes.faqSchema(pairs)]));
+        row.schemaTypes = [...new Set((row.schemaTypes || []).concat('FAQPage'))];
+        row.issues = (row.issues || []).filter((x) => x !== 'schema_missing' && x !== 'faq_no_schema');
+        done.push('FAQ schema');
+      }
+      if (b.do_cms === '1' && pairs.length) {
+        const r = await addCmsItems(token, site, b.collection, pairs.map((p) => ({ name: p.q, html: '<p>' + html.esc(p.a) + '</p>', text: p.a })));
+        if (r.error) return back(r.error);
+        done.push(`${r.made} answer${r.made === 1 ? '' : 's'} as drafts in ${r.name}`);
+      }
+      if (pairs.length) draft.faq = pairs;
+      if (audit) await store.saveAudit(site.id, audit);
+    }
+  } catch (e) { return webflowFailed(res, user, site, e, kwUrl(site, k)); }
+  if (!done.length) return back('Nothing was selected to apply.');
+  await store.saveDraft(site.id, 'kwfix:' + k.id, draft);
+  await store.updateSite(site.id, (s) => { const x = s.keywords.find((y) => y.id === k.id); if (x) x.fixedAt = Date.now(); });
+  back(`Applied ${andList(done)}. Publish your site in Webflow, then check the keyword again.`);
+}
+function andList(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+
+async function handleKeywordRelated(req, res, user) {
+  const b = await readBody(req);
+  const { site, k } = await keywordContext(user, b.id, b.k);
+  if (!site) return notFound(res);
+  if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
+  if (!kwLib.available()) return redirect(res, kwUrl(site, k, noticeQuery(user, 'Keyword data is not connected on the server yet.')));
+  if (!(await store.rateOk('labs:' + user.id, 80, 86400))) return redirect(res, kwUrl(site, k, noticeQuery(user, 'That is a lot of keyword lookups for one day. Try again tomorrow.')));
+  let items = [];
+  try { items = await kwLib.related(k.text, site.project.country, site.project.language, 15); }
+  catch (e) { return redirect(res, kwUrl(site, k, noticeQuery(user, e.message))); }
+  await store.saveDraft(site.id, 'rel:' + k.id, { list: items, at: Date.now() });
+  redirect(res, kwUrl(site, k));
+}
+
+async function handleDiscover(req, res, user) {
+  const b = await readBody(req);
+  const site = await ownedSite(user, b.id);
+  if (!site) return notFound(res);
+  if (!(await store.rateOk('discover:' + site.id, 6, 86400))) return redirect(res, siteUrl(site, 'tab=discover&' + noticeQuery(user, 'Keywords were looked up several times today. Try again tomorrow.')));
+  const d = await discoverFor(site, user);
+  await store.updateSite(site.id, (s) => { s.discover = d; });
+  redirect(res, siteUrl(site, 'tab=discover'));
 }
 
 async function handleTrack(req, res, user) {
@@ -420,20 +733,22 @@ async function handleTrack(req, res, user) {
   const on = b.on === '1';
   if (on && !site.tracked) {
     const count = (await store.getSites(user.siteIds || [])).filter((s) => s.tracked).length;
-    if (count >= user._limits.sites) return redirect(res, siteUrl(site, 'tab=setup&' + noticeQuery(user, `Your plan tracks ${user._limits.sites} site${user._limits.sites === 1 ? '' : 's'}. Pause another site or upgrade.`)));
+    if (count >= user._limits.sites) return redirect(res, siteUrl(site, 'tab=settings&' + noticeQuery(user, `Your plan tracks ${user._limits.sites} site${user._limits.sites === 1 ? '' : 's'}. Pause another site or upgrade.`)));
   }
   await store.updateSite(site.id, (s) => { s.tracked = on; s.pausedByUser = !on; });
-  redirect(res, siteUrl(site, 'tab=setup&saved=1'));
+  redirect(res, siteUrl(site, 'tab=settings&saved=1'));
 }
 
 async function handleAudit(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
   if (!site) return notFound(res);
-  if (!(await store.rateOk('audit:' + site.id, 3, 600))) return redirect(res, siteUrl(site, 'tab=audit&' + noticeQuery(user, 'The audit ran a moment ago. Try again in a few minutes.')));
+  const k = b.back && (site.keywords || []).find((x) => x.id === String(b.back));
+  const backTo = (extra) => (k ? kwUrl(site, k, extra) : siteUrl(site, 'tab=audit' + (extra ? '&' + extra : '')));
+  if (!(await store.rateOk('audit:' + site.id, 3, 600))) return redirect(res, backTo(noticeQuery(user, 'The audit ran a moment ago. Try again in a few minutes.')));
   try { await jobs.runAudit(site, user, 40000); }
-  catch (e) { return redirect(res, siteUrl(site, 'tab=audit&' + noticeQuery(user, 'The audit could not finish: ' + e.message))); }
-  redirect(res, siteUrl(site, 'tab=audit'));
+  catch (e) { return redirect(res, backTo(noticeQuery(user, 'The audit could not finish: ' + e.message))); }
+  redirect(res, backTo(k ? noticeQuery(user, 'Your pages are read. The best page for this keyword is shown below.') : ''));
 }
 
 async function handleLlms(req, res, user) {
@@ -513,7 +828,7 @@ async function handleFixSuggest(req, res, user) {
   const draft = (await store.getDraft(site.id, key)) || {};
   try {
     if (b.what === 'faq') {
-      const qs = (site.prompts || []).map((p) => p.text);
+      const qs = (site.keywords || []).flatMap((k) => k.questions || []);
       draft.faq = await fixes.suggestFaq(site.project, page, qs);
       if (!draft.faq.length) return redirect(res, back + '&' + noticeQuery(user, 'The page does not have enough content to answer questions. Add content first.'));
     } else {
@@ -652,7 +967,7 @@ async function handleSettingsPage(req, res, user) {
   const q = queryOf(req);
   const sites = await store.getSites(user.siteIds || []);
   const notice = q.upgraded ? 'Thanks! Your plan updates as soon as the payment is confirmed, usually within a minute.' : (q.saved ? 'Saved.' : html.esc(noticeFrom(q, user)));
-  send(res, 200, html.settingsPage(user, sites, user._limits, notice, { billing: await billing.canCheckout(user), providerName: 'Polar' }));
+  send(res, 200, html.settingsPage(user, sites, user._limits, notice, { billing: await billing.canCheckout(user), providerName: 'Polar', usage: store.usageOf(user) }));
 }
 async function handleSettingsSave(req, res, user) {
   const b = await readBody(req);
@@ -747,9 +1062,9 @@ async function handleReport(req, res, token) {
   const site = siteId ? await store.getSite(siteId) : null;
   if (!site || site.settings.reportToken !== token) return gone();
   const owner = await store.getUser(site.userId);
-  const shown = await shownRun(site);
   const hist = await store.history(site.id, 12);
-  send(res, 200, html.reportPage(owner, site, { prompts: shown.run.prompts || [], engines: shown.run.engines || [], results: shown.results, history: hist, prev: hist[1] || null, whiteLabel: owner ? limitsFor(owner).whiteLabel : false }),
+  const used = [...new Set(Object.values(site.kw || {}).flatMap((x) => Object.keys((x && x.eng) || {})))];
+  send(res, 200, html.reportPage(owner, site, { engines: used.length ? used : (site.latest && site.latest.engines) || [], history: hist, whiteLabel: owner ? limitsFor(owner).whiteLabel : false }),
     { 'X-Robots-Tag': 'noindex', 'Cache-Control': 'public, max-age=0, s-maxage=120' });
 }
 
@@ -794,7 +1109,16 @@ module.exports = async function handler(req, res) {
       if (r === 'POST /app/site/run') return await handleRun(req, res, user);
       if (r === 'POST /app/run/pump') return await handlePump(req, res, user);
       if (r === 'POST /app/site/settings') return await handleSiteSettings(req, res, user);
-      if (r === 'POST /app/site/prompts') return await handlePrompts(req, res, user);
+      if (r === 'POST /app/keywords') return await handleKeywordsAdd(req, res, user);
+      if (r === 'GET /app/keyword') return await handleKeywordPage(req, res, user);
+      if (r === 'POST /app/keyword/check') return await handleKeywordCheck(req, res, user);
+      if (r === 'POST /app/keyword/questions') return await handleKeywordQuestions(req, res, user);
+      if (r === 'POST /app/keyword/remove') return await handleKeywordRemove(req, res, user);
+      if (r === 'POST /app/keyword/page') return await handleKeywordTarget(req, res, user);
+      if (r === 'POST /app/keyword/plan') return await handleKeywordPlan(req, res, user);
+      if (r === 'POST /app/keyword/apply') return await handleKeywordApply(req, res, user);
+      if (r === 'POST /app/keyword/related') return await handleKeywordRelated(req, res, user);
+      if (r === 'POST /app/discover') return await handleDiscover(req, res, user);
       if (r === 'POST /app/site/track') return await handleTrack(req, res, user);
       if (r === 'POST /app/site/audit') return await handleAudit(req, res, user);
       if (r === 'POST /app/site/report') return await handleReportLink(req, res, user);
@@ -818,4 +1142,4 @@ module.exports = async function handler(req, res) {
     return send(res, 500, html.errorPage('Something went wrong', (e && e.message) || 'Unexpected error.', '/'));
   }
 };
-module.exports._test = { parseFaq, parseRivals, cleanPrompts, canRun, manualUsed };
+module.exports._test = { parseFaq, parseRivals, canRun, canCheckKeyword, targetFor };

@@ -3,274 +3,650 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AI SEO Deck: every AI answer about you, in one place</title>
-<meta name="description" content="See whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend your brand, all in one place. Then fix your Webflow site so they do.">
+<title>AI SEO Deck: does AI recommend you?</title>
+<meta name="description" content="Type a keyword and see whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend you. Then fix your Webflow site in one click and track every keyword week by week.">
 <link rel="icon" href="/favicon.png">
 <meta property="og:title" content="AI SEO Deck: every AI, one deck">
-<meta property="og:description" content="Track your brand across seven AI answer engines and fix your Webflow site for AI search.">
+<meta property="og:description" content="Keyword by keyword, see whether seven AI engines recommend you, then fix your Webflow site in one click.">
 <meta property="og:image" content="/og.png">
+<meta name="theme-color" content="#0D1130">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
 <style>
-:root{--paper:#F5F6F8;--surface:#FFFFFF;--ink:#10162B;--muted:#5C6478;--line:#E2E5EC;--soft:#EEF0F4;--mark:#FFE066;--mark-ink:#10162B;--cite:#2D5BFF;--cite-soft:#E7EDFF;--slate:#8A93A6;--good:#1C8F5A;--bad:#C93C34;--warn-soft:#FFF3D6;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--paper:#0D1120;--surface:#151A2C;--ink:#EAEDF6;--muted:#9AA3B8;--line:#262D44;--soft:#1C2236;--mark:#FFD84D;--cite:#7D9BFF;--cite-soft:#1D2750;--slate:#6B748C;--good:#4FD08F;--bad:#FF8077;--warn-soft:#352A12;color-scheme:dark}}
+:root{
+  --bg:#0D1130;--bg2:#10153A;--panel:#141A45;--panel2:#1A2153;--lift:#212A63;
+  --line:#283070;--line2:#1E2560;--grid:rgba(140,155,255,.07);
+  --ink:#F1F2FF;--muted:#A6ABD4;--faint:#6F76AE;
+  --mark:#FFE45C;--mark-ink:#1B1600;--cite:#86AEFF;--cite-soft:rgba(134,174,255,.14);
+  --rival:#FF93A8;--good:#5DE3A9;--bad:#FF8080;
+  --sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
 a{color:var(--cite);text-underline-offset:3px}
-a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--cite);outline-offset:3px}
-h1,h2,h3{margin:0;letter-spacing:-.025em;line-height:1.05;text-wrap:balance}
-h1{font-size:clamp(46px,7vw,92px);font-weight:800;letter-spacing:-.045em}
-h2{font-size:clamp(28px,3.4vw,40px);font-weight:800}
-h3{font-size:19px;font-weight:700;letter-spacing:-.01em}
+:focus-visible{outline:2px solid var(--mark);outline-offset:3px;border-radius:6px}
+h1,h2,h3{margin:0;text-wrap:balance;font-stretch:112%}
+h1{font-size:clamp(44px,6.6vw,92px);line-height:.95;font-weight:820;letter-spacing:-.04em;font-stretch:114%}
+h2{font-size:clamp(31px,4.2vw,52px);line-height:1.02;font-weight:780;letter-spacing:-.03em}
+h3{font-size:19px;line-height:1.25;font-weight:700;letter-spacing:-.01em;font-stretch:104%}
 p{margin:0}
-.top{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
-.brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-.top nav{display:flex;gap:22px;align-items:center;font-weight:600;font-size:15px}
-.top nav a{color:var(--ink);text-decoration:none}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:700;font-size:16px;padding:13px 20px;border-radius:12px;text-decoration:none;border:1px solid var(--line);color:var(--ink);background:var(--surface);cursor:pointer}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-stretch:87.5%;font-weight:400;letter-spacing:-.01em}
+
+/* header */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:rgba(13,17,48,.82);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.top.scrolled{border-bottom-color:var(--line2)}
+.top .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:14px;padding-bottom:14px}
+.brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
+.top nav{display:flex;gap:24px;align-items:center;font-weight:600;font-size:15px}
+.top nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+.top nav a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:700;font-size:16px;line-height:1.2;padding:14px 22px;border-radius:12px;text-decoration:none;border:1px solid var(--line);color:var(--ink);background:var(--panel);cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.btn:hover{background:var(--panel2);border-color:var(--faint)}
 .btn.mark{background:var(--mark);border-color:var(--mark);color:var(--mark-ink)}
-.btn.sm{padding:8px 14px;font-size:14.5px;border-radius:10px}
-.hero{display:grid;grid-template-columns:1fr 1.02fr;gap:52px;align-items:center;padding:44px 0 64px}
-.hero .lede{font-size:clamp(17px,1.6vw,20px);color:var(--muted);margin:24px 0 30px;max-width:44ch}
-.hero .lede b{color:var(--ink);font-weight:600}
-.note{font-size:14px;color:var(--muted);margin-top:14px}
-.actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn.mark:hover{background:#FFEB85;border-color:#FFEB85}
+.btn.sm{padding:9px 15px;font-size:14.5px;border-radius:10px}
+.top nav .btn{color:var(--mark-ink)}
 
-/* the demo: one question, every engine */
-.demo{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px;display:grid;gap:16px;box-shadow:0 30px 60px -40px rgba(16,22,43,.35);min-width:0}
-.ask{justify-self:end;background:var(--ink);color:var(--paper);border-radius:16px 16px 4px 16px;padding:10px 15px;font-weight:600;max-width:92%}
-.etabs{display:flex;gap:6px;flex-wrap:wrap}
-.etabs::-webkit-scrollbar{display:none}
-.etab{font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:6px 11px;display:inline-flex;gap:7px;align-items:center;white-space:nowrap;cursor:pointer}
-.etab[aria-selected=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.st{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
-.st.named{background:var(--mark)}.st.both{background:var(--mark);box-shadow:inset 0 0 0 2px var(--cite)}.st.none{background:var(--slate);opacity:.55;width:6px;height:6px}
-.who{display:flex;gap:10px;align-items:center;font-size:13.5px;font-weight:700;flex-wrap:wrap;min-height:26px}
-.pill{display:inline-flex;font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--soft);color:var(--muted)}
-.pill.mark{background:var(--mark);color:var(--mark-ink)}.pill.cite{background:var(--cite-soft);color:var(--cite)}
-.quote{font-family:Newsreader,Georgia,serif;font-size:19px;line-height:1.6;min-height:4.8em}
-mark{color:inherit;padding:0 2px;border-radius:2px;background:linear-gradient(var(--mark),var(--mark)) no-repeat 0 55%/100% 76%}
-@media (prefers-reduced-motion:no-preference){.fresh mark{animation:sweep 700ms 120ms cubic-bezier(.3,.7,.2,1) both}@keyframes sweep{from{background-size:0 76%}to{background-size:100% 76%}}}
-.rival{text-decoration:underline dotted var(--slate) 2px;text-underline-offset:3px}
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:56px 56px;background-position:-1px -1px;-webkit-mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 55%,transparent 100%);mask-image:linear-gradient(#000 0%,rgba(0,0,0,.6) 55%,transparent 100%);pointer-events:none}
+.hero::after{content:"";position:absolute;left:50%;top:44%;width:min(1100px,120vw);height:640px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(120,150,255,.20),transparent);pointer-events:none}
+.hero .wrap{position:relative;z-index:1}
+.hero-text{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:28px 56px;align-items:end;padding:72px 0 44px}
+.hero-text .lede{font-size:clamp(17px,1.5vw,19.5px);line-height:1.6;color:var(--muted);max-width:46ch}
+.hero-text .lede b{color:var(--ink);font-weight:600}
+.hero-side{display:grid;gap:22px;padding-bottom:8px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.note{font-size:14px;color:var(--faint)}
+
+/* the deck (live demo) */
+.deck{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel) 120px);border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 50px 120px -40px rgba(3,6,30,.9);margin-bottom:96px;min-width:0}
+.deck-bar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line2)}
+.kw{flex:1 1 360px;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 16px;min-width:0}
+.kw:focus-within{border-color:var(--cite)}
+.kw svg{flex:none;color:var(--faint)}
+.kw label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.kw input{flex:1;min-width:0;background:transparent;border:0;color:var(--ink);font:inherit;font-size:18px;font-weight:600;padding:8px 0;outline:none}
+.kw input::placeholder{color:var(--faint);font-weight:500}
+.kw .btn{padding:11px 18px;font-size:15px}
+.tries{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px;color:var(--faint)}
+.try{font:inherit;font-size:13.5px;font-weight:600;color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.try:hover{color:var(--ink);border-color:var(--faint)}
+.try[aria-pressed=true]{color:var(--ink);background:var(--lift);border-color:var(--lift)}
+.lanes{list-style:none;margin:0;padding:6px 0}
+.lane{position:relative;display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:center;padding:13px 20px;min-height:66px;border-top:1px solid var(--line2)}
+.lane:first-child{border-top:0}
+.lane .eng{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.sig{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none;transition:background .3s,box-shadow .3s}
+.lane.named .sig{background:var(--mark);box-shadow:0 0 0 4px rgba(255,228,92,.14)}
+.lane.none .sig{background:transparent;box-shadow:inset 0 0 0 2px var(--faint)}
+.lane.na .sig{background:transparent;box-shadow:inset 0 0 0 2px var(--line)}
+.lane .body{min-width:0;display:grid;gap:4px}
+.lane .q{font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lane .q b{font-weight:500;color:var(--muted)}
+.lane .say{font-size:15px;line-height:1.5;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:1.5em}
+.lane .say.wait{color:var(--faint)}
+.lane .res{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;border-radius:999px;padding:4px 10px;white-space:nowrap;border:1px solid transparent}
+.pill.named{background:var(--mark);color:var(--mark-ink)}
+.pill.none{border-color:var(--line);color:var(--muted)}
+.pill.cite{background:var(--cite-soft);color:var(--cite)}
+.pill.na{border:1px dashed var(--line);color:var(--faint)}
+mark{color:inherit;padding:0 2px;border-radius:3px;background:linear-gradient(var(--mark),var(--mark)) no-repeat 0 60%/100% 80%;color:var(--mark-ink)}
+.rival{color:var(--rival);text-decoration:underline dotted rgba(255,147,168,.55) 1.5px;text-underline-offset:3px}
+.scan{position:absolute;left:0;bottom:-1px;height:2px;width:100%;background:linear-gradient(90deg,transparent,var(--cite),transparent);background-size:40% 100%;background-repeat:no-repeat;opacity:0}
+.lane.busy .scan{opacity:1;animation:scan 1.1s linear infinite}
+@keyframes scan{from{background-position:-40% 0}to{background-position:140% 0}}
+.lane.busy .say{color:var(--faint)}
+.fresh mark{animation:sweep .7s .1s cubic-bezier(.3,.7,.2,1) both}
+@keyframes sweep{from{background-size:0 80%}to{background-size:100% 80%}}
+.verdict{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 28px;align-items:center;padding:20px;border-top:1px solid var(--line);background:rgba(8,11,36,.35);border-radius:0 0 21px 21px}
+.vnum{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.04em;font-stretch:118%;font-variant-numeric:tabular-nums}
+.vnum small{font-size:22px;color:var(--faint);font-weight:700;letter-spacing:-.02em}
+.vtext{display:grid;gap:4px;min-width:0}
+.vtext strong{font-size:18px;font-weight:700}
+.vtext span{font-size:14px;color:var(--muted)}
+.verdict[data-state=wait] .vnum,.verdict[data-state=wait] .vtext{opacity:.45}
+.example{font-size:12.5px;color:var(--faint);margin-left:auto}
+
+/* sections */
+section{padding:112px 0;border-top:1px solid var(--line2)}
+.sec-head{display:grid;gap:16px;max-width:64ch;margin-bottom:48px}
+.sec-head p{color:var(--muted);font-size:18.5px;line-height:1.6}
+
+/* how a keyword is checked */
+.flow{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr);gap:0;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.stage{position:relative;padding:24px 22px 26px;display:grid;gap:14px;align-content:start;border-left:1px solid var(--line2)}
+.stage:first-child{border-left:0}
+.stage:not(:last-child)::after{content:"";position:absolute;right:-7px;top:50%;width:12px;height:12px;background:var(--panel);border-top:1px solid var(--line);border-right:1px solid var(--line);transform:translateY(-50%) rotate(45deg);z-index:1}
+.stage h3{font-size:15px;color:var(--muted);font-weight:600;font-stretch:100%}
+.chipkw{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;justify-self:start}
+.bubbles{display:grid;gap:8px}
+.bubble{background:var(--lift);border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14.5px;line-height:1.45}
+.bubble.g{background:transparent;border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--muted)}
+.bubble.g b{color:var(--ink);font-weight:600}
+.engs{display:flex;flex-wrap:wrap;gap:6px}
+.engs span{font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--bg)}
+.score{display:grid;gap:6px}
+.score .big{font-size:56px;line-height:1;font-weight:800;letter-spacing:-.04em;font-stretch:118%;color:var(--mark)}
+.score span{font-size:14px;color:var(--muted)}
+.why{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin-top:36px}
+.why p{color:var(--muted);font-size:15.5px}
+.why h3{margin-bottom:8px}
+
+/* deck table */
+.tablecard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:8px 0 4px;overflow-x:auto}
+table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeric:tabular-nums}
+.kt th{font-size:12.5px;color:var(--faint);font-weight:600;text-align:center;padding:14px 8px 12px;white-space:nowrap}
+.kt th:first-child,.kt td:first-child{text-align:left;padding-left:22px}
+.kt th:last-child,.kt td:last-child{padding-right:22px}
+.kt td{border-top:1px solid var(--line2);padding:14px 8px;text-align:center;font-size:14.5px}
+.kt td.k{font-weight:700;font-size:15px;white-space:nowrap}
+.kt td.v{color:var(--muted);text-align:right}
+.kt th.v{text-align:right}
+.c{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:middle}
+.c.n{background:var(--mark)}
+.c.b{background:var(--mark);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--cite)}
+.c.ci{box-shadow:inset 0 0 0 2.5px var(--cite)}
+.c.o{width:6px;height:6px;background:var(--faint);opacity:.7}
+.c.x{width:12px;height:2px;border-radius:2px;background:var(--line)}
+.vis{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+.vis i{display:block;width:64px;height:6px;border-radius:999px;background:var(--line2);overflow:hidden;position:relative}
+.vis i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--mark);border-radius:inherit}
+.trend{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+.trend svg{display:block}
+.up{color:var(--good);font-weight:700;font-size:13.5px}
+.down{color:var(--bad);font-weight:700;font-size:13.5px}
+.flat{color:var(--faint);font-weight:700;font-size:13.5px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px;color:var(--muted);margin-top:18px}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+
+/* fix plan */
+.fixgrid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:56px;align-items:start}
+.fixgrid .points{display:grid;gap:26px}
+.fixgrid .points p{color:var(--muted)}
+.plan-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.plan-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line2)}
+.plan-head strong{font-size:17px}
+.plan-head .muted{font-size:14px}
+.fx{list-style:none;margin:0;padding:0}
+.fx li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:14px;padding:18px 22px;border-top:1px solid var(--line2)}
+.fx li:first-child{border-top:0}
+.tick{width:24px;height:24px;border-radius:8px;border:1.5px solid var(--line);display:grid;place-items:center;margin-top:1px;transition:background .25s,border-color .25s}
+.tick svg{opacity:0;transition:opacity .2s}
+.fx li.done .tick{background:var(--good);border-color:var(--good)}
+.fx li.done .tick svg{opacity:1}
+.fx li.manual .tick{border-style:dashed}
+.fx h3{font-size:16px;font-stretch:100%}
+.fx p{font-size:14.5px;color:var(--muted);margin-top:4px}
+.diff{display:grid;gap:6px;margin-top:10px;font-size:14px}
+.diff div{display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;align-items:baseline}
+.diff span{color:var(--faint);font-size:12.5px}
+.diff s{color:var(--faint);text-decoration-color:rgba(255,128,128,.6)}
+.diff b{font-weight:600}
+.status{font-size:13px;color:var(--good);font-weight:600;margin-top:6px;display:none}
+.fx li.done .status{display:block}
+.plan-foot{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 22px;border-top:1px solid var(--line);background:rgba(8,11,36,.35)}
+.plan-foot p{font-size:14px;color:var(--muted);flex:1 1 260px}
+
+/* related keywords */
+.rel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px}
+.box h3{margin-bottom:6px}
+.box > p{color:var(--muted);font-size:14.5px;margin-bottom:14px}
+.rk{list-style:none;margin:0;padding:0}
+.rk li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line2);font-variant-numeric:tabular-nums}
+.rk li:first-child{border-top:0}
+.rk .kwt{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .vol{color:var(--muted);font-size:14px;text-align:right}
+.track{font:inherit;font-size:13.5px;font-weight:700;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px 12px;cursor:pointer;min-width:92px}
+.track[aria-pressed=true]{background:var(--mark);border-color:var(--mark);color:var(--mark-ink)}
+.queries{display:flex;flex-wrap:wrap;gap:8px}
+.queries span{font-family:var(--mono);font-stretch:87.5%;font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--bg)}
+
+/* insights */
+.ins{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-top:1px solid var(--line2)}
+.ins > div{padding:28px 28px 8px 0;display:grid;gap:14px;align-content:start}
+.ins > div + div{padding-left:28px;border-left:1px solid var(--line2)}
+.ins p{color:var(--muted);font-size:15px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--muted)}
-.chip.own{background:var(--cite-soft);color:var(--cite);border-color:transparent;font-weight:700}
-.rowline{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
-.rowline .dots{display:flex;gap:8px}
-.dot{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center}
-.dot.named{background:var(--mark)}.dot.both{background:var(--mark);box-shadow:inset 0 0 0 2.5px var(--cite)}.dot.none::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--slate);opacity:.55}
-.dot.cur{outline:2px solid var(--ink);outline-offset:2px}
+.chip{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted)}
+.sent{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line2)}
+.sent i{display:block;height:100%}.sent .pos{background:var(--good)}.sent .neu{background:var(--faint)}.sent .neg{background:var(--bad)}
+.hosts{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:14px}
+.hosts li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.hosts li span:first-child{font-family:var(--mono);font-stretch:87.5%;font-size:12.5px}
+.hosts li span:last-child{color:var(--faint);font-variant-numeric:tabular-nums}
+.gapline{display:grid;gap:8px;font-size:14.5px}
+.gapline b{font-weight:700}
 
-.engines{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:6px 0 0}
-.engines span{font-weight:700;font-size:15px;border:1px solid var(--line);border-radius:999px;padding:7px 14px;background:var(--surface)}
-section{padding:76px 0;border-top:1px solid var(--line)}
-.sec-head{display:grid;gap:12px;max-width:62ch;margin-bottom:36px}
-.sec-head p{color:var(--muted);font-size:18px}
-.gridcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;overflow-x:auto}
-table.grid{border-collapse:collapse;width:100%;min-width:760px}
-.grid th{font-size:13px;color:var(--muted);font-weight:700;text-align:center;padding:0 6px 12px;white-space:nowrap}
-.grid th:first-child{text-align:left}
-.grid td{border-top:1px solid var(--line);padding:9px 6px;text-align:center}
-.grid td:first-child{text-align:left;font-size:15px}
-.cell{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;font-weight:800;font-size:12.5px;color:var(--mark-ink);vertical-align:middle}
-.cell.named{background:var(--mark)}.cell.both{background:var(--mark);box-shadow:inset 0 0 0 3px var(--cite)}.cell.cited{box-shadow:inset 0 0 0 3px var(--cite)}
-.cell.none::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--slate);opacity:.55}
-.cell.na::before{content:"";width:10px;height:2px;border-radius:2px;background:var(--line)}
-.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13.5px;color:var(--muted);margin-top:16px}
-.legend .cell{width:16px;height:16px;margin-right:6px}
-.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:grid;gap:12px;align-content:start}
-.card p{color:var(--muted);font-size:15.5px}
-.sent{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--soft)}
-.sent i{display:block;height:100%}.sent .pos{background:var(--good)}.sent .neu{background:var(--slate);opacity:.6}.sent .neg{background:var(--bad)}
-.gap{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:6px;font-size:14.5px}
-.gap b{font-weight:700}
-.fixes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 48px}
-.fix{padding:22px 0;border-top:1px solid var(--line);display:grid;gap:8px}
-.fix p{color:var(--muted)}
-.fix code{font-size:14px;background:var(--soft);border-radius:6px;padding:1px 6px}
-ol.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;counter-reset:s}
-ol.steps li{display:grid;gap:10px;align-content:start}
-ol.steps li::before{counter-increment:s;content:counter(s);width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-weight:800}
-ol.steps p{color:var(--muted)}
+/* pricing */
 .plans{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-.plan{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:grid;gap:10px;align-content:start}
-.plan.pick{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.price{font-size:34px;font-weight:800;letter-spacing:-.03em}
-.price span{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0}
-.plan ul{margin:0;padding-left:18px;color:var(--muted);font-size:15px;display:grid;gap:4px}
-details{border-top:1px solid var(--line);padding:18px 0}
-details:last-child{border-bottom:1px solid var(--line)}
-summary{font-weight:700;font-size:18px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.plan{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.plan.pick{border-color:var(--mark);box-shadow:0 0 0 1px var(--mark) inset}
+.plan h3{font-size:18px}
+.price{font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1;font-stretch:115%}
+.price span{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;font-stretch:100%}
+.kwcount{font-size:15px;font-weight:700}
+.kwcount b{font-size:22px;font-weight:800;color:var(--mark);font-stretch:112%}
+.plan ul{margin:0;padding:0;list-style:none;color:var(--muted);font-size:14.5px;display:grid;gap:7px}
+.plan li{display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px}
+.plan li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint);margin-top:9px}
+.plan .btn{margin-top:auto}
+.plan ul{margin-bottom:6px}
+.fine{font-size:14px;color:var(--faint);margin-top:20px;max-width:80ch}
+
+/* faq */
+.faq details{max-width:860px}
+details{border-top:1px solid var(--line2);padding:20px 0}
+details:last-child{border-bottom:1px solid var(--line2)}
+summary{font-weight:700;font-size:18px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
 summary::-webkit-details-marker{display:none}
-summary::after{content:"+";font-weight:400;color:var(--muted)}
-details[open] summary::after{content:"−"}
-details p{color:var(--muted);margin-top:10px;max-width:70ch}
-.cta{display:grid;justify-items:start;gap:18px}
-footer{border-top:1px solid var(--line);padding:26px 0 40px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 22px}
+summary svg{flex:none;color:var(--faint);transition:transform .2s}
+details[open] summary svg{transform:rotate(45deg)}
+details p{color:var(--muted);margin-top:12px;max-width:72ch}
+
+.cta{text-align:left;display:grid;gap:26px;justify-items:start}
+.cta h2{font-size:clamp(40px,6vw,80px);font-stretch:118%;letter-spacing:-.04em}
+footer{border-top:1px solid var(--line2);padding:28px 0 44px;font-size:14px;color:var(--faint)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:8px 22px}
 footer a{color:var(--muted)}
-@media(max-width:960px){.hero{grid-template-columns:1fr;gap:34px;padding-top:24px}.plans{grid-template-columns:repeat(2,minmax(0,1fr))}.fixes{grid-template-columns:1fr}ol.steps{grid-template-columns:1fr}.three{grid-template-columns:1fr}}
-@media(max-width:560px){.plans{grid-template-columns:1fr}.top nav a.hide-s{display:none}.demo{padding:16px}.quote{font-size:17.5px;min-height:6.4em}}
+
+@media (max-width:1020px){
+  .hero-text{grid-template-columns:1fr;gap:26px;padding-top:48px}
+  .lane{grid-template-columns:120px minmax(0,1fr);}
+  .lane .res{grid-column:2;justify-content:flex-start}
+  .flow{grid-template-columns:1fr 1fr}
+  .stage:nth-child(3){border-left:0}
+  .stage:nth-child(n+3){border-top:1px solid var(--line2)}
+  .stage:nth-child(2)::after{display:none}
+  .why{grid-template-columns:1fr;gap:22px}
+  .fixgrid,.rel{grid-template-columns:1fr;gap:28px}
+  .ins{grid-template-columns:1fr}
+  .ins > div,.ins > div + div{padding:24px 0;border-left:0;border-top:1px solid var(--line2)}
+  .ins > div:first-child{border-top:0}
+  .plans{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  section{padding:76px 0}
+  .top nav a.hide-s{display:none}
+  .top nav{gap:16px}
+  .deck{margin-bottom:64px;border-radius:18px}
+  .deck-bar{padding:14px}
+  .kw input{font-size:16.5px}
+  .lane{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:14px}
+  .lane .eng{grid-column:1;grid-row:1}
+  .lane .res{grid-column:2;grid-row:1}
+  .lane .body{grid-column:1 / -1;grid-row:2}
+  .lane .q{display:none}
+  .verdict{grid-template-columns:auto minmax(0,1fr);padding:16px}
+  .verdict .btn{grid-column:1 / -1;justify-self:start}
+  .vnum{font-size:38px}
+  .flow{grid-template-columns:1fr}
+  .stage{border-left:0;border-top:1px solid var(--line2)}
+  .stage:first-child{border-top:0}
+  .stage::after{display:none}
+  .plans{grid-template-columns:1fr}
+  .rk li{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}
+  .rk .vol{grid-column:1;grid-row:2;text-align:left}
+  .rk .track{grid-column:2;grid-row:1 / span 2}
+  .example{margin-left:0;width:100%}
+  .tablecard{padding:0;overflow:visible}
+  table.kt{min-width:0}
+  .kt thead{display:none}
+  .kt tbody,.kt tr{display:block}
+  .kt tr{display:flex;flex-wrap:wrap;align-items:center;padding:16px 16px 14px;border-top:1px solid var(--line2)}
+  .kt tr::before{content:"";flex-basis:100%;height:0;order:2}
+  .kt td.k,.kt td.v:nth-child(2){order:1}
+  .kt td[data-e]{order:3}
+  .kt td.v:nth-last-child(2),.kt td.v:last-child{order:4}
+  .kt tr:first-child{border-top:0}
+  .kt td{border:0;padding:0}
+  .kt td.k{flex:1 1 0;min-width:0;padding:0 12px 12px 0;font-size:15.5px;white-space:normal}
+  .kt td.v:nth-child(2){flex:0 0 auto;margin-left:auto;padding:0 0 12px;font-size:13.5px}
+  .kt td.v:nth-child(2)::after{content:" a month"}
+  .kt td[data-e]{flex:0 0 14.28%;display:grid;grid-template-rows:20px auto;justify-items:center;align-items:center;gap:4px;padding-bottom:12px}
+  .kt td[data-e]::after{content:attr(data-e);font-size:10.5px;color:var(--faint);font-weight:600;white-space:nowrap}
+  .kt td.v:nth-last-child(2){flex:1 1 50%;text-align:left}
+  .kt td.v:nth-last-child(2) .vis{justify-content:flex-start}
+  .kt td.v:last-child{flex:1 1 50%}
+}
+@media (max-width:480px){
+  .top nav .btn{display:none}
+  .brand{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){
+  .lane.busy .scan{animation:none;opacity:0}
+  .fresh mark{animation:none}
+  .btn,.sig,.tick,.tick svg{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header class="top">
-  <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--ink)"/><circle cx="11" cy="11" r="4" fill="var(--mark)"/><circle cx="21" cy="11" r="4" fill="none" stroke="var(--cite)" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="var(--slate)"/><circle cx="21" cy="21" r="4" fill="var(--mark)" stroke="var(--cite)" stroke-width="2.4"/></svg>AI SEO Deck</a>
-  <nav aria-label="Main"><a class="hide-s" href="#pricing">Pricing</a><a class="hide-s" href="/docs">Docs</a><a href="/login">Sign in</a></nav>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#F1F2FF"/><circle cx="11" cy="11" r="4" fill="#E8C300"/><circle cx="21" cy="11" r="4" fill="none" stroke="#2F5BFF" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="#8A93B8"/><circle cx="21" cy="21" r="4" fill="#E8C300" stroke="#2F5BFF" stroke-width="2.4"/></svg>AI SEO Deck</a>
+    <nav aria-label="Main"><a class="hide-s" href="#how">How it works</a><a class="hide-s" href="#pricing">Pricing</a><a class="hide-s" href="/docs">Docs</a><a href="/login">Sign in</a><a class="btn sm mark" href="/auth">Connect Webflow</a></nav>
+  </div>
 </header>
 
 <main>
 <div class="hero">
-  <div>
-    <h1>Every AI.<br>One deck.</h1>
-    <p class="lede">See whether <b>ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok</b> recommend you, all in one place. Then fix your Webflow site so they do.</p>
-    <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#grid">See the grid</a></div>
-    <p class="note">Works on every Webflow plan. The free plan needs no card.</p>
-  </div>
-  <div class="demo" id="demo" aria-label="Example: the same question answered by seven AI engines">
-    <p class="ask">Which bookkeeping app is best for UK freelancers?</p>
-    <div class="etabs" role="tablist" aria-label="AI engines"></div>
-    <div role="tabpanel" id="dpanel" aria-live="polite">
-      <div class="who" id="dwho"></div>
-      <p class="quote" id="dtext"></p>
-      <div class="chips" id="dsrc"></div>
+  <div class="wrap">
+    <div class="hero-text">
+      <h1>Does AI recommend you?</h1>
+      <div class="hero-side">
+        <p class="lede">Type a keyword your customers search for. AI SEO Deck asks <b>ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok</b> the way people do, shows where you are named and where a rival takes your place, then fixes your Webflow site in one click.</p>
+        <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#how">How it works</a></div>
+        <p class="note">Free plan, no card. Works on every Webflow plan.</p>
+      </div>
     </div>
-    <div class="rowline"><span>This question across 7 AI engines</span><span class="dots" id="ddots" aria-hidden="true"></span></div>
+
+    <div class="deck" id="deck">
+      <form class="deck-bar" id="kwform" action="/auth" method="get">
+        <div class="kw">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <label for="kwin">Keyword</label>
+          <input id="kwin" name="kw" autocomplete="off" spellcheck="false" maxlength="80" placeholder="Type a keyword" value="bookkeeping app for freelancers">
+          <button class="btn mark" type="submit" id="kwgo">Check</button>
+        </div>
+        <div class="tries" role="group" aria-label="Example keywords">
+          <span>Try</span>
+        </div>
+        <span class="example">Example answers with made-up brands</span>
+      </form>
+      <ol class="lanes" id="lanes" aria-label="Answers from seven AI engines"></ol>
+      <div class="verdict" id="verdict" data-state="wait" aria-live="polite">
+        <div class="vnum" id="vnum">0<small>/7</small></div>
+        <div class="vtext"><strong id="vhead">Asking seven AI engines</strong><span id="vsub">Each engine searches the web and writes its answer.</span></div>
+        <a class="btn" href="#fix" id="vgo">See the fixes</a>
+      </div>
+    </div>
   </div>
 </div>
 
-<section id="grid">
-  <div class="sec-head"><h2>Every answer, on one grid</h2><p>One row per question, one column per AI engine. See where you show up, where a rival takes your place and which sites the engines trust. Checked every week, with a trend over time.</p></div>
-  <div class="gridcard">
-    <table class="grid">
-      <thead><tr><th scope="col">Question</th><th scope="col">ChatGPT</th><th scope="col">AI Overviews</th><th scope="col">AI Mode</th><th scope="col">Gemini</th><th scope="col">Perplexity</th><th scope="col">Claude</th><th scope="col">Grok</th></tr></thead>
-      <tbody>
-        <tr><td>Best bookkeeping app for UK freelancers?</td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
-        <tr><td>Which invoicing tool works with Making Tax Digital?</td><td><span class="cell cited" aria-label="Site cited, not named"></span></td><td><span class="cell na" aria-label="No AI answer from Google"></span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
-        <tr><td>Ledgerbird alternatives for small agencies</td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named second">2</span></td></tr>
-        <tr><td>Cheapest accounting software for a one person company</td><td><span class="cell named" aria-label="Named third">3</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
-      </tbody>
-    </table>
-    <div class="legend" aria-hidden="true"><span><span class="cell named"></span>Named, with its place among your rivals</span><span><span class="cell both"></span>Named and your site cited</span><span><span class="cell cited"></span>Site cited, not named</span><span><span class="cell none"></span>Not named</span><span><span class="cell na"></span>No AI answer from Google</span></div>
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head"><h2>One keyword, every way people ask</h2><p>AI answers change with every question, so one prompt tells you very little. AI SEO Deck turns each keyword into the questions your customers really ask, sends them to seven engines and adds the answers up into one score you can track week by week.</p></div>
+    <div class="flow">
+      <div class="stage"><h3>Your keyword</h3><span class="chipkw"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>bookkeeping app for freelancers</span><p class="muted" style="font-size:14px">Pick it yourself, or from the keywords where AI already cites you.</p></div>
+      <div class="stage"><h3>Asked the way people ask</h3>
+        <div class="bubbles"><div class="bubble">Which bookkeeping app is best for freelancers?</div><div class="bubble">How much does bookkeeping software cost for a freelancer?</div><div class="bubble g">Google AI Overviews and AI Mode get the search itself: <b>bookkeeping app for freelancers</b></div></div></div>
+      <div class="stage"><h3>Seven AI engines, live web search on</h3><div class="engs"><span>ChatGPT</span><span>AI Overviews</span><span>AI Mode</span><span>Gemini</span><span>Perplexity</span><span>Claude</span><span>Grok</span></div><p class="muted" style="font-size:14px">12 answers for every keyword, every week.</p></div>
+      <div class="stage score"><h3>One score</h3><div class="big">67%</div><span>Named in 8 of 12 answers, your site cited in 5</span></div>
+    </div>
+    <div class="why">
+      <div><h3>Many answers, not one</h3><p>A single answer can be luck. Twelve answers a week show a pattern, so a change in your score means something changed.</p></div>
+      <div><h3>The searches behind the answer</h3><p>Before they answer, the engines run their own web searches. We keep them: they are the keywords that decide which sites get read and cited.</p></div>
+      <div><h3>Questions you can edit</h3><p>Every keyword comes with the questions we ask for it, in your language. Read the full answers, and change the questions whenever you like.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="table">
+  <div class="wrap">
+    <div class="sec-head"><h2>All your keywords on one deck</h2><p>One row per keyword, one column per AI engine. Search volume, visibility and the trend at a glance. Open a keyword to read every answer and see what to fix.</p></div>
+    <div class="tablecard">
+      <table class="kt">
+        <thead><tr><th scope="col">Keyword</th><th scope="col" class="v">Searches a month</th><th scope="col">ChatGPT</th><th scope="col">AI Overviews</th><th scope="col">AI Mode</th><th scope="col">Gemini</th><th scope="col">Perplexity</th><th scope="col">Claude</th><th scope="col">Grok</th><th scope="col" class="v">Visible</th><th scope="col" class="v">4 weeks</th></tr></thead>
+        <tbody id="ktbody"></tbody>
+      </table>
+    </div>
+    <div class="legend" aria-hidden="true"><span><i class="c n"></i>Named</span><span><i class="c b"></i>Named and your site cited</span><span><i class="c ci"></i>Your site cited, not named</span><span><i class="c o"></i>Not named</span><span><i class="c x"></i>No AI answer on Google</span><span>Example data with a made-up brand</span></div>
+  </div>
+</section>
+
+<section id="fix">
+  <div class="wrap fixgrid">
+    <div>
+      <div class="sec-head" style="margin-bottom:30px"><h2>Not there yet? Fix it in one click</h2><p>For every keyword, AI SEO Deck finds the page that should win, writes what is missing and applies it to Webflow when you say so.</p></div>
+      <div class="points">
+        <div><h3>The right page for each keyword</h3><p>We match the keyword to your best page. If there is none, we draft a new one in your CMS.</p></div>
+        <div><h3>You review, Webflow stays in charge</h3><p>Every change shows the current value next to the new one. It lands in Webflow as an unpublished edit, and nothing goes live until you publish.</p></div>
+        <div><h3>Then check the keyword again</h3><p>After you publish, re-check the keyword with one click and follow the score on the weekly trend.</p></div>
+      </div>
+    </div>
+    <div class="plan-card">
+      <div class="plan-head"><strong>bookkeeping app for freelancers</strong><span class="muted">Best page: /freelancers</span></div>
+      <ul class="fx" id="fx">
+        <li><span class="tick" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06261A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><div><h3>Title and description</h3><p>The first thing search engines and AI read about the page.</p>
+          <div class="diff"><div><span>Now</span><s>Freelancers | Tallyhawk</s></div><div><span>New</span><b>Bookkeeping App for Freelancers: Invoices, Receipts and Tax in One Place | Tallyhawk</b></div></div><p class="status">Saved to Webflow</p></div></li>
+        <li><span class="tick" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06261A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><div><h3>Answers to what people ask</h3><p>Three answers written from your own page, for the questions behind this keyword, added to the page as FAQ schema.</p><p class="status">Saved to Webflow</p></div></li>
+        <li><span class="tick" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06261A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><div><h3>The same answers in your CMS</h3><p>Each answer becomes a draft item in your FAQ collection, ready to show on the page.</p><p class="status">Added to your CMS as drafts</p></div></li>
+        <li class="manual"><span class="tick" aria-hidden="true"></span><div><h3>Be where the AI looks</h3><p>The engines cited these sites for this keyword. Reviews and listings there move you into the answers.</p><div class="queries" style="margin-top:10px"><span>g2.com</span><span>capterra.com</span><span>reddit.com</span></div></div></li>
+      </ul>
+      <div class="plan-foot"><p id="fxnote">3 fixes ready to apply. The last one is up to you.</p><button class="btn mark" type="button" id="fxgo">Apply 3 fixes to Webflow</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="related">
+  <div class="wrap">
+    <div class="sec-head"><h2>Find the keywords you already win</h2><p>Your site shows up in more AI answers than you think. We list the keywords where Google's AI Overviews already cite you and the searches the AI ran for your keywords. Track any of them in one click.</p></div>
+    <div class="rel">
+      <div class="box"><h3>Cited in Google AI Overviews</h3><p>Keywords where your site is already a source. Example data.</p>
+        <ul class="rk" id="rk"></ul></div>
+      <div class="box"><h3>What the AI searched for</h3><p>Searches the engines ran before answering about bookkeeping app for freelancers.</p>
+        <div class="queries"><span>bookkeeping app freelancers uk</span><span>tallyhawk vs ledgerbird</span><span>bookkeeping app reviews reddit</span><span>freelancer invoicing software comparison</span><span>cheapest accounting app self employed</span><span>bookkeeping app receipt scanning</span></div></div>
+    </div>
   </div>
 </section>
 
 <section>
-  <div class="sec-head"><h2>What the answers tell you</h2><p>Every check turns hundreds of AI answers into three things you can act on.</p></div>
-  <div class="three">
-    <div class="card"><h3>How AI describes you</h3><div class="sent" role="img" aria-label="12 positive, 5 neutral, 1 negative"><i class="pos" style="width:66%"></i><i class="neu" style="width:28%"></i><i class="neg" style="width:6%"></i></div>
-      <div class="chips"><span class="chip">simple mobile app</span><span class="chip">MTD ready</span><span class="chip">best for sole traders</span></div>
-      <p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
-    <div class="card"><h3>Where rivals win</h3><div class="gap"><b>Ledgerbird alternatives for small agencies</b><span class="chips"><span class="chip">ChatGPT</span><span class="chip">AI Mode</span><span class="chip">Gemini</span></span></div>
-      <p>Every question where an engine recommends a rival and not you, widest gaps first, with what to do next.</p></div>
-    <div class="card"><h3>What the AI searched for</h3><div class="chips"><span class="chip">best mtd software freelancers</span><span class="chip">tallyhawk reviews</span><span class="chip">ledgerbird vs sumwise</span></div>
-      <p>The web searches the engines ran before answering, and the sites they read. Your shortest list of pages to write and places to be listed.</p></div>
+  <div class="wrap">
+    <div class="sec-head"><h2>What else every check tells you</h2><p>Hundreds of AI answers a month, turned into three short lists you can act on.</p></div>
+    <div class="ins">
+      <div><h3>How AI describes you</h3><div class="sent" role="img" aria-label="14 positive, 5 neutral, 1 negative"><i class="pos" style="width:70%"></i><i class="neu" style="width:25%"></i><i class="neg" style="width:5%"></i></div><div class="chips"><span class="chip">simple mobile app</span><span class="chip">tax-ready reports</span><span class="chip">good for sole traders</span></div><p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
+      <div><h3>Where rivals win</h3><div class="gapline"><b>invoicing software for small business</b><span class="muted" style="font-size:14px"><span class="rival">Ledgerbird</span> is named by ChatGPT, AI Mode and Claude, you are not.</span></div><p>Keywords where an engine recommends a rival instead of you, widest gaps first.</p></div>
+      <div><h3>Sites the AI trusts</h3><ul class="hosts"><li><span>g2.com</span><span>31 answers</span></li><li><span>reddit.com</span><span>22 answers</span></li><li><span>capterra.com</span><span>14 answers</span></li></ul><p>The places to be listed, reviewed or mentioned, counted across all your keywords.</p></div>
+    </div>
   </div>
-</section>
-
-<section>
-  <div class="sec-head"><h2>Fix it without leaving Webflow</h2><p>The site audit reads your live pages the way AI crawlers do. Each finding comes with a fix you review first and apply in one click.</p></div>
-  <div class="fixes">
-    <div class="fix"><h3>Titles and descriptions</h3><p>Suggestions written from the page itself, checked for length, saved to the page settings in Webflow.</p></div>
-    <div class="fix"><h3>Structured data</h3><p>Organization, WebSite and FAQ schema in JSON-LD, merged with what the page already has and written through Webflow's schema API.</p></div>
-    <div class="fix"><h3>Answers people ask for</h3><p>Turn the questions from your grid into clear answers from your own content, and add them to a CMS collection as drafts.</p></div>
-    <div class="fix"><h3>AI crawlers and llms.txt</h3><p>See which engines your <code>robots.txt</code> blocks and download a ready <code>llms.txt</code> for Site settings.</p></div>
-  </div>
-</section>
-
-<section>
-  <div class="sec-head"><h2>Set up in three minutes</h2></div>
-  <ol class="steps">
-    <li><h3>Connect Webflow</h3><p>Pick the sites AI SEO Deck may read. It writes only when you press Apply on a fix.</p></li>
-    <li><h3>Choose your questions</h3><p>We suggest questions from your homepage, in your language. Add your rivals so you can compare.</p></li>
-    <li><h3>Get your first grid</h3><p>The first check runs right away. After that it repeats every week and emails you what changed.</p></li>
-  </ol>
 </section>
 
 <section id="pricing">
-  <div class="sec-head"><h2>Pricing</h2><p>Prices in US dollars a month. Yearly plans get two months free. Cancel any time.</p></div>
-  <div class="plans">
-    <div class="plan"><h3>Free</h3><p class="price">$0</p><ul><li>1 site, 5 questions</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked monthly</li><li>Site audit and suggestions</li></ul><a class="btn sm" href="/auth">Start free</a></div>
-    <div class="plan pick"><h3>Solo</h3><p class="price">$29<span> /month</span></p><ul><li>1 site, 25 questions</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>2 extra checks on demand a month</li></ul><a class="btn sm mark" href="/auth">Choose Solo</a></div>
-    <div class="plan"><h3>Studio</h3><p class="price">$79<span> /month</span></p><ul><li>5 sites, 75 questions</li><li>Everything in Solo</li><li>Client report links with your agency name</li></ul><a class="btn sm" href="/auth">Choose Studio</a></div>
-    <div class="plan"><h3>Agency</h3><p class="price">$199<span> /month</span></p><ul><li>20 sites, 200 questions</li><li>Everything in Studio</li><li>Priority support</li></ul><a class="btn sm" href="/auth">Choose Agency</a></div>
+  <div class="wrap">
+    <div class="sec-head"><h2>Pricing</h2><p>US dollars a month. Yearly plans get two months free. Cancel any time.</p></div>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><p class="price">$0</p><p class="kwcount"><b>3</b> keywords</p><ul><li>1 site</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked every month</li><li>Site audit and fix suggestions</li></ul><a class="btn sm" href="/auth">Start free</a></div>
+      <div class="plan pick"><h3>Solo</h3><p class="price">$19<span> /month</span></p><p class="kwcount"><b>10</b> keywords</p><ul><li>1 site</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>10 keyword re-checks a month</li></ul><a class="btn sm mark" href="/auth">Choose Solo</a></div>
+      <div class="plan"><h3>Studio</h3><p class="price">$49<span> /month</span></p><p class="kwcount"><b>30</b> keywords</p><ul><li>5 sites</li><li>Everything in Solo</li><li>Client report links with your agency name</li><li>30 keyword re-checks a month</li></ul><a class="btn sm" href="/auth">Choose Studio</a></div>
+      <div class="plan"><h3>Agency</h3><p class="price">$149<span> /month</span></p><p class="kwcount"><b>100</b> keywords</p><ul><li>20 sites</li><li>Everything in Studio</li><li>100 keyword re-checks a month</li><li>Priority support</li></ul><a class="btn sm" href="/auth">Choose Agency</a></div>
+    </div>
+    <p class="fine">On paid plans each keyword gets 12 AI answers a week: two questions on ChatGPT, Gemini, Perplexity, Claude and Grok, and the keyword itself on Google AI Overviews and AI Mode. Keywords you only look at, such as ideas and keywords found in AI Overviews, do not count until you track them.</p>
   </div>
 </section>
 
 <section>
-  <div class="sec-head"><h2>Questions</h2></div>
-  <details><summary>Which AI engines do you check?</summary><p>ChatGPT, Gemini, Perplexity, Claude and Grok through their official APIs with live web search on, and Google AI Overviews and AI Mode from live Google results. The free plan covers ChatGPT, Google AI Overviews and Perplexity; paid plans cover all seven.</p></details>
-  <details><summary>How do you know what the AI says?</summary><p>We ask each engine your questions the way a person would and read the full answer and its sources. Answers vary between people and days, so the grid shows trends across many questions and weeks rather than a single answer.</p></details>
-  <details><summary>Does it change my site without asking?</summary><p>No. Every fix is shown first and written to Webflow only when you press Apply. Changes arrive as unpublished edits, so nothing goes live until you publish in Webflow.</p></details>
-  <details><summary>Which Webflow plans does it work with?</summary><p>It works with sites on any Webflow plan. Fixes are written to static pages; for CMS pages you get the advice to apply in the collection template.</p></details>
-  <details><summary>What does a question look like?</summary><p>The way your customers would type it, for example "best dentist for veneers in Antalya" or "Ledgerbird alternatives". We suggest a first set from your homepage, in your language.</p></details>
-  <details><summary>Can I cancel any time?</summary><p>Yes. Paid plans run through Polar and can be cancelled from Settings. Deleting your account removes all stored data and revokes Webflow access.</p></details>
+  <div class="wrap faq">
+    <div class="sec-head"><h2>Questions</h2></div>
+    <details><summary>Why keywords and not prompts?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Keywords are how you already plan SEO and content, and they are what the AI searches for before it answers. Each keyword is checked with the questions people really ask, so you get a steady score instead of one lucky or unlucky answer. You can read and edit those questions at any time.</p></details>
+    <details><summary>Which AI engines do you check?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>ChatGPT, Gemini, Perplexity, Claude and Grok through their official APIs with live web search on, and Google AI Overviews and AI Mode from live Google results. The free plan covers ChatGPT, Google AI Overviews and Perplexity; paid plans cover all seven.</p></details>
+    <details><summary>How do you know what the AI says?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>We ask each engine the way a person would and read the full answer and its sources. Answers vary between people and days, so scores are built from many answers and followed over weeks rather than taken from a single reply.</p></details>
+    <details><summary>Where do keyword ideas and search volumes come from?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Search volumes, keyword ideas and the keywords where Google's AI Overviews cite your site come from DataForSEO, a search data provider. Related searches also come from the AI engines themselves, from the web searches they run while answering.</p></details>
+    <details><summary>Does it change my site without asking?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>No. Every fix is shown first and written to Webflow only when you press Apply. Changes arrive as unpublished edits and CMS drafts, so nothing goes live until you publish in Webflow.</p></details>
+    <details><summary>Which Webflow plans does it work with?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Any Webflow plan. Titles, descriptions and schema are written to static pages; for CMS template pages you get the change to make in the collection, and answers and new pages are added to your CMS as drafts.</p></details>
+    <details><summary>Can I cancel any time?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Yes. Paid plans run through Polar and can be cancelled from Settings. Deleting your account removes all stored data and revokes Webflow access.</p></details>
+  </div>
 </section>
 
-<section class="cta">
-  <h2>See what every AI says about you</h2>
-  <a class="btn mark" href="/auth">Connect Webflow, free</a>
+<section>
+  <div class="wrap cta">
+    <h2>Every AI.<br>One deck.</h2>
+    <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#pricing">See pricing</a></div>
+  </div>
 </section>
 </main>
 
-<footer><span>AI SEO Deck by Silit Labs</span><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span></footer>
-</div>
+<footer><div class="wrap"><span>AI SEO Deck by Silit Labs</span><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span><span>Brands in the examples are made up.</span><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span></div></footer>
+
 <script>
 (function () {
-  var B = 'Tallyhawk', R = ['Ledgerbird', 'Sumwise'];
-  var E = [
-    { n: 'ChatGPT', s: 'both', rank: 1, t: 'For UK freelancers the tools recommended most often are Tallyhawk, Ledgerbird and Sumwise. Tallyhawk stands out for Making Tax Digital support and a simple mobile app.', src: ['tallyhawk.com', 'which.co.uk', 'reddit.com'] },
-    { n: 'AI Overviews', s: 'named', rank: 2, t: 'Popular choices include Ledgerbird for small agencies and Tallyhawk for sole traders who want to file VAT returns from their phone.', src: ['which.co.uk', 'gov.uk'] },
-    { n: 'AI Mode', s: 'none', t: 'Ledgerbird and Sumwise are recommended most often. Compare bank feeds, receipt capture and HMRC submission before you choose.', src: ['ledgerbird.io', 'money.co.uk'] },
-    { n: 'Gemini', s: 'both', rank: 1, t: 'Tallyhawk is a strong pick for UK freelancers thanks to Making Tax Digital filing and quick invoicing from the app.', src: ['tallyhawk.com', 'techradar.com'] },
-    { n: 'Perplexity', s: 'named', rank: 2, t: 'Sumwise is the cheapest option, while Tallyhawk offers the simplest invoicing on a phone.', src: ['reddit.com', 'sumwise.co'] },
-    { n: 'Claude', s: 'named', rank: 1, t: 'Tallyhawk, Ledgerbird and Sumwise all support Making Tax Digital. Tallyhawk is the most focused on freelancers.', src: ['which.co.uk'] },
-    { n: 'Grok', s: 'none', t: 'Freelancers posting on X mostly mention Ledgerbird and Sumwise for bookkeeping.', src: ['x.com', 'ledgerbird.io'] }
+  var ENG = ['ChatGPT', 'AI Overviews', 'AI Mode', 'Gemini', 'Perplexity', 'Claude', 'Grok'];
+  // Example data. The brands are made up.
+  var EX = [
+    { kw: 'bookkeeping app for freelancers', brand: ['Tallyhawk'], rivals: ['Ledgerbird', 'Sumwise'], lanes: [
+      { q: 'best bookkeeping app freelancers uk', s: 'named', r: 1, c: 1, ms: 2400, t: 'For freelancers the apps recommended most are Tallyhawk, Ledgerbird and Sumwise. Tallyhawk stands out for tax-ready reports and a simple mobile app.' },
+      { q: '', s: 'na', ms: 900, t: 'Google showed no AI Overview for this search.' },
+      { q: 'freelancer bookkeeping software comparison', s: 'named', r: 2, c: 0, ms: 2000, t: 'Ledgerbird suits small agencies, while Tallyhawk is the simpler choice for one person businesses.' },
+      { q: 'tallyhawk vs ledgerbird', s: 'named', r: 1, c: 1, ms: 1600, t: 'Tallyhawk is a strong pick for freelancers thanks to quick invoicing and automatic bank matching.' },
+      { q: 'cheapest bookkeeping app freelancers', s: 'none', ms: 2200, t: 'Sumwise is the cheapest option, and Ledgerbird has the most integrations.' },
+      { q: 'bookkeeping app for self employed', s: 'named', r: 2, c: 0, ms: 3000, t: 'Ledgerbird, Tallyhawk and Sumwise all handle invoices and receipts. Ledgerbird is the most complete.' },
+      { q: 'freelancer bookkeeping', s: 'none', ms: 2600, t: 'Freelancers mostly mention Ledgerbird and Sumwise when they talk about bookkeeping.' }
+    ] },
+    { kw: 'webflow agency in london', brand: ['Foldline Studio'], rivals: ['Paperkite', 'Studio Merida'], lanes: [
+      { q: 'best webflow agency london', s: 'named', r: 1, c: 1, ms: 2500, t: 'For Webflow projects in London, Foldline Studio and Paperkite come up most often. Foldline Studio is known for SaaS sites and clean CMS setups.' },
+      { q: '', s: 'named', r: 2, c: 0, ms: 1100, t: 'Popular Webflow agencies in London include Paperkite and Foldline Studio, with portfolios of startup and SaaS sites.' },
+      { q: 'webflow agency london reviews', s: 'none', ms: 2100, t: 'Paperkite and Studio Merida are mentioned most often. Compare their portfolios and ask about CMS training before you sign.' },
+      { q: 'webflow agency for saas', s: 'named', r: 1, c: 1, ms: 1700, t: 'Foldline Studio is a strong pick for SaaS companies thanks to its Webflow design systems and quick launches.' },
+      { q: 'webflow experts london reviews', s: 'named', r: 2, c: 1, ms: 2300, t: 'Reviews point to Paperkite, Foldline Studio and Studio Merida as trusted Webflow partners in London.' },
+      { q: 'webflow agency london pricing', s: 'none', ms: 3100, t: 'Paperkite and Studio Merida both offer fixed-price Webflow builds with ongoing support.' },
+      { q: 'webflow agency london', s: 'named', r: 1, c: 0, ms: 2700, t: 'Designers often share Foldline Studio launches and Webflow tips.' }
+    ] },
+    { kw: 'wedding photographer in lisbon', brand: ['Studio Alva'], rivals: ['Mare Weddings', 'Lisbon Lens Co'], lanes: [
+      { q: 'best wedding photographer lisbon', s: 'none', ms: 2300, t: 'Mare Weddings and Lisbon Lens Co are often recommended for weddings in Lisbon and Sintra.' },
+      { q: '', s: 'named', r: 2, c: 1, ms: 1000, t: 'Popular choices include Mare Weddings and Studio Alva, known for documentary style coverage.' },
+      { q: 'lisbon wedding photographer prices', s: 'none', ms: 1900, t: 'Expect to pay more in peak season. Mare Weddings and Lisbon Lens Co publish their packages online.' },
+      { q: 'documentary wedding photographer portugal', s: 'named', r: 1, c: 0, ms: 1800, t: 'Studio Alva is a good fit if you want relaxed, documentary style photos in Lisbon.' },
+      { q: 'lisbon wedding photographer reviews', s: 'none', ms: 2400, t: 'Couples review Mare Weddings highly for destination weddings in Portugal.' },
+      { q: 'wedding photographer lisbon english speaking', s: 'none', ms: 3100, t: 'Lisbon Lens Co and Mare Weddings both work with couples from abroad.' },
+      { q: 'lisbon wedding photographer', s: 'none', ms: 2600, t: 'Mare Weddings shares many Lisbon wedding stories.' }
+    ] }
   ];
-  var tabs = document.querySelector('.etabs'), who = document.getElementById('dwho'), txt = document.getElementById('dtext'), src = document.getElementById('dsrc'), dots = document.getElementById('ddots'), panel = document.getElementById('dpanel');
-  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
-  function mark(t) {
-    var h = esc(t).replace(new RegExp(B, 'g'), '<mark>' + B + '</mark>');
-    R.forEach(function (r) { h = h.replace(new RegExp(r, 'g'), '<span class="rival">' + r + '</span>'); });
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var $ = function (id) { return document.getElementById(id); };
+  var lanesEl = $('lanes'), input = $('kwin'), form = $('kwform'), tries = document.querySelector('.tries');
+  var verdict = $('verdict'), vnum = $('vnum'), vhead = $('vhead'), vsub = $('vsub'), vgo = $('vgo');
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function marked(t, ex) {
+    var h = esc(t);
+    ex.brand.forEach(function (b) { h = h.split(b).join('<mark>' + b + '</mark>'); });
+    ex.rivals.forEach(function (r) { h = h.split(r).join('<span class="rival">' + r + '</span>'); });
     return h;
   }
-  E.forEach(function (e, i) {
+  ENG.forEach(function (n, i) {
+    var li = document.createElement('li');
+    li.className = 'lane';
+    li.innerHTML = '<div class="eng"><span class="sig" aria-hidden="true"></span>' + n + '</div><div class="body"><p class="q"></p><p class="say wait">Waiting</p></div><div class="res"></div><span class="scan" aria-hidden="true"></span>';
+    lanesEl.appendChild(li);
+  });
+  EX.forEach(function (ex, i) {
     var b = document.createElement('button');
-    b.className = 'etab'; b.type = 'button'; b.setAttribute('role', 'tab'); b.id = 'dt' + i; b.setAttribute('aria-controls', 'dpanel');
-    b.innerHTML = '<span class="st ' + e.s + '" aria-hidden="true"></span>' + esc(e.n);
-    b.addEventListener('click', function () { stop(); show(i, true); });
-    tabs.appendChild(b);
-    var d = document.createElement('span'); d.className = 'dot ' + e.s; dots.appendChild(d);
+    b.type = 'button'; b.className = 'try'; b.textContent = ex.kw;
+    b.addEventListener('click', function () { run(i, true); });
+    tries.appendChild(b);
   });
-  var cur = 0, timer = null;
-  function show(i, fromUser) {
-    cur = i;
-    var e = E[i];
-    Array.prototype.forEach.call(tabs.children, function (b, k) { b.setAttribute('aria-selected', k === i ? 'true' : 'false'); b.tabIndex = k === i ? 0 : -1; });
-    Array.prototype.forEach.call(dots.children, function (d, k) { d.classList.toggle('cur', k === i); });
-    panel.setAttribute('aria-labelledby', 'dt' + i);
-    who.innerHTML = esc(e.n) + ' ' + (e.s === 'none' ? '<span class="pill">Not named</span>' : '<span class="pill mark">Named #' + e.rank + '</span>') + (e.s === 'both' ? '<span class="pill cite">Your site cited</span>' : '');
-    txt.innerHTML = mark(e.t);
-    src.innerHTML = e.src.map(function (s) { return '<span class="chip' + (s === 'tallyhawk.com' ? ' own' : '') + '">' + esc(s) + '</span>'; }).join('');
-    panel.classList.remove('fresh'); void panel.offsetWidth; panel.classList.add('fresh');
-    if (fromUser) tabs.children[i].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  var timers = [], current = -1;
+  function clear() { timers.forEach(clearTimeout); timers = []; }
+  function later(fn, ms) { timers.push(setTimeout(fn, still ? 0 : ms)); }
+  function setVerdict(ex, done) {
+    var named = 0, cited = 0, rivals = {};
+    ex.lanes.forEach(function (l, i) {
+      if (!done[i]) return;
+      if (l.s === 'named') named++;
+      if (l.c) cited++;
+      ex.rivals.forEach(function (r) { if (l.t.indexOf(r) >= 0) rivals[r] = (rivals[r] || 0) + 1; });
+    });
+    var count = done.filter(Boolean).length;
+    vnum.innerHTML = named + '<small>/7</small>';
+    if (count < 7) { verdict.dataset.state = 'wait'; vhead.textContent = 'Asking seven AI engines'; vsub.textContent = count + ' of 7 answered'; return; }
+    verdict.dataset.state = 'done';
+    var top = Object.keys(rivals).sort(function (a, b) { return rivals[b] - rivals[a]; }).map(function (r) { return r + ' in ' + rivals[r]; }).join(', ');
+    vhead.textContent = named >= 4 ? 'Yes. ' + named + ' of 7 AI engines name you.' : named > 0 ? 'Sometimes. ' + named + ' of 7 AI engines name you.' : 'No. None of the 7 AI engines name you.';
+    vsub.textContent = (cited ? 'Your site is cited in ' + cited + '. ' : 'Your site is not cited yet. ') + (top ? 'Rivals named: ' + top + '.' : '');
+    vgo.textContent = named >= 4 ? 'See how to reach 7 of 7' : 'See the fixes';
   }
-  function stop() { if (timer) { clearInterval(timer); timer = null; } }
-  tabs.addEventListener('keydown', function (ev) {
-    if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
-    ev.preventDefault(); stop();
-    var n = (cur + (ev.key === 'ArrowRight' ? 1 : E.length - 1)) % E.length;
-    show(n, true); tabs.children[n].focus();
+  function run(i, user) {
+    clear();
+    current = i;
+    var ex = EX[i];
+    Array.prototype.forEach.call(tries.querySelectorAll('.try'), function (b, k) { b.setAttribute('aria-pressed', k === i ? 'true' : 'false'); });
+    input.value = ex.kw;
+    $('kwgo').textContent = 'Check';
+    var done = [false, false, false, false, false, false, false];
+    Array.prototype.forEach.call(lanesEl.children, function (li, k) {
+      var l = ex.lanes[k];
+      li.className = 'lane busy';
+      li.querySelector('.q').innerHTML = l.q ? 'Searching <b class="mono">' + esc(l.q) + '</b>' : 'Reading Google results';
+      var say = li.querySelector('.say');
+      say.className = 'say wait'; say.textContent = 'Writing the answer';
+      li.querySelector('.res').innerHTML = '';
+      later(function () {
+        li.className = 'lane ' + l.s + ' fresh';
+        say.className = 'say';
+        say.innerHTML = marked(l.t, ex);
+        li.querySelector('.res').innerHTML = l.s === 'named' ? '<span class="pill named">Named #' + l.r + '</span>' + (l.c ? '<span class="pill cite">Cited</span>' : '') : l.s === 'na' ? '<span class="pill na">No AI answer</span>' : '<span class="pill none">Not named</span>';
+        done[k] = true;
+        setVerdict(ex, done);
+      }, (user ? 300 : 1400) + l.ms);
+    });
+    setVerdict(ex, done);
+  }
+  form.addEventListener('submit', function (e) {
+    var v = input.value.trim().toLowerCase();
+    var k = -1;
+    EX.forEach(function (ex, i) { if (ex.kw === v) k = i; });
+    if (k >= 0 || !v) { e.preventDefault(); run(k >= 0 ? k : 0, true); }
+    // any other keyword: continue to /auth?kw=..., the app checks it on the user's own site
   });
-  show(0);
-  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!still) {
-    timer = setInterval(function () { show((cur + 1) % E.length); }, 3600);
-    document.getElementById('demo').addEventListener('mouseenter', stop);
-    document.getElementById('demo').addEventListener('focusin', stop);
+  input.addEventListener('input', function () {
+    var v = input.value.trim().toLowerCase();
+    var sample = EX.some(function (ex) { return ex.kw === v; });
+    $('kwgo').textContent = sample || !v ? 'Check' : 'Check on my site';
+  });
+  run(0, false);
+
+  // keyword table (example data)
+  var ROWS = [
+    ['bookkeeping app for freelancers', '2,900', 'bxnbono', 58, [40, 47, 52, 58]],
+    ['invoicing software for small business', '6,600', 'ooonboo', 21, [25, 23, 19, 21]],
+    ['expense tracker for contractors', '1,300', 'nbnnion', 61, [44, 50, 55, 61]],
+    ['accounting app for self employed', '880', 'xnobnoo', 33, [33, 31, 35, 33]],
+    ['receipt scanner app', '720', 'onoooon', 25, [8, 12, 17, 25]],
+    ['tax software for freelancers', '590', 'bnnbnon', 75, [70, 73, 71, 75]]
+  ];
+  var SHORT = ['GPT', 'AIO', 'Mode', 'Gemini', 'Pplx', 'Claude', 'Grok'];
+  var MAP = { n: 'n', b: 'b', i: 'ci', o: 'o', x: 'x' }, LBL = { n: 'Named', b: 'Named and cited', i: 'Cited, not named', o: 'Not named', x: 'No AI answer' };
+  function spark(pts) {
+    var w = 64, h = 22, min = Math.min.apply(null, pts) - 4, max = Math.max.apply(null, pts) + 4;
+    var d = pts.map(function (p, k) { return (k ? 'L' : 'M') + (k * (w / (pts.length - 1))).toFixed(1) + ' ' + (h - (p - min) / (max - min) * h).toFixed(1); }).join(' ');
+    var up = pts[pts.length - 1] >= pts[0];
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true"><path d="' + d + '" fill="none" stroke="' + (up ? 'var(--good)' : 'var(--bad)') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
+  $('ktbody').innerHTML = ROWS.map(function (r) {
+    var cells = r[2].split('').slice(0, 7).map(function (ch, k) { return '<td data-e="' + SHORT[k] + '"><i class="c ' + MAP[ch] + '" role="img" aria-label="' + ENG[k] + ': ' + LBL[ch] + '"></i></td>'; }).join('');
+    var d = r[4][3] - r[4][0];
+    return '<tr><td class="k">' + esc(r[0]) + '</td><td class="v">' + r[1] + '</td>' + cells + '<td class="v"><span class="vis"><i style="--w:' + r[3] + '%"></i>' + r[3] + '%</span></td><td class="v"><span class="trend">' + spark(r[4]) + '<span class="' + (d > 0 ? 'up' : d < 0 ? 'down' : 'flat') + '">' + (d > 0 ? '+' : '') + d + '</span></span></td></tr>';
+  }).join('');
+
+  // related keywords (example data)
+  var REL = [['invoice template for freelancers', '6,600'], ['best expense tracker app', '2,400'], ['how to do bookkeeping as a freelancer', '1,900'], ['self employed tax deductions', '1,300'], ['mileage tracker app', '880']];
+  $('rk').innerHTML = REL.map(function (r) { return '<li><span class="kwt">' + esc(r[0]) + '</span><span class="vol">' + r[1] + ' a month</span><button class="track" type="button" aria-pressed="false">Track</button></li>'; }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('.track'), function (b) {
+    b.addEventListener('click', function () { var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? 'Tracking' : 'Track'; });
+  });
+
+  // one-click fixes (example)
+  var fxgo = $('fxgo');
+  fxgo.addEventListener('click', function () {
+    if (fxgo.dataset.done) return;
+    fxgo.disabled = true; fxgo.textContent = 'Applying';
+    var items = document.querySelectorAll('#fx li:not(.manual)');
+    Array.prototype.forEach.call(items, function (li, k) { setTimeout(function () { li.classList.add('done'); }, still ? 0 : 450 * (k + 1)); });
+    setTimeout(function () {
+      fxgo.dataset.done = '1'; fxgo.textContent = 'Applied'; fxgo.disabled = false;
+      $('fxnote').textContent = 'Done. 3 changes are waiting in Webflow as unpublished edits. Publish, then re-check the keyword.';
+    }, still ? 0 : 450 * (items.length + 1));
+  });
+
+  var top = $('top');
+  function onScroll() { top.classList.toggle('scrolled', window.scrollY > 8); }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
 })();
 </script>
 </body>

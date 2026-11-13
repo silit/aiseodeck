@@ -4,11 +4,11 @@
 //   users:all             set of user ids
 //   email:{address}       user id for an email (sign in by email link)
 //   login:{sha256}        one-time sign in link, 15 minutes
-//   site:{id}             site record: project settings, prompts, schedule, latest results summary
+//   site:{id}             site record: project settings, keywords, latest summary per keyword, schedule, site summary
 //   sites:all             set of tracked site ids (the scheduler walks this)
-//   run:{id}              one check run (prompts x engines) with a snapshot of the project
-//   rq:{runId}            tasks still to do for a run ("promptId|engine|attempt")
-//   res:{runId}           hash of results, field "promptId|engine"
+//   run:{id}              one check run (keyword questions x engines) with a snapshot of the project
+//   rq:{runId}            tasks still to do for a run ("unitId|engine|attempt", unitId = keywordId.q)
+//   res:{runId}           hash of results, field "unitId|engine"
 //   runs:active           set of run ids with work left
 //   hist:{siteId}         run summaries, newest first
 //   audit:{siteId}        latest site audit
@@ -17,7 +17,7 @@
 //   calls:{day}           engine calls made that day (cost guard)
 const kv = require('./kv');
 const { seal, open, random, sha256 } = require('./crypto');
-const { limitsFor } = require('./plans');
+const { limitsFor, QUESTIONS } = require('./plans');
 
 const HISTORY_KEEP = 52;
 const RESULTS_KEEP = 8; // runs whose full answers stay readable
@@ -111,7 +111,8 @@ function newSite(meta, userId, connectionId) {
     tracked: false,
     pausedByUser: false,
     project: { brand: meta.displayName || '', aliases: [], domains: [...new Set(domains)], competitors: [], country: '', language: '', ready: false },
-    prompts: [],
+    keywords: [], // [{ id, text, questions: [], volume, source, page, at, fixedAt }]
+    kw: {}, // latest summary per keyword id (see analyze.keywordSummary) plus { at, runId, trend: [[at, visibility]] }
     sched: { lastRunAt: null, nextRunAt: null, runId: '', lastManualAt: null, firstRunDone: false },
     latest: null,
     audit: null,
@@ -125,9 +126,20 @@ function refreshMeta(site, meta) {
   site.url = primaryUrl(meta) || site.url;
   return site;
 }
-async function getSite(id) { return kv.getJSON('site:' + id); }
-async function getSites(ids) { return ids && ids.length ? (await kv.mgetJSON(ids.map((id) => 'site:' + id))).filter(Boolean) : []; }
+// Sites saved before keywords existed tracked questions ("prompts"): each question becomes a keyword asked as itself.
+function normalizeSite(site) {
+  if (!site) return site;
+  if (!Array.isArray(site.keywords)) {
+    site.keywords = (site.prompts || []).map((p) => ({ id: p.id, text: String(p.text || '').toLowerCase().replace(/[?!.]+$/, '').slice(0, 80), questions: [p.text], volume: null, source: 'migrated', page: '', at: p.at || Date.now() }));
+  }
+  delete site.prompts;
+  if (!site.kw || typeof site.kw !== 'object') site.kw = {};
+  return site;
+}
+async function getSite(id) { return normalizeSite(await kv.getJSON('site:' + id)); }
+async function getSites(ids) { return ids && ids.length ? (await kv.mgetJSON(ids.map((id) => 'site:' + id))).filter(Boolean).map(normalizeSite) : []; }
 async function saveSite(site) {
+  normalizeSite(site);
   site.updatedAt = Date.now();
   await kv.setJSON('site:' + site.id, site);
   if (site.tracked) await kv.sadd('sites:all', site.id); else await kv.srem('sites:all', site.id);
@@ -148,6 +160,7 @@ async function deleteSite(site) {
   const hist = await kv.lrangeJSON('hist:' + site.id, HISTORY_KEEP);
   const runIds = hist.map((h) => h.runId).filter(Boolean);
   if (site.sched && site.sched.runId) runIds.push(site.sched.runId);
+  for (const k of Object.values(site.kw || {})) if (k && k.runId && !runIds.includes(k.runId)) runIds.push(k.runId);
   for (const r of runIds) { await kv.del('run:' + r, 'rq:' + r, 'res:' + r); await kv.srem('runs:active', r); }
   if (site.settings && site.settings.reportToken) await kv.del('report:' + site.settings.reportToken);
   await kv.del('site:' + site.id, 'hist:' + site.id, 'audit:' + site.id);
@@ -200,25 +213,51 @@ function clearRevoked(user, connId) {
   return false;
 }
 
-// Prompts used by all of a user's sites (the plan's prompt limit is a shared pool)
-async function promptCount(user, exceptSiteId) {
+// Keywords used by all of a user's sites (the plan's keyword limit is a shared pool)
+async function keywordCount(user, exceptSiteId) {
   const sites = await getSites(user.siteIds || []);
-  return sites.filter((s) => s.id !== exceptSiteId).reduce((a, s) => a + (s.prompts || []).length, 0);
+  return sites.filter((s) => s.id !== exceptSiteId).reduce((a, s) => a + (s.keywords || []).length, 0);
+}
+
+// Monthly counters on the user record: keyword checks on demand and free first checks of new keywords.
+const monthOf = (t) => new Date(t || Date.now()).toISOString().slice(0, 7);
+function usageOf(user, now) {
+  const u = user.usage && user.usage.month === monthOf(now) ? user.usage : { month: monthOf(now), rechecks: 0, newChecks: 0 };
+  return { month: u.month, rechecks: u.rechecks || 0, newChecks: u.newChecks || 0 };
+}
+async function addUsage(userId, kind, n, now) {
+  const user = await getUser(userId);
+  if (!user) return null;
+  const u = usageOf(user, now);
+  u[kind] = (u[kind] || 0) + n;
+  user.usage = u;
+  await saveUser(user);
+  return u;
 }
 
 /* ---------- runs ---------- */
-async function createRun(site, user, engines, reason) {
+// Google AI Overviews and AI Mode answer searches, so they get the keyword itself; the chat engines get the questions.
+const SEARCH_ENGINES = ['aio', 'aimode'];
+
+// keywords: the keywords to check ([{ id, text, questions }]). partial: a check of some keywords only (on demand or new
+// keywords); it updates those keywords and leaves the weekly schedule alone.
+async function createRun(site, user, engines, reason, keywords, partial) {
   const id = random(10);
-  const prompts = (site.prompts || []).map((p) => ({ id: p.id, text: p.text }));
+  const kws = (keywords || site.keywords || []).map((k) => ({ id: k.id, text: k.text, questions: (k.questions || []).filter(Boolean).slice(0, QUESTIONS) }));
+  const units = [];
+  for (const k of kws) {
+    units.push({ id: k.id + '.k', k: k.id, q: 'k', text: k.text });
+    (k.questions.length ? k.questions : [k.text]).forEach((t, i) => units.push({ id: k.id + '.' + i, k: k.id, q: String(i), text: t }));
+  }
+  const tasks = [];
+  for (const u of units) for (const e of engines) if ((u.q === 'k') === SEARCH_ENGINES.includes(e)) tasks.push(u.id + '|' + e + '|0');
   const p = site.project;
   const run = {
-    id, siteId: site.id, userId: user.id, at: Date.now(), reason: reason || 'scheduled', status: 'running',
-    engines, prompts, total: prompts.length * engines.length, lastProgressAt: Date.now(),
+    id, siteId: site.id, userId: user.id, at: Date.now(), reason: reason || 'scheduled', status: 'running', partial: !!partial,
+    engines, keywords: kws, units, total: tasks.length, lastProgressAt: Date.now(),
     project: { brand: p.brand, aliases: p.aliases || [], domains: p.domains || [], competitors: p.competitors || [], country: p.country || '', language: p.language || '' }
   };
   await kv.setJSON('run:' + id, run);
-  const tasks = [];
-  for (const pr of prompts) for (const e of engines) tasks.push(pr.id + '|' + e + '|0');
   for (let i = 0; i < tasks.length; i += 200) await kv.rpush('rq:' + id, ...tasks.slice(i, i + 200));
   await kv.sadd('runs:active', id);
   return run;
@@ -233,14 +272,21 @@ async function saveResult(runId, field, result) { return kv.hsetJSON('res:' + ru
 async function results(runId) { return runId ? kv.hgetallJSON('res:' + runId) : {}; }
 async function resultCount(runId) { return kv.hlen('res:' + runId); }
 async function endRun(runId) { await kv.srem('runs:active', runId); await kv.del('rq:' + runId); }
-async function pushHistory(siteId, entry) {
+// keep: run ids whose answers are still the latest for some keyword (never deleted here)
+async function pushHistory(siteId, entry, keep) {
   await kv.lpushJSON('hist:' + siteId, entry);
   const all = await kv.lrangeJSON('hist:' + siteId, HISTORY_KEEP + 5);
   // Full answers are kept for the latest runs only; older runs keep their summary
-  for (const old of all.slice(RESULTS_KEEP)) if (old.runId) { await kv.del('res:' + old.runId); await kv.del('run:' + old.runId); }
+  for (const old of all.slice(RESULTS_KEEP)) if (old.runId && !(keep || []).includes(old.runId)) { await kv.del('res:' + old.runId); await kv.del('run:' + old.runId); }
   if (all.length > HISTORY_KEEP) await kv.command('LTRIM', 'hist:' + siteId, '0', String(HISTORY_KEEP - 1));
 }
 async function history(siteId, n) { return kv.lrangeJSON('hist:' + siteId, n || HISTORY_KEEP); }
+// Checks of single keywords are not in the history; their answers expire on their own after 90 days.
+async function expireRun(runId, days) {
+  const sec = String(Math.round((days || 90) * 86400));
+  await kv.expire('res:' + runId, sec);
+  await kv.expire('run:' + runId, sec);
+}
 
 // Cost guard: at most MAX_DAILY_CALLS engine calls per day across all users.
 async function takeCalls(n) {
@@ -284,7 +330,7 @@ async function unlock(name) { return kv.del('lock:' + name); }
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
   getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, newUser, addConnection, tokenOf, tokenForSite,
-  primaryUrl, bareHost, newSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, promptCount,
-  createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, takeCalls, callsToday,
+  primaryUrl, bareHost, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
+  monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock
 };

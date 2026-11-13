@@ -1,28 +1,24 @@
 'use strict';
-// Extra findings for a finished run: questions where rivals are named and the brand is not (gaps),
-// and how the AI answers describe the brand (sentiment, descriptors, statements worth checking).
+// Extra findings: keywords where rivals are named and the brand is not (gaps), and how the AI answers
+// describe the brand (sentiment, descriptors, statements worth checking).
 const llm = require('./llm');
+const { engineCounts } = require('./analyze');
 
 const clean = (t, n) => String(t || '').replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, n);
 
-// res: { "promptId|engine": result }. Sorted by how many engines name a rival instead of the brand.
-function gaps(run, res) {
+// keywords: [{ id, text }], kw: latest keyword summaries. Widest gaps first: the most engines that name a rival instead.
+function gaps(keywords, kw) {
   const out = [];
-  for (const p of run.prompts || []) {
-    const engines = [];
+  for (const k of keywords || []) {
+    const s = kw && kw[k.id];
+    const engines = Object.keys((s && s.lost) || {});
+    if (!engines.length) continue;
     const rivals = {};
-    let named = 0, answered = 0;
-    for (const e of run.engines || []) {
-      const r = res[p.id + '|' + e];
-      if (!r || !r.ok || r.none) continue;
-      answered++;
-      if (r.mentioned) { named++; continue; }
-      const who = Object.entries(r.comp || {}).filter(([, v]) => v && v.m).map(([k]) => k);
-      if (who.length) { engines.push(e); for (const w of who) rivals[w] = (rivals[w] || 0) + 1; }
-    }
-    if (engines.length) out.push({ p: p.id, text: p.text, engines, rivals: Object.entries(rivals).sort((a, b) => b[1] - a[1]).map(([name]) => name).slice(0, 3), named, answered });
+    for (const e of engines) for (const r of s.lost[e]) rivals[r] = (rivals[r] || 0) + 1;
+    const c = engineCounts(s);
+    out.push({ k: k.id, text: k.text, engines, rivals: Object.entries(rivals).sort((a, b) => b[1] - a[1]).map(([name]) => name).slice(0, 3), named: c.named, answered: c.answered });
   }
-  return out.sort((a, b) => b.engines.length - a.engines.length || a.named - b.named).slice(0, 15);
+  return out.sort((a, b) => b.engines.length - a.engines.length || a.named - b.named).slice(0, 20);
 }
 
 // One short AI call per run, on the answers that name the brand.

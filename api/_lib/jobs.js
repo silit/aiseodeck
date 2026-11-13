@@ -19,29 +19,38 @@ const pct = (x) => Math.round((x || 0) * 100) + '%';
 
 /* ---------- starting runs ---------- */
 
-// Prompts this site may use now: the plan's pool minus what the user's older tracked sites use.
-async function allowedPrompts(site, user, limits) {
+// How many of this site's keywords the plan covers now: the plan's pool minus what the user's older tracked sites use.
+async function allowedKeywords(site, user, limits) {
   const sites = (await store.getSites(user.siteIds || [])).filter((s) => s.tracked).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  let left = limits.prompts;
+  let left = limits.keywords;
   for (const s of sites) {
-    const n = (s.prompts || []).length;
+    const n = (s.keywords || []).length;
     if (s.id === site.id) return Math.max(0, Math.min(n, left));
     left -= n;
   }
-  return Math.max(0, Math.min((site.prompts || []).length, left));
+  return Math.max(0, Math.min((site.keywords || []).length, left));
 }
 
-async function startRun(site, user, reason) {
+// opts.keywordIds: check only these keywords (a keyword check on demand, or keywords just added). While another
+// check of the site is running they wait and start right after it.
+async function startRun(site, user, reason, opts) {
+  opts = opts || {};
   const limits = limitsFor(user);
   const list = engines.forLimits(limits);
   if (!list.length) return { error: 'No AI engine is set up yet.' };
-  const n = await allowedPrompts(site, user, limits);
-  if (!n) return { error: 'No prompts to check. Add prompts first, or stay within your plan\'s prompt limit.' };
-  const runSite = Object.assign({}, site, { prompts: (site.prompts || []).slice(0, n) });
-  const run = await store.createRun(runSite, user, list, reason);
+  const allowed = (site.keywords || []).slice(0, await allowedKeywords(site, user, limits));
+  const only = opts.keywordIds ? allowed.filter((k) => opts.keywordIds.includes(k.id)) : allowed;
+  if (!only.length) return { error: opts.keywordIds ? 'This keyword is over your plan\'s keyword limit, so it is not checked.' : 'No keywords to check. Add keywords first, or stay within your plan\'s keyword limit.' };
+  if (site.sched && site.sched.runId) {
+    if (!opts.keywordIds) return { error: 'A check is already running.' };
+    await store.updateSite(site.id, (s) => { s.sched.pendingKw = [...new Set((s.sched.pendingKw || []).concat(only.map((k) => k.id)))]; });
+    return { queued: true };
+  }
+  const partial = !!opts.keywordIds;
+  const run = await store.createRun(site, user, list, reason, only, partial);
   await store.updateSite(site.id, (s) => {
     s.sched.runId = run.id;
-    if (reason === 'manual') s.sched.lastManualAt = Date.now();
+    s.sched.pendingKw = (s.sched.pendingKw || []).filter((id) => !only.some((k) => k.id === id));
   });
   return { run };
 }
@@ -52,7 +61,7 @@ async function scheduleDue(now, max) {
   let started = 0;
   for (const site of sites) {
     if (started >= (max || 20)) break;
-    if (!site.tracked || !site.project || !site.project.ready || !(site.prompts || []).length) continue;
+    if (!site.tracked || !site.project || !site.project.ready || !(site.keywords || []).length) continue;
     if (site.sched.runId) continue;
     if (site.sched.nextRunAt && site.sched.nextRunAt > now) continue;
     const user = await store.getUser(site.userId);
@@ -77,27 +86,28 @@ async function scheduleDue(now, max) {
 /* ---------- doing the work ---------- */
 
 async function doTask(run, task, deadline) {
-  const [pid, engine, attemptRaw] = String(task).split('|');
+  const [uid, engine, attemptRaw] = String(task).split('|');
   const attempt = parseInt(attemptRaw, 10) || 0;
-  const prompt = (run.prompts || []).find((p) => p.id === pid);
-  const field = pid + '|' + engine;
-  if (!prompt) return 'skip';
+  const unit = (run.units || []).find((u) => u.id === uid);
+  const field = uid + '|' + engine;
+  if (!unit) return 'skip';
   if (!(await store.takeCalls(1))) { await store.requeue(run.id, task); return 'budget'; }
   const timeoutMs = Math.min(40000, Math.max(5000, (deadline || Date.now() + 40000) - Date.now() - 2000));
+  const base = { p: uid, k: unit.k, q: unit.q, e: engine };
   try {
-    const ans = await engines.ask(engine, prompt.text, { country: run.project.country, language: run.project.language, timeoutMs });
-    if (ans.none) { // Google showed no AI answer for this question
-      await store.saveResult(run.id, field, { p: pid, e: engine, ok: true, none: true, at: Date.now(), ms: ans.ms, model: ans.model });
+    const ans = await engines.ask(engine, unit.text, { country: run.project.country, language: run.project.language, timeoutMs });
+    if (ans.none) { // Google showed no AI answer for this search
+      await store.saveResult(run.id, field, Object.assign(base, { ok: true, none: true, at: Date.now(), ms: ans.ms, model: ans.model }));
       return 'ok';
     }
     const a = analyze.analyzeAnswer(run.project, ans);
-    await store.saveResult(run.id, field, Object.assign({ p: pid, e: engine, ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, 1500), queries: (ans.queries || []).slice(0, 6) }, a));
+    await store.saveResult(run.id, field, Object.assign(base, { ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, 1500), queries: (ans.queries || []).slice(0, 6) }, a));
     return 'ok';
   } catch (e) {
     // a timeout caused by our own short time window is not the engine's fault: try again without counting it
-    if (e.message === 'timed out' && timeoutMs < 40000) { await store.requeue(run.id, pid + '|' + engine + '|' + attempt); return 'retry'; }
-    if (e.retry && attempt + 1 < MAX_ATTEMPTS) { await store.requeue(run.id, pid + '|' + engine + '|' + (attempt + 1)); return 'retry'; }
-    await store.saveResult(run.id, field, { p: pid, e: engine, ok: false, at: Date.now(), err: String(e.message || e).slice(0, 200) });
+    if (e.message === 'timed out' && timeoutMs < 40000) { await store.requeue(run.id, uid + '|' + engine + '|' + attempt); return 'retry'; }
+    if (e.retry && attempt + 1 < MAX_ATTEMPTS) { await store.requeue(run.id, uid + '|' + engine + '|' + (attempt + 1)); return 'retry'; }
+    await store.saveResult(run.id, field, Object.assign(base, { ok: false, at: Date.now(), err: String(e.message || e).slice(0, 200) }));
     return 'failed';
   }
 }
@@ -165,58 +175,83 @@ async function maybeFinish(runId, now) {
   return true;
 }
 
+// Writes each checked keyword's new summary (and a point on its trend), then adds up the site.
 async function finishRun(run, now) {
   now = now || Date.now();
   const res = await store.results(run.id);
   const list = Object.values(res).filter(Boolean);
-  const summary = analyze.summarize(run.project, list);
-  summary.gaps = insights.gaps(run, res);
-  try { summary.insights = await insights.describe(run, list); } catch (e) { console.error('[aiseodeck] insights', e.message); }
+  const sums = {};
+  for (const k of run.keywords || []) sums[k.id] = analyze.keywordSummary(run.project, run.engines, list.filter((r) => r.k === k.id));
+  let described = null;
+  if (!run.partial) { try { described = await insights.describe(run, list); } catch (e) { console.error('[aiseodeck] insights', e.message); } }
   run.status = 'done';
   run.finishedAt = now;
-  run.summary = summary;
+  run.summary = { keywords: Object.keys(sums).length, ok: list.filter((r) => r.ok && !r.none).length, total: list.length };
   await store.saveRun(run);
   await store.endRun(run.id);
   const user = await store.getUser(run.userId);
   const limits = user ? limitsFor(user) : { everyMs: 7 * DAY };
   let prev = null;
+  let pending = [];
   const site = await store.updateSite(run.siteId, (s) => {
     prev = s.latest;
-    s.latest = Object.assign({ runId: run.id, at: run.at, finishedAt: now, engines: run.engines, prompts: run.prompts.length }, summary);
+    const ids = new Set((s.keywords || []).map((k) => k.id));
+    for (const [id, sum] of Object.entries(sums)) {
+      if (!ids.has(id)) continue; // removed while it was being checked
+      const trend = (((s.kw[id] && s.kw[id].trend) || []).concat([[now, Math.round(sum.vis * 100)]])).slice(-12);
+      s.kw[id] = Object.assign(sum, { at: now, runId: run.id, trend });
+    }
+    for (const id of Object.keys(s.kw)) if (!ids.has(id)) delete s.kw[id];
+    const summary = analyze.siteSummary(s.project, s.keywords, s.kw);
+    summary.gaps = insights.gaps(s.keywords, s.kw);
+    summary.insights = described || (s.latest && s.latest.insights) || null;
+    s.latest = Object.assign({ runId: run.id, at: run.at, finishedAt: now, engines: run.engines, partial: !!run.partial }, summary);
     s.sched.runId = '';
-    s.sched.lastRunAt = now;
-    s.sched.firstRunDone = true;
-    s.sched.nextRunAt = now + limits.everyMs;
-    delete s.sched.note;
+    if (!run.partial) {
+      s.sched.lastRunAt = now;
+      s.sched.firstRunDone = true;
+      s.sched.nextRunAt = now + limits.everyMs;
+      delete s.sched.note;
+    }
+    pending = (s.sched.pendingKw || []).slice();
   });
   if (!site) return null;
-  await store.pushHistory(site.id, { runId: run.id, at: run.at, finishedAt: now, score: summary.score, mentionRate: summary.mentionRate, citationRate: summary.citationRate, avgRank: summary.avgRank, ok: summary.ok, total: summary.total, engines: run.engines, reason: run.reason });
-  if (user && user.settings && user.settings.digest && run.reason !== 'manual' && !(await store.digestDone(run.id))) {
-    try { await sendDigest(user, site, summary, prev); } catch (e) { console.error('[aiseodeck] digest email failed', e.message); }
+  const keep = Object.values(site.kw || {}).map((k) => k.runId).filter(Boolean);
+  const l = site.latest;
+  if (run.partial) await store.expireRun(run.id, 90);
+  else await store.pushHistory(site.id, { runId: run.id, at: run.at, finishedAt: now, score: l.score, mentionRate: l.mentionRate, citationRate: l.citationRate, avgRank: l.avgRank, ok: l.ok, total: l.total, keywords: l.keywords, kwNamed: l.kwNamed, engines: run.engines, reason: run.reason }, keep);
+  // keywords added while this check was running
+  if (pending.length && user) { try { await startRun(site, user, 'new', { keywordIds: pending }); } catch (e) { console.error('[aiseodeck] pending keywords', e.message); } }
+  if (!run.partial && user && user.settings && user.settings.digest && run.reason !== 'manual' && !(await store.digestDone(run.id))) {
+    try { await sendDigest(user, site, l, prev); } catch (e) { console.error('[aiseodeck] digest email failed', e.message); }
   }
-  return summary;
+  return l;
 }
 
 function digestHtml(site, s, prev) {
   const url = appUrl() + '/app/site?id=' + encodeURIComponent(site.id);
-  const delta = prev && typeof prev.score === 'number' ? s.score - prev.score : null;
+  const delta = prev && typeof prev.score === 'number' && !prev.partial ? s.score - prev.score : null;
+  const kws = (site.keywords || []).filter((k) => site.kw[k.id]);
+  const rows = kws.map((k) => ({ k, v: Math.round((site.kw[k.id].vis || 0) * 100), t: site.kw[k.id].trend || [] }))
+    .sort((a, b) => b.v - a.v).slice(0, 8)
+    .map(({ k, v, t }) => {
+      const d = t.length > 1 ? t[t.length - 1][1] - t[t.length - 2][1] : null;
+      return `<tr><td style="padding:6px 14px 6px 0;border-top:1px solid #E3E6F2">${esc(k.text)}</td><td style="padding:6px 0;border-top:1px solid #E3E6F2;text-align:right;font-weight:700">${v}%</td><td style="padding:6px 0 6px 10px;border-top:1px solid #E3E6F2;text-align:right;color:${d > 0 ? '#138A5A' : d < 0 ? '#C93C34' : '#6B7194'}">${d == null ? '' : (d > 0 ? '+' : '') + d}</td></tr>`;
+    }).join('');
   const top = (s.voice || []).filter((v) => !v.own && v.n > 0).slice(0, 3).map((v) => esc(v.name) + ' (' + pct(v.share) + ')').join(', ');
-  const hosts = (s.topHosts || []).slice(0, 5).map((h) => esc(h.host)).join(', ');
-  return `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#15131f;max-width:560px">
-<p style="font-size:13px;color:#6b6780;margin:0 0 6px">AI SEO Deck weekly check</p>
-<h2 style="margin:0 0 14px;font-size:20px">${esc(site.project.brand || site.name)}: AI visibility ${s.score}/100${delta == null ? '' : ` (${delta >= 0 ? '+' : ''}${delta})`}</h2>
-<table style="border-collapse:collapse;font-size:14px;margin-bottom:14px"><tr><td style="padding:4px 14px 4px 0">Mentioned in</td><td><b>${pct(s.mentionRate)}</b> of answers</td></tr>
-<tr><td style="padding:4px 14px 4px 0">Website cited in</td><td><b>${pct(s.citationRate)}</b> of answers</td></tr>
-<tr><td style="padding:4px 14px 4px 0">Answers checked</td><td>${s.ok}${s.failed ? ` (${s.failed} could not be read)` : ''}</td></tr></table>
-${top ? `<p style="font-size:14px;margin:0 0 8px">Competitors named most: ${top}</p>` : ''}
-${hosts ? `<p style="font-size:14px;margin:0 0 14px">Sites the engines cite most for your questions: ${hosts}</p>` : ''}
-<p><a href="${esc(url)}" style="display:inline-block;background:#6c4cf1;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600">Open the full report</a></p>
-<p style="font-size:12px;color:#6b6780">You get this email after each scheduled check. Turn it off in Settings.</p></div>`;
+  return `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#0F1433;max-width:560px">
+<p style="font-size:13px;color:#5A6080;margin:0 0 6px">AI SEO Deck weekly check</p>
+<h2 style="margin:0 0 8px;font-size:21px">${esc(site.project.brand || site.name)}: visible in ${s.score}% of AI answers${delta == null ? '' : ` (${delta >= 0 ? '+' : ''}${delta})`}</h2>
+<p style="font-size:14px;margin:0 0 14px;color:#5A6080">Named by at least one AI engine for ${s.kwNamed || 0} of ${s.keywords || 0} keywords. Your site was cited in ${pct(s.citationRate)} of answers.</p>
+${rows ? `<table style="border-collapse:collapse;font-size:14px;margin-bottom:14px;min-width:320px"><tr><th style="text-align:left;font-size:12px;color:#5A6080;padding-bottom:4px">Keyword</th><th style="text-align:right;font-size:12px;color:#5A6080">Visible</th><th></th></tr>${rows}</table>` : ''}
+${top ? `<p style="font-size:14px;margin:0 0 14px">Rivals named most: ${top}</p>` : ''}
+<p><a href="${esc(url)}" style="display:inline-block;background:#FFE45C;color:#1B1600;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700">Open your deck</a></p>
+<p style="font-size:12px;color:#5A6080">You get this email after each scheduled check. Turn it off in Settings.</p></div>`;
 }
 async function sendDigest(user, site, summary, prev) {
   const to = (user.settings && user.settings.reportEmail) || user.email;
   if (!to) return;
-  await email.send({ to, subject: `AI visibility for ${site.project.brand || site.name}: ${summary.score}/100`, html: digestHtml(site, summary, prev), text: `AI visibility for ${site.project.brand || site.name}: ${summary.score}/100. Mentioned in ${pct(summary.mentionRate)} of answers, cited in ${pct(summary.citationRate)}. ${appUrl()}/app/site?id=${site.id}` });
+  await email.send({ to, subject: `AI visibility for ${site.project.brand || site.name}: ${summary.score}% of answers`, html: digestHtml(site, summary, prev), text: `AI visibility for ${site.project.brand || site.name}: named in ${summary.score}% of AI answers for ${summary.keywords || 0} keywords, cited in ${pct(summary.citationRate)}. ${appUrl()}/app/site?id=${site.id}` });
 }
 
 /* ---------- audits ---------- */
@@ -268,4 +303,4 @@ async function tick(opts) {
   return out;
 }
 
-module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedPrompts, digestHtml };
+module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedKeywords, digestHtml };

@@ -1,13 +1,16 @@
 'use strict';
-// Plans and what each one allows. Prompts are a pool shared by all of a user's sites.
+// Plans and what each one allows. Keywords are a pool shared by all of a user's sites.
+// Each keyword is asked as QUESTIONS customer questions on every chat engine (ChatGPT, Gemini, Perplexity,
+// Claude, Grok); Google AI Overviews and AI Mode get the keyword itself. With all 7 engines: 12 answers a check.
 const DAY = 86400000;
+const QUESTIONS = 2;
 
 const PLANS = {
-  solo: { name: 'Solo', sites: 1, prompts: 25, monthly: 29, yearly: 290 },
-  studio: { name: 'Studio', sites: 5, prompts: 75, monthly: 79, yearly: 790 },
-  agency: { name: 'Agency', sites: 20, prompts: 200, monthly: 199, yearly: 1990 }
+  solo: { name: 'Solo', sites: 1, keywords: 10, rechecks: 10, monthly: 19, yearly: 190 },
+  studio: { name: 'Studio', sites: 5, keywords: 30, rechecks: 30, monthly: 49, yearly: 490 },
+  agency: { name: 'Agency', sites: 20, keywords: 100, rechecks: 100, monthly: 149, yearly: 1490 }
 };
-const FREE = { name: 'Free', sites: 1, prompts: 5 };
+const FREE = { name: 'Free', sites: 1, keywords: 3, rechecks: 0 };
 
 function complimentary(user) {
   // "@webflow.com" is always included so the Marketplace review team gets the highest tier.
@@ -26,10 +29,12 @@ function limitsFor(user) {
     plan,
     name: p.name,
     sites: p.sites,
-    prompts: p.prompts,
+    keywords: p.keywords,
+    questions: QUESTIONS,
     allEngines: paid, // free: ChatGPT, Google AI Overviews and Perplexity; paid: every engine
     everyMs: (paid ? 7 : 30) * DAY,
-    manualPerMonth: paid ? 2 : 0, // extra checks on demand per site and month (the first run after setup is always allowed)
+    rechecks: p.rechecks, // keyword checks on demand per account and month
+    newChecks: p.keywords, // free first checks of newly added keywords per month
     auditPages: { free: 20, solo: 100, studio: 150, agency: 250 }[plan],
     canApply: paid, // writing fixes to Webflow
     whiteLabel: plan === 'studio' || plan === 'agency',
@@ -39,9 +44,10 @@ function limitsFor(user) {
   if (user && user.limitOverride) {
     const o = user.limitOverride;
     if (o.sites > lim.sites) lim.sites = o.sites;
-    if (o.prompts > lim.prompts) lim.prompts = o.prompts;
+    if (o.keywords > lim.keywords) lim.keywords = o.keywords;
+    if (o.rechecks > lim.rechecks) lim.rechecks = o.rechecks;
   }
   return lim;
 }
 
-module.exports = { PLANS, FREE, DAY, limitsFor, complimentary };
+module.exports = { PLANS, FREE, DAY, QUESTIONS, limitsFor, complimentary };

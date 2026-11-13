@@ -1,7 +1,7 @@
 'use strict';
 // Reads an AI answer for a project: is the brand mentioned, where, is its website cited, which competitors
 // show up and which websites the engine relied on. Matching ignores case, accents and punctuation
-// ("Sevil Smile", "sevil-smile", "SevilSmile" and an all caps spelling with Turkish dotted letters all match).
+// ("Brightline Studio", "brightline-studio", "BrightlineStudio" and an all caps spelling with Turkish dotted letters all match).
 
 // Lowercase, accents removed, everything that is not a letter or digit turned into one space.
 // map[i] is the index in the original text of normalized character i (for snippets).
@@ -33,7 +33,7 @@ function findTerm(textNorm, term) {
   };
   tryOne(t);
   const compact = t.replace(/ /g, '');
-  if (compact !== t && compact.length >= 4) tryOne(compact); // "sevil smile" also finds "sevilsmile"
+  if (compact !== t && compact.length >= 4) tryOne(compact); // "brightline studio" also finds "brightlinestudio"
   return best; // index in textNorm (the leading space of hay shifts by one, the match starts after it)
 }
 
@@ -55,7 +55,7 @@ function detect(entity, textNorm, sources) {
   }
   const domains = (entity.domains || []).map(cleanDomain).filter(Boolean);
   const citedUrls = (sources || []).filter((s) => hostMatches(s.host || s.url, domains)).map((s) => s.url || s.host);
-  // A domain written in the answer text ("visit sevilsmile.com") counts as a mention too
+  // A domain written in the answer text ("visit brightline.com") counts as a mention too
   if (index < 0) for (const d of domains) { const i = findTerm(textNorm, d); if (i >= 0 && (index < 0 || i < index)) index = i; }
   return { mentioned: index >= 0, index, cited: citedUrls.length > 0, citedUrls: citedUrls.slice(0, 5) };
 }
@@ -167,4 +167,114 @@ function summarize(project, results) {
   };
 }
 
-module.exports = { norm, normMap, findTerm, cleanDomain, hostMatches, detect, analyzeAnswer, summarize, snippetAt };
+/* ---------- keywords ---------- */
+
+// The state of one engine for one keyword, as one letter (the deck's dots):
+// b named and cited, n named, i cited only, o answered without naming you, x Google showed no AI answer, f could not be read.
+const STATE_ORDER = ['b', 'n', 'i', 'o', 'x', 'f'];
+const topEntries = (obj, n) => Object.entries(obj).sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))).slice(0, n);
+
+// rows: every result of one keyword in one run ({ e, ok, none, mentioned, cited, rank, comp, hosts, queries, citedUrls }).
+function keywordSummary(project, engines, rows) {
+  const ownDomains = (project.domains || []).map(cleanDomain).filter(Boolean);
+  const eng = {};
+  const lost = {};
+  const rivals = {}, hosts = {}, queries = {}, own = {};
+  const ranks = [];
+  let n = 0, m = 0, c = 0, na = 0, f = 0;
+  for (const e of engines) {
+    const rs = rows.filter((r) => r && r.e === e);
+    if (!rs.length) continue;
+    const ok = rs.filter((r) => r.ok && !r.none);
+    const named = ok.filter((r) => r.mentioned).length;
+    const cited = ok.filter((r) => r.cited).length;
+    na += rs.filter((r) => r.ok && r.none).length;
+    f += rs.filter((r) => !r.ok).length;
+    n += ok.length; m += named; c += cited;
+    eng[e] = !ok.length ? (rs.some((r) => r.ok && r.none) ? 'x' : 'f') : named && cited ? 'b' : named ? 'n' : cited ? 'i' : 'o';
+    const lostTo = {};
+    for (const r of ok) {
+      if (r.mentioned && r.rank) ranks.push(r.rank);
+      for (const [name, v] of Object.entries(r.comp || {})) if (v && v.m) { rivals[name] = (rivals[name] || 0) + 1; if (!r.mentioned) lostTo[name] = (lostTo[name] || 0) + 1; }
+      for (const h of r.hosts || []) if (!hostMatches(h, ownDomains)) hosts[h] = (hosts[h] || 0) + 1;
+      for (const q of r.queries || []) { const k = String(q).toLowerCase().replace(/\s+/g, ' ').trim(); if (k) queries[k] = (queries[k] || 0) + 1; }
+      for (const u of r.citedUrls || []) { const k = String(u).replace(/[?#].*$/, '').replace(/\/+$/, ''); if (k) own[k] = (own[k] || 0) + 1; }
+    }
+    if (!named && Object.keys(lostTo).length) lost[e] = topEntries(lostTo, 3).map(([name]) => name);
+  }
+  return {
+    n, m, c, na, f,
+    vis: n ? m / n : 0,
+    rank: ranks.length ? Math.round((ranks.reduce((a, x) => a + x, 0) / ranks.length) * 10) / 10 : null,
+    eng,
+    lost,
+    rivals: topEntries(rivals, 5),
+    hosts: topEntries(hosts, 8),
+    queries: topEntries(queries, 10).map(([q]) => q),
+    own: topEntries(own, 5)
+  };
+}
+
+// Engines that name the brand for a keyword, and how many answered at all.
+function engineCounts(sum) {
+  const states = Object.values((sum && sum.eng) || {});
+  return { named: states.filter((s) => s === 'b' || s === 'n').length, answered: states.filter((s) => s !== 'x' && s !== 'f').length, checked: states.length };
+}
+// "yes" when most engines that answered name you, "some" when at least one does, "no" otherwise.
+function verdict(sum) {
+  const k = engineCounts(sum);
+  if (!sum || !k.answered) return 'none';
+  if (k.named * 2 > k.answered) return 'yes';
+  return k.named ? 'some' : 'no';
+}
+
+// Adds up the latest summary of every keyword into the site's numbers.
+// keywords: [{ id, text }], kw: { [id]: keywordSummary + { at, runId, trend } }
+function siteSummary(project, keywords, kw) {
+  let n = 0, m = 0, c = 0, na = 0, f = 0, rankSum = 0, rankN = 0, measured = 0, kwNamed = 0;
+  const byEngine = {}, voice = { [project.brand]: 0 }, hosts = {}, queries = {}, own = {};
+  for (const r of project.competitors || []) if (r && r.name) voice[r.name] = 0;
+  for (const k of keywords || []) {
+    const s = kw && kw[k.id];
+    if (!s) continue;
+    measured++;
+    n += s.n || 0; m += s.m || 0; c += s.c || 0; na += s.na || 0; f += s.f || 0;
+    if (s.m) kwNamed++;
+    if (s.rank && s.m) { rankSum += s.rank * s.m; rankN += s.m; }
+    voice[project.brand] += s.m || 0;
+    for (const [name, x] of s.rivals || []) if (name in voice) voice[name] += x;
+    for (const [h, x] of s.hosts || []) hosts[h] = (hosts[h] || 0) + x;
+    for (const q of s.queries || []) queries[q] = (queries[q] || 0) + 1;
+    for (const [u, x] of s.own || []) own[u] = (own[u] || 0) + x;
+    for (const [e, st] of Object.entries(s.eng || {})) {
+      const b = (byEngine[e] = byEngine[e] || { k: 0, km: 0, kc: 0, kx: 0 });
+      if (st === 'x' || st === 'f') { if (st === 'x') b.kx++; continue; }
+      b.k++;
+      if (st === 'b' || st === 'n') b.km++;
+      if (st === 'b' || st === 'i') b.kc++;
+    }
+  }
+  const voiceList = Object.entries(voice).map(([name, x]) => ({ name, own: name === project.brand, n: x }));
+  const vt = voiceList.reduce((a, v) => a + v.n, 0);
+  for (const v of voiceList) v.share = vt ? v.n / vt : 0;
+  voiceList.sort((a, b) => b.n - a.n || (a.own ? -1 : 1));
+  return {
+    keywords: measured,
+    kwNamed,
+    ok: n,
+    total: n + na + f,
+    none: na,
+    failed: f,
+    mentionRate: n ? m / n : 0,
+    citationRate: n ? c / n : 0,
+    score: n ? Math.round((100 * m) / n) : 0,
+    avgRank: rankN ? Math.round((rankSum / rankN) * 10) / 10 : null,
+    byEngine,
+    voice: voiceList,
+    topHosts: topEntries(hosts, 15).map(([host, x]) => ({ host, n: x })),
+    topQueries: topEntries(queries, 15).map(([q, x]) => ({ q, n: x })),
+    ownCited: topEntries(own, 10).map(([url, x]) => ({ url, n: x }))
+  };
+}
+
+module.exports = { norm, normMap, findTerm, cleanDomain, hostMatches, detect, analyzeAnswer, summarize, snippetAt, keywordSummary, siteSummary, engineCounts, verdict, STATE_ORDER };
