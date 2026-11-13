@@ -25,7 +25,7 @@ Live address (planned): https://aiseodeck.silitlabs.com
 | Studio | $79/mo, $790/yr | 5 | 75 | as Solo + client report links with agency name |
 | Agency | $199/mo, $1990/yr | 20 | 200 | as Studio |
 
-Rough AI cost per answer, averaged over the 7 engines, is about 1.2 cents (ChatGPT about 1.1, Perplexity about 0.5, Gemini about 0.4 within the free grounding quota, AI Overviews about 0.3, AI Mode 0.4, Claude about 1.5, Grok about 2.5). Worst case per month (4.33 weekly checks + 2 on demand, every question): Solo about $14, Studio about $41, Agency about $110. `MAX_DAILY_CALLS` (default 1500, about $18 a day) stops all checks for the day once reached; work continues the next day.
+Rough AI cost per answer (Nov 2026 list prices), averaged over the 7 engines, is 1.1 to 1.5 cents: ChatGPT about 1.1 to 2 (web search $10 per 1,000 calls), AI Overviews 0.4 and AI Mode 0.4 (DataForSEO live), Gemini about 0.2 within the 5,000 free grounded prompts a month and about 3 after ($14 per 1,000 search queries), Perplexity about 0.5 to 0.8, Claude about 1.2 to 3 (web search $10 per 1,000), Grok about 2.5 to 4 (web search $5 per 1,000 calls plus tokens). Worst case per month (4.33 weekly checks + 2 on demand, every question, 1.5 cents): Solo about $17, Studio about $50, Agency about $133. `MAX_DAILY_CALLS` (default 1500, at most about $22 a day) stops all checks for the day once reached; work continues the next day.
 
 ## Kurulum (Batuhan için, sırayla)
 
