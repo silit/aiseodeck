@@ -90,7 +90,8 @@ function answerFor(prompt) {
 const ai = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const body = await readJSON(req);
-  if (u.pathname === '/v1/responses') {
+  if (u.pathname === '/v1/responses' || u.pathname === '/xai/v1/responses') {
+    const isGrok = u.pathname.startsWith('/xai/');
     if (!body.tools) {
       // text generation (suggestions)
       const ins = String(body.instructions || '') + ' ' + String(body.input || '');
@@ -98,12 +99,13 @@ const ai = http.createServer(async (req, res) => {
       if (/List \d+ questions/.test(ins)) return json(res, 200, { output_text: '{"prompts": ["Best clinic for veneers in Antalya?", "Where to get dental implants in Antalya?", "How much do veneers cost in Turkey?"]}' });
       if (/meta description/.test(ins)) return json(res, 200, { output: [{ type: 'message', content: [{ type: 'output_text', text: '```json\n{"title": "Veneers and smile design in Antalya | Lumen Dental", "description": "Digital smile design, veneers and implants in Antalya for patients from the UK and Ireland, planned with a fully digital workflow."}\n```' }] }] });
       if (/FAQ answers/.test(ins)) return json(res, 200, { output_text: '{"faq": [{"q": "How long do veneers last?", "a": "Veneers usually last 10 to 15 years with good care."}, {"q": "Do UK visitors need a visa?", "a": "Most UK visitors do not need a visa for a short stay."}]}' });
+      if (/Excerpts from AI answers/.test(ins)) return json(res, 200, { output_text: '{"sentiment": ["positive", "neutral", "positive"], "descriptors": ["digital smile design", "popular for veneers"], "check": ["Lumen Dental uses digital smile design."]}' });
       return json(res, 200, { output_text: '{}' });
     }
-    engineCalls.push({ e: 'openai', p: body.input, model: body.model, country: body.tools[0].user_location && body.tools[0].user_location.country });
+    engineCalls.push({ e: isGrok ? 'grok' : 'openai', p: body.input, model: body.model, country: body.tools[0].user_location && body.tools[0].user_location.country, auth: req.headers.authorization });
     const a = answerFor(body.input);
     return json(res, 200, { model: body.model, output: [
-      { type: 'web_search_call', id: 'ws1', status: 'completed', action: { type: 'search', sources: a.sources.map((s) => ({ type: 'url', url: s })) } },
+      { type: 'web_search_call', id: 'ws1', status: 'completed', action: { type: 'search', query: 'antalya dental clinic reviews', sources: a.sources.map((s) => ({ type: 'url', url: s })) } },
       { type: 'message', content: [{ type: 'output_text', text: a.text, annotations: a.sources.map((s) => ({ type: 'url_citation', url: s, title: 'T', start_index: 0, end_index: 1 })) }] }] });
   }
   if (u.pathname === '/v1/sonar') {
@@ -118,7 +120,25 @@ const ai = http.createServer(async (req, res) => {
     engineCalls.push({ e: 'gemini', p: prompt, key: req.headers['x-goog-api-key'] });
     if (/price|cost/i.test(prompt)) return json(res, 400, { error: { message: 'API key not valid' } });
     const a = answerFor(prompt);
-    return json(res, 200, { modelVersion: m[1], candidates: [{ content: { parts: [{ text: a.text }] }, groundingMetadata: { groundingChunks: a.sources.map((s) => ({ web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc', title: new URL(s).hostname.replace(/^www\./, '') } })) } }] });
+    return json(res, 200, { modelVersion: m[1], candidates: [{ content: { parts: [{ text: a.text }] }, groundingMetadata: { webSearchQueries: ['antalya dental clinic reviews'], groundingChunks: a.sources.map((s) => ({ web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc', title: new URL(s).hostname.replace(/^www\./, '') } })) } }] });
+  }
+  if (u.pathname === '/v1/messages') {
+    engineCalls.push({ e: 'claude', p: body.messages[0].content, model: body.model, tool: body.tools[0].type, key: req.headers['x-api-key'] });
+    const a = answerFor(body.messages[0].content);
+    return json(res, 200, { model: body.model, content: [
+      { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'veneers antalya clinics' } },
+      { type: 'web_search_tool_result', tool_use_id: 's1', content: a.sources.map((s) => ({ type: 'web_search_result', url: s, title: 'T' })) },
+      { type: 'text', text: a.text, citations: a.sources.map((s) => ({ type: 'web_search_result_location', url: s, title: 'T', cited_text: 'x' })) }] });
+  }
+  if (u.pathname === '/v3/serp/google/organic/live/advanced' || u.pathname === '/v3/serp/google/ai_mode/live/advanced') {
+    const mode = u.pathname.includes('ai_mode') ? 'aimode' : 'aio';
+    const task = body[0];
+    engineCalls.push({ e: mode, p: task.keyword, loc: task.location_code, lang: task.language_code, auth: req.headers.authorization });
+    if (req.headers.authorization !== 'Basic ' + Buffer.from('dl:dp').toString('base64')) return json(res, 200, { status_code: 20000, tasks: [{ status_code: 40100, status_message: 'You are not authorized' }] });
+    const a = answerFor(task.keyword);
+    const overview = { type: 'ai_overview', markdown: mode === 'aio' && /veneer/i.test(task.keyword) ? 'Lumen Dental and Bright Smile Clinic are popular for veneers in Antalya [1](https://lumendental.com/veneers).' : a.text, items: [], references: a.sources.map((s) => ({ type: 'ai_overview_reference', domain: new URL(s).hostname.replace(/^www\./, ''), url: s, title: 'T' })) };
+    const items = mode === 'aio' && /implant/i.test(task.keyword) ? [{ type: 'organic', url: 'https://x.com' }] : [overview, { type: 'organic', url: 'https://x.com' }];
+    return json(res, 200, { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.0024, result: [{ keyword: task.keyword, items }] }] });
   }
   json(res, 404, { error: { message: 'mock ai: no route ' + u.pathname } });
 });
@@ -212,6 +232,9 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     OPENAI_API_KEY: 'ok', OPENAI_API_BASE: 'http://127.0.0.1:' + aiPort,
     PERPLEXITY_API_KEY: 'pk', PERPLEXITY_API_BASE: 'http://127.0.0.1:' + aiPort,
     GEMINI_API_KEY: 'gk', GEMINI_API_BASE: 'http://127.0.0.1:' + aiPort,
+    ANTHROPIC_API_KEY: 'ak', ANTHROPIC_API_BASE: 'http://127.0.0.1:' + aiPort,
+    XAI_API_KEY: 'xk', XAI_API_BASE: 'http://127.0.0.1:' + aiPort + '/xai',
+    DATAFORSEO_LOGIN: 'dl', DATAFORSEO_PASSWORD: 'dp', DATAFORSEO_API_BASE: 'http://127.0.0.1:' + aiPort,
     POLAR_ACCESS_TOKEN: 'polar_oat', POLAR_API_BASE: 'http://127.0.0.1:' + polarPort, POLAR_WEBHOOK_SECRET: 'whsec_' + Buffer.from('polar-secret-key').toString('base64')
   });
   const host = '127.0.0.1:' + custPort;
@@ -242,7 +265,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const kept = fx.mergeSchema({ '@graph': [{ '@type': 'Product', name: 'Kit' }] }, [fx.faqSchema([{ q: 'a?', a: 'b' }, { q: 'c?', a: 'd' }])]);
     assert(kept['@graph'].some((n) => n['@type'] === 'Product'), 'merge keeps unrelated existing nodes');
     const { limitsFor } = require('../api/_lib/plans');
-    assert(limitsFor({ plan: 'free', email: 'a@b.com' }).engines === 1 && limitsFor({ plan: 'solo' }).prompts === 40, 'plan limits');
+    assert(limitsFor({ plan: 'free', email: 'a@b.com' }).allEngines === false && limitsFor({ plan: 'solo' }).prompts === 25 && limitsFor({ plan: 'agency' }).prompts === 200, 'plan limits');
     assert(limitsFor({ plan: 'free', email: 'reviewer@webflow.com' }).plan === 'agency', 'Webflow reviewers get Agency');
     const { parseFaq, parseRivals } = require('../api/index.js')._test;
     assert(parseFaq('Q: One?\nA: First answer\ncontinues\n\nQ: Two?\nA: Second').length === 2, 'FAQ text parses into pairs');
@@ -270,7 +293,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(site.project.ready && site.tracked && site.prompts.length === 4, 'project is ready and tracked with 4 questions');
   assert(site.project.competitors[0].domain === 'brightsmile.com' && site.project.country === 'GB', 'rivals and market saved');
   const run1 = getJ('run:' + site.sched.runId);
-  assert(run1 && run1.engines.join() === 'openai' && run1.total === 4, 'free plan: first run on ChatGPT only, 4 answers');
+  assert(run1 && run1.engines.join() === 'openai,aio,perplexity' && run1.total === 12, 'free plan: first run on ChatGPT, Google AI Overviews and Perplexity, 12 answers');
 
   console.log('first run through the page pump');
   for (let i = 0; i < 6; i++) {
@@ -278,20 +301,29 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     if (JSON.parse(r.body).finished || JSON.parse(r.body).idle) break;
   }
   site = getJ('site:siteA');
-  assert(!site.sched.runId && site.latest && site.latest.ok === 4, 'run finished with 4 answers');
-  assert(site.latest.mentionRate === 0.5 && site.latest.citationRate === 0.5, 'named in 2 of 4 answers and cited in 2 (both veneer questions)');
-  assert(site.latest.voice[0].name === 'Bright Smile Clinic' && site.latest.voice[0].n === 3 && site.latest.voice[1].n === 2, 'share of voice: the rival is named in 3 answers, the brand in 2');
+  assert(!site.sched.runId && site.latest && site.latest.ok === 11 && site.latest.none === 1, 'run finished: 11 answers, 1 question without a Google AI Overview');
+  assert(Math.abs(site.latest.mentionRate - 6 / 11) < 1e-9 && Math.abs(site.latest.citationRate - 6 / 11) < 1e-9, 'named and cited in 6 of 11 answers (the veneer questions)');
+  assert(site.latest.voice[0].name === 'Bright Smile Clinic' && site.latest.voice[0].n === 8 && site.latest.voice[1].n === 6, 'share of voice: the rival is named in 8 answers, the brand in 6');
+  assert(site.latest.byEngine.aio.na === 1 && site.latest.byEngine.aio.m === 2, 'AI Overviews: one question had none, two name the brand');
+  assert(site.latest.insights && site.latest.insights.descriptors.includes('digital smile design') && site.latest.insights.sentiment.positive === 2, 'insights: descriptors and sentiment from the answers that name the brand');
+  assert(site.latest.gaps.length === 1 && /implants/.test(site.latest.gaps[0].text) && site.latest.gaps[0].rivals[0] === 'Bright Smile Clinic', 'where rivals win: the implants question');
+  assert(site.latest.topQueries.some((q) => q.q === 'antalya dental clinic reviews'), 'what the AI searched for is collected');
+  assert(engineCalls.some((c) => c.e === 'aio' && c.loc === 2826 && c.lang === 'en'), 'Google AI Overviews asked for the UK market in English');
   assert(engineCalls.filter((c) => c.e === 'openai').every((c) => c.country === 'GB' && c.model === 'gpt-6-luna'), 'ChatGPT calls use the market and the default model');
   assert(emails.some((e) => /AI visibility for Lumen Dental/.test(e.subject)), 'first report email sent');
   assert(site.sched.nextRunAt - Date.now() > 29 * 86400000, 'free plan: next check in about a month');
 
   r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('class="cell both"') && r.body.includes('visibility score'), 'answer grid and ring render');
+  assert(r.body.includes('class="cell lock"') && r.body.includes('4 more AI engines') && r.body.includes('class="cell na"'), 'free plan sees the paid engines as locked columns, and the question without an AI Overview');
+  assert(r.body.includes('How AI describes you') && r.body.includes('digital smile design'), 'insights panel renders');
   assert(r.body.includes('disabled') && r.body.includes('Checks on demand are part of the paid plans'), 'free plan cannot run a check on demand');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=transcripts', { headers: { cookie } });
   assert(r.body.includes('<mark>Lumen Dental</mark>') && r.body.includes('rival-name') && r.body.includes('chip own'), 'transcripts highlight the brand, rivals and own sources');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=sources', { headers: { cookie } });
-  assert(r.body.includes('whatclinic.com') && !/<b>lumendental\.com<\/b>/.test(r.body), 'sources list excludes the own domain');
+  assert(r.body.includes('whatclinic.com') && !/class="host" title="lumendental\.com"/.test(r.body) && r.body.includes('lumendental.com/veneers'), 'sources list excludes the own domain and lists the own pages cited');
+  r = await request(port, 'GET', '/app/site?id=siteA&tab=rivals', { headers: { cookie } });
+  assert(r.status === 200 && r.body.includes('Where rivals win') && r.body.includes('Where to get dental implants in Antalya?'), 'rivals tab lists the gap');
 
   console.log('upgrade and a full run from cron');
   const user = getJ('user:user_1');
@@ -300,18 +332,23 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'POST', '/app/site/run', { headers: { cookie, 'content-type': 'application/x-www-form-urlencoded', origin: 'https://app.test' }, body: 'id=siteA' });
   site = getJ('site:siteA');
   const run2 = getJ('run:' + site.sched.runId);
-  assert(run2 && run2.engines.join() === 'openai,perplexity,gemini' && run2.total === 12, 'paid run asks all three engines');
+  assert(run2 && run2.engines.join() === 'openai,aio,aimode,gemini,perplexity,claude,grok' && run2.total === 28, 'paid run asks all seven AI engines');
   r = await request(port, 'GET', '/cron/tick', {});
   assert(r.status === 401, 'cron needs the key');
   for (let i = 0; i < 4 && getJ('site:siteA').sched.runId; i++) r = await request(port, 'GET', '/cron/tick?key=cronkey', {});
   site = getJ('site:siteA');
-  assert(!site.sched.runId && site.latest.total === 12, 'cron finished the paid run');
+  assert(!site.sched.runId && site.latest.total === 28, 'cron finished the paid run');
   const res2 = Object.fromEntries([...db.get('res:' + run2.id)].map(([k, v]) => [k, JSON.parse(v)]));
   const gem = Object.values(res2).filter((x) => x.e === 'gemini');
   assert(gem.some((x) => !x.ok && /API key/.test(x.err)) && gem.some((x) => x.ok && x.cited), 'Gemini: a 400 is recorded as failed, grounding domains count as citations');
   assert(Object.values(res2).filter((x) => x.e === 'perplexity').every((x) => x.ok), 'Perplexity: the 429 was retried and every answer read');
-  assert(engineCalls.filter((c) => c.e === 'perplexity').length === 5, 'Perplexity was called once more for the retry');
-  assert(site.latest.failed === 1 && site.latest.ok === 11, 'summary counts the failed answer');
+  assert(engineCalls.filter((c) => c.e === 'perplexity').length === 9, 'Perplexity was called once more for the retry');
+  assert(site.latest.failed === 1 && site.latest.ok === 26 && site.latest.none === 1, 'summary counts the failed answer and the missing AI Overview');
+  const cl = Object.values(res2).filter((x) => x.e === 'claude' && x.ok && x.cited);
+  const gk = Object.values(res2).filter((x) => x.e === 'grok' && x.ok && x.cited);
+  assert(cl.length === 2 && gk.length === 2 && cl[0].queries[0] === 'veneers antalya clinics', 'Claude and Grok answers read, with citations and searches');
+  assert(engineCalls.some((c) => c.e === 'claude' && c.tool === 'web_search_20250305' && c.model === 'claude-haiku-5-5') && engineCalls.some((c) => c.e === 'grok' && c.auth === 'Bearer xk'), 'Claude and Grok called with the right tool, model and key');
+  assert(Object.values(res2).some((x) => x.e === 'aimode' && x.ok && x.mentioned), 'Google AI Mode answers read');
   assert(site.sched.manual && site.sched.manual.n === 1, 'the check on demand is counted for this month');
   await require('../api/_lib/store').updateSite('siteA', (s) => { s.sched.manual.n = 2; });
   r = await request(port, 'POST', '/app/site/run', { headers: { cookie, 'content-type': 'application/x-www-form-urlencoded', origin: 'https://app.test' }, body: 'id=siteA' });

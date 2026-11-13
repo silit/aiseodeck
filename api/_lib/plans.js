@@ -3,9 +3,9 @@
 const DAY = 86400000;
 
 const PLANS = {
-  solo: { name: 'Solo', sites: 1, prompts: 40, monthly: 29, yearly: 290 },
-  studio: { name: 'Studio', sites: 5, prompts: 120, monthly: 79, yearly: 790 },
-  agency: { name: 'Agency', sites: 20, prompts: 400, monthly: 199, yearly: 1990 }
+  solo: { name: 'Solo', sites: 1, prompts: 25, monthly: 29, yearly: 290 },
+  studio: { name: 'Studio', sites: 5, prompts: 75, monthly: 79, yearly: 790 },
+  agency: { name: 'Agency', sites: 20, prompts: 200, monthly: 199, yearly: 1990 }
 };
 const FREE = { name: 'Free', sites: 1, prompts: 5 };
 
@@ -27,7 +27,7 @@ function limitsFor(user) {
     name: p.name,
     sites: p.sites,
     prompts: p.prompts,
-    engines: paid ? 4 : 1, // free: one engine (ChatGPT when it is set up)
+    allEngines: paid, // free: ChatGPT, Google AI Overviews and Perplexity; paid: every engine
     everyMs: (paid ? 7 : 30) * DAY,
     manualPerMonth: paid ? 2 : 0, // extra checks on demand per site and month (the first run after setup is always allowed)
     auditPages: { free: 20, solo: 100, studio: 150, agency: 250 }[plan],

@@ -112,7 +112,9 @@ function analyzeAnswer(project, answer) {
 // One run's results -> the numbers on the dashboard.
 // results: [{ p: promptId, e: engine, ok, mentioned, rank, cited, comp, hosts }]
 function summarize(project, results) {
-  const ok = results.filter((r) => r && r.ok);
+  const all = results.filter(Boolean);
+  const ok = all.filter((r) => r.ok && !r.none);
+  const none = all.filter((r) => r.ok && r.none);
   const n = ok.length;
   const m = ok.filter((r) => r.mentioned).length;
   const c = ok.filter((r) => r.cited).length;
@@ -123,9 +125,10 @@ function summarize(project, results) {
   const rankScore = n ? rankSum / n : 0;
   const byEngine = {};
   for (const r of ok) {
-    const e = (byEngine[r.e] = byEngine[r.e] || { n: 0, m: 0, c: 0 });
+    const e = (byEngine[r.e] = byEngine[r.e] || { n: 0, m: 0, c: 0, na: 0 });
     e.n++; if (r.mentioned) e.m++; if (r.cited) e.c++;
   }
+  for (const r of none) (byEngine[r.e] = byEngine[r.e] || { n: 0, m: 0, c: 0, na: 0 }).na++;
   // Share of voice: of all answers naming any tracked brand, how many name each one
   const voice = [{ name: project.brand, own: true, n: m }];
   for (const comp of project.competitors || []) {
@@ -140,10 +143,20 @@ function summarize(project, results) {
   const hostCount = {};
   for (const r of ok) for (const h of r.hosts || []) if (!hostMatches(h, own)) hostCount[h] = (hostCount[h] || 0) + 1;
   const topHosts = Object.entries(hostCount).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([host, k]) => ({ host, n: k }));
+  // What the engines searched for to answer (query fan-out) and which of the brand's own pages they cite
+  const qCount = {};
+  for (const r of ok) for (const q of r.queries || []) { const k = String(q).toLowerCase(); qCount[k] = qCount[k] || { q, n: 0 }; qCount[k].n++; }
+  const topQueries = Object.values(qCount).sort((a, b) => b.n - a.n).slice(0, 15);
+  const uCount = {};
+  for (const r of ok) for (const u of r.citedUrls || []) { const k = String(u).replace(/[?#].*$/, '').replace(/\/+$/, ''); uCount[k] = (uCount[k] || 0) + 1; }
+  const ownCited = Object.entries(uCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([url, k]) => ({ url, n: k }));
   return {
-    total: results.length,
+    total: all.length,
     ok: n,
-    failed: results.length - n,
+    none: none.length,
+    failed: all.length - n - none.length,
+    topQueries,
+    ownCited,
     mentionRate,
     citationRate,
     avgRank: ranks.length ? ranks.reduce((a, x) => a + x, 0) / ranks.length : null,

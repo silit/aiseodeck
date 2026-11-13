@@ -331,19 +331,21 @@ async function handleSitePage(req, res, user) {
   const site = await ownedSite(user, q.id);
   if (!site) return notFound(res);
   if (!site.project.ready) return redirect(res, '/app/setup?id=' + encodeURIComponent(site.id));
-  const tab = ['answers', 'transcripts', 'sources', 'audit', 'setup'].includes(q.tab) ? q.tab : 'answers';
+  const tab = ['answers', 'transcripts', 'rivals', 'sources', 'audit', 'setup'].includes(q.tab) ? q.tab : 'answers';
   const shown = await shownRun(site);
   let progress = null;
   if (site.sched.runId) {
     const active = await store.getRun(site.sched.runId);
     progress = { total: active ? active.total : 0, done: await store.resultCount(site.sched.runId) };
   }
-  const hist = await store.history(site.id, 2);
+  const hist = await store.history(site.id, 12);
+  const shownEngines = shown.run.engines || [];
+  const locked = engines.lockedFor(user._limits).filter((e) => !shownEngines.includes(e));
   const audit = tab === 'audit' ? await store.getAudit(site.id) : null;
   let notice = html.esc(noticeFrom(q, user));
   if (q.saved) notice = 'Saved.';
   send(res, 200, html.sitePage(user, site, {
-    tab, limits: user._limits, prompts: shown.run.prompts || [], engines: shown.run.engines || [], results: shown.results, progress,
+    tab, limits: user._limits, prompts: shown.run.prompts || [], engines: shownEngines, results: shown.results, progress, locked, history: hist,
     prev: hist[1] || null, audit, notice, canRun: canRun(site, user._limits, Date.now())
   }));
 }

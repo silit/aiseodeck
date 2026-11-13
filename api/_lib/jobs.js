@@ -9,6 +9,7 @@ const wf = require('./webflow');
 const email = require('./email');
 const { limitsFor, DAY } = require('./plans');
 
+const insights = require('./insights');
 const STALE_MS = 3 * 60000; // a run with no tasks left and no progress for this long is finished as it is
 const MAX_ATTEMPTS = 3;
 
@@ -84,9 +85,13 @@ async function doTask(run, task, deadline) {
   if (!(await store.takeCalls(1))) { await store.requeue(run.id, task); return 'budget'; }
   const timeoutMs = Math.min(40000, Math.max(5000, (deadline || Date.now() + 40000) - Date.now() - 2000));
   try {
-    const ans = await engines.ask(engine, prompt.text, { country: run.project.country, timeoutMs });
+    const ans = await engines.ask(engine, prompt.text, { country: run.project.country, language: run.project.language, timeoutMs });
+    if (ans.none) { // Google showed no AI answer for this question
+      await store.saveResult(run.id, field, { p: pid, e: engine, ok: true, none: true, at: Date.now(), ms: ans.ms, model: ans.model });
+      return 'ok';
+    }
     const a = analyze.analyzeAnswer(run.project, ans);
-    await store.saveResult(run.id, field, Object.assign({ p: pid, e: engine, ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, 1500) }, a));
+    await store.saveResult(run.id, field, Object.assign({ p: pid, e: engine, ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, 1500), queries: (ans.queries || []).slice(0, 6) }, a));
     return 'ok';
   } catch (e) {
     // a timeout caused by our own short time window is not the engine's fault: try again without counting it
@@ -151,7 +156,12 @@ async function maybeFinish(runId, now) {
   if (left > 0) return false;
   const done = await store.resultCount(runId);
   if (done < run.total && now - (run.lastProgressAt || run.at) < STALE_MS) return false; // answers still coming in
-  await finishRun(run, now);
+  if (!(await store.lock('finish:' + runId, 90))) return false; // another worker is finishing it
+  try {
+    const fresh = await store.getRun(runId);
+    if (!fresh || fresh.status !== 'running') return false;
+    await finishRun(fresh, now);
+  } finally { await store.unlock('finish:' + runId); }
   return true;
 }
 
@@ -160,6 +170,8 @@ async function finishRun(run, now) {
   const res = await store.results(run.id);
   const list = Object.values(res).filter(Boolean);
   const summary = analyze.summarize(run.project, list);
+  summary.gaps = insights.gaps(run, res);
+  try { summary.insights = await insights.describe(run, list); } catch (e) { console.error('[aiseodeck] insights', e.message); }
   run.status = 'done';
   run.finishedAt = now;
   run.summary = summary;

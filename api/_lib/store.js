@@ -244,7 +244,7 @@ async function history(siteId, n) { return kv.lrangeJSON('hist:' + siteId, n || 
 
 // Cost guard: at most MAX_DAILY_CALLS engine calls per day across all users.
 async function takeCalls(n) {
-  const max = parseInt(process.env.MAX_DAILY_CALLS || '', 10) || 4000;
+  const max = parseInt(process.env.MAX_DAILY_CALLS || '', 10) || 1500;
   const key = 'calls:' + day();
   const used = await kv.incrBy(key, n);
   if (used === n) await kv.expire(key, 3 * 86400);

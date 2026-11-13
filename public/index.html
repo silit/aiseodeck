@@ -3,24 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AI SEO Deck: get named by ChatGPT, Perplexity and Gemini</title>
-<meta name="description" content="See whether ChatGPT, Perplexity and Gemini name and cite your Webflow site, then fix what keeps you out of their answers, right from Webflow. Works on every Webflow plan.">
+<title>AI SEO Deck: every AI answer about you, in one place</title>
+<meta name="description" content="See whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend your brand, all in one place. Then fix your Webflow site so they do.">
 <link rel="icon" href="/favicon.png">
-<meta property="og:title" content="AI SEO Deck for Webflow">
-<meta property="og:description" content="Track your brand in ChatGPT, Perplexity and Gemini answers and fix your Webflow site for AI search.">
+<meta property="og:title" content="AI SEO Deck: every AI, one deck">
+<meta property="og:description" content="Track your brand across seven AI answer engines and fix your Webflow site for AI search.">
 <meta property="og:image" content="/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
 <style>
-:root{--paper:#F5F6F8;--surface:#FFFFFF;--ink:#10162B;--muted:#5C6478;--line:#E2E5EC;--soft:#EEF0F4;--mark:#FFE066;--mark-ink:#10162B;--cite:#2D5BFF;--cite-soft:#E7EDFF;--slate:#8A93A6;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--paper:#0D1120;--surface:#151A2C;--ink:#EAEDF6;--muted:#9AA3B8;--line:#262D44;--soft:#1C2236;--mark:#FFD84D;--cite:#7D9BFF;--cite-soft:#1D2750;--slate:#6B748C;color-scheme:dark}}
+:root{--paper:#F5F6F8;--surface:#FFFFFF;--ink:#10162B;--muted:#5C6478;--line:#E2E5EC;--soft:#EEF0F4;--mark:#FFE066;--mark-ink:#10162B;--cite:#2D5BFF;--cite-soft:#E7EDFF;--slate:#8A93A6;--good:#1C8F5A;--bad:#C93C34;--warn-soft:#FFF3D6;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--paper:#0D1120;--surface:#151A2C;--ink:#EAEDF6;--muted:#9AA3B8;--line:#262D44;--soft:#1C2236;--mark:#FFD84D;--cite:#7D9BFF;--cite-soft:#1D2750;--slate:#6B748C;--good:#4FD08F;--bad:#FF8077;--warn-soft:#352A12;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
 a{color:var(--cite);text-underline-offset:3px}
 a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--cite);outline-offset:3px}
-h1,h2,h3{margin:0;letter-spacing:-.025em;line-height:1.08;text-wrap:balance}
-h1{font-size:clamp(38px,5.4vw,66px);font-weight:800}
+h1,h2,h3{margin:0;letter-spacing:-.025em;line-height:1.05;text-wrap:balance}
+h1{font-size:clamp(46px,7vw,92px);font-weight:800;letter-spacing:-.045em}
 h2{font-size:clamp(28px,3.4vw,40px);font-weight:800}
 h3{font-size:19px;font-weight:700;letter-spacing:-.01em}
 p{margin:0}
@@ -28,39 +28,64 @@ p{margin:0}
 .brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
 .top nav{display:flex;gap:22px;align-items:center;font-weight:600;font-size:15px}
 .top nav a{color:var(--ink);text-decoration:none}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:700;font-size:16px;padding:13px 20px;border-radius:12px;text-decoration:none;border:1px solid var(--line);color:var(--ink);background:var(--surface)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:700;font-size:16px;padding:13px 20px;border-radius:12px;text-decoration:none;border:1px solid var(--line);color:var(--ink);background:var(--surface);cursor:pointer}
 .btn.mark{background:var(--mark);border-color:var(--mark);color:var(--mark-ink)}
-.btn.ink{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .btn.sm{padding:8px 14px;font-size:14.5px;border-radius:10px}
-.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding:56px 0 72px}
-.hero .lede{font-size:clamp(17px,1.6vw,20px);color:var(--muted);margin:22px 0 30px;max-width:46ch}
-.hero .note{font-size:14px;color:var(--muted);margin-top:14px}
-.chat{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px;display:grid;gap:16px;box-shadow:0 30px 60px -40px rgba(16,22,43,.35)}
-.ask{justify-self:end;background:var(--ink);color:var(--paper);border-radius:16px 16px 4px 16px;padding:10px 15px;font-weight:600;max-width:90%}
-.who{display:flex;gap:10px;align-items:center;font-size:13.5px;font-weight:700;flex-wrap:wrap}
+.hero{display:grid;grid-template-columns:1fr 1.02fr;gap:52px;align-items:center;padding:44px 0 64px}
+.hero .lede{font-size:clamp(17px,1.6vw,20px);color:var(--muted);margin:24px 0 30px;max-width:44ch}
+.hero .lede b{color:var(--ink);font-weight:600}
+.note{font-size:14px;color:var(--muted);margin-top:14px}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+
+/* the demo: one question, every engine */
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px;display:grid;gap:16px;box-shadow:0 30px 60px -40px rgba(16,22,43,.35);min-width:0}
+.ask{justify-self:end;background:var(--ink);color:var(--paper);border-radius:16px 16px 4px 16px;padding:10px 15px;font-weight:600;max-width:92%}
+.etabs{display:flex;gap:6px;flex-wrap:wrap}
+.etabs::-webkit-scrollbar{display:none}
+.etab{font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:6px 11px;display:inline-flex;gap:7px;align-items:center;white-space:nowrap;cursor:pointer}
+.etab[aria-selected=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.st{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.st.named{background:var(--mark)}.st.both{background:var(--mark);box-shadow:inset 0 0 0 2px var(--cite)}.st.none{background:var(--slate);opacity:.55;width:6px;height:6px}
+.who{display:flex;gap:10px;align-items:center;font-size:13.5px;font-weight:700;flex-wrap:wrap;min-height:26px}
 .pill{display:inline-flex;font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--soft);color:var(--muted)}
 .pill.mark{background:var(--mark);color:var(--mark-ink)}.pill.cite{background:var(--cite-soft);color:var(--cite)}
-.quote{font-family:Newsreader,Georgia,serif;font-size:19px;line-height:1.6}
+.quote{font-family:Newsreader,Georgia,serif;font-size:19px;line-height:1.6;min-height:4.8em}
 mark{color:inherit;padding:0 2px;border-radius:2px;background:linear-gradient(var(--mark),var(--mark)) no-repeat 0 55%/100% 76%}
-@media (prefers-reduced-motion:no-preference){.hero mark{animation:sweep 900ms 600ms cubic-bezier(.3,.7,.2,1) both}@keyframes sweep{from{background-size:0 76%}to{background-size:100% 76%}}}
+@media (prefers-reduced-motion:no-preference){.fresh mark{animation:sweep 700ms 120ms cubic-bezier(.3,.7,.2,1) both}@keyframes sweep{from{background-size:0 76%}to{background-size:100% 76%}}}
 .rival{text-decoration:underline dotted var(--slate) 2px;text-underline-offset:3px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--muted)}
 .chip.own{background:var(--cite-soft);color:var(--cite);border-color:transparent;font-weight:700}
-section{padding:72px 0;border-top:1px solid var(--line)}
-.sec-head{display:grid;gap:12px;max-width:60ch;margin-bottom:36px}
+.rowline{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.rowline .dots{display:flex;gap:8px}
+.dot{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center}
+.dot.named{background:var(--mark)}.dot.both{background:var(--mark);box-shadow:inset 0 0 0 2.5px var(--cite)}.dot.none::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--slate);opacity:.55}
+.dot.cur{outline:2px solid var(--ink);outline-offset:2px}
+
+.engines{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:6px 0 0}
+.engines span{font-weight:700;font-size:15px;border:1px solid var(--line);border-radius:999px;padding:7px 14px;background:var(--surface)}
+section{padding:76px 0;border-top:1px solid var(--line)}
+.sec-head{display:grid;gap:12px;max-width:62ch;margin-bottom:36px}
 .sec-head p{color:var(--muted);font-size:18px}
 .gridcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;overflow-x:auto}
-table.grid{border-collapse:collapse;width:100%;min-width:560px}
-.grid th{font-size:13px;color:var(--muted);font-weight:700;text-align:center;padding:0 8px 12px}
+table.grid{border-collapse:collapse;width:100%;min-width:760px}
+.grid th{font-size:13px;color:var(--muted);font-weight:700;text-align:center;padding:0 6px 12px;white-space:nowrap}
 .grid th:first-child{text-align:left}
-.grid td{border-top:1px solid var(--line);padding:9px 8px;text-align:center}
+.grid td{border-top:1px solid var(--line);padding:9px 6px;text-align:center}
 .grid td:first-child{text-align:left;font-size:15px}
 .cell{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;font-weight:800;font-size:12.5px;color:var(--mark-ink);vertical-align:middle}
 .cell.named{background:var(--mark)}.cell.both{background:var(--mark);box-shadow:inset 0 0 0 3px var(--cite)}.cell.cited{box-shadow:inset 0 0 0 3px var(--cite)}
 .cell.none::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--slate);opacity:.55}
+.cell.na::before{content:"";width:10px;height:2px;border-radius:2px;background:var(--line)}
 .legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13.5px;color:var(--muted);margin-top:16px}
 .legend .cell{width:16px;height:16px;margin-right:6px}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:grid;gap:12px;align-content:start}
+.card p{color:var(--muted);font-size:15.5px}
+.sent{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--soft)}
+.sent i{display:block;height:100%}.sent .pos{background:var(--good)}.sent .neu{background:var(--slate);opacity:.6}.sent .neg{background:var(--bad)}
+.gap{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:6px;font-size:14.5px}
+.gap b{font-weight:700}
 .fixes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 48px}
 .fix{padding:22px 0;border-top:1px solid var(--line);display:grid;gap:8px}
 .fix p{color:var(--muted)}
@@ -85,8 +110,8 @@ details p{color:var(--muted);margin-top:10px;max-width:70ch}
 .cta{display:grid;justify-items:start;gap:18px}
 footer{border-top:1px solid var(--line);padding:26px 0 40px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 22px}
 footer a{color:var(--muted)}
-@media(max-width:900px){.hero{grid-template-columns:1fr;gap:36px;padding-top:28px}.plans{grid-template-columns:repeat(2,minmax(0,1fr))}.fixes{grid-template-columns:1fr}ol.steps{grid-template-columns:1fr}}
-@media(max-width:560px){.plans{grid-template-columns:1fr}.top nav a.hide-s{display:none}.chat{padding:18px}.quote{font-size:17.5px}}
+@media(max-width:960px){.hero{grid-template-columns:1fr;gap:34px;padding-top:24px}.plans{grid-template-columns:repeat(2,minmax(0,1fr))}.fixes{grid-template-columns:1fr}ol.steps{grid-template-columns:1fr}.three{grid-template-columns:1fr}}
+@media(max-width:560px){.plans{grid-template-columns:1fr}.top nav a.hide-s{display:none}.demo{padding:16px}.quote{font-size:17.5px;min-height:6.4em}}
 </style>
 </head>
 <body>
@@ -99,32 +124,49 @@ footer a{color:var(--muted)}
 <main>
 <div class="hero">
   <div>
-    <h1>Find out if ChatGPT recommends you</h1>
-    <p class="lede">Every week, AI SEO Deck asks ChatGPT, Perplexity and Gemini the questions your customers ask. You see where your brand is named and where your Webflow site is cited, then fix what keeps you out of the answers, right from Webflow.</p>
-    <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#how">See how it works</a></div>
+    <h1>Every AI.<br>One deck.</h1>
+    <p class="lede">See whether <b>ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok</b> recommend you, all in one place. Then fix your Webflow site so they do.</p>
+    <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#grid">See the grid</a></div>
     <p class="note">Works on every Webflow plan. The free plan needs no card.</p>
   </div>
-  <div class="chat" aria-label="Example of a tracked AI answer">
+  <div class="demo" id="demo" aria-label="Example: the same question answered by seven AI engines">
     <p class="ask">Which bookkeeping app is best for UK freelancers?</p>
-    <div class="who">ChatGPT <span class="pill mark">Named #1</span><span class="pill cite">Your site cited</span></div>
-    <p class="quote">For UK freelancers the tools recommended most often are <mark>Tallyhawk</mark>, <span class="rival">Ledgerbird</span> and <span class="rival">Sumwise</span>. <mark>Tallyhawk</mark> stands out for Making Tax Digital support and a simple mobile app.</p>
-    <div class="chips"><span class="chip own">tallyhawk.com</span><span class="chip">which.co.uk</span><span class="chip">reddit.com</span></div>
+    <div class="etabs" role="tablist" aria-label="AI engines"></div>
+    <div role="tabpanel" id="dpanel" aria-live="polite">
+      <div class="who" id="dwho"></div>
+      <p class="quote" id="dtext"></p>
+      <div class="chips" id="dsrc"></div>
+    </div>
+    <div class="rowline"><span>This question across 7 AI engines</span><span class="dots" id="ddots" aria-hidden="true"></span></div>
   </div>
 </div>
 
-<section id="how">
-  <div class="sec-head"><h2>Every answer, on one grid</h2><p>One row per question, one column per AI assistant. You see at a glance where you show up, where a rival takes your place and which sites the assistants trust.</p></div>
+<section id="grid">
+  <div class="sec-head"><h2>Every answer, on one grid</h2><p>One row per question, one column per AI engine. See where you show up, where a rival takes your place and which sites the engines trust. Checked every week, with a trend over time.</p></div>
   <div class="gridcard">
     <table class="grid">
-      <thead><tr><th scope="col">Question</th><th scope="col">ChatGPT</th><th scope="col">Perplexity</th><th scope="col">Gemini</th></tr></thead>
+      <thead><tr><th scope="col">Question</th><th scope="col">ChatGPT</th><th scope="col">AI Overviews</th><th scope="col">AI Mode</th><th scope="col">Gemini</th><th scope="col">Perplexity</th><th scope="col">Claude</th><th scope="col">Grok</th></tr></thead>
       <tbody>
-        <tr><td>Best bookkeeping app for UK freelancers?</td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
-        <tr><td>Which invoicing tool works with Making Tax Digital?</td><td><span class="cell cited" aria-label="Site cited, not named"></span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell named" aria-label="Named first">1</span></td></tr>
-        <tr><td>Ledgerbird alternatives for small agencies</td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
-        <tr><td>Cheapest accounting software for a one person company</td><td><span class="cell named" aria-label="Named third">3</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
+        <tr><td>Best bookkeeping app for UK freelancers?</td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
+        <tr><td>Which invoicing tool works with Making Tax Digital?</td><td><span class="cell cited" aria-label="Site cited, not named"></span></td><td><span class="cell na" aria-label="No AI answer from Google"></span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
+        <tr><td>Ledgerbird alternatives for small agencies</td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named first">1</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell both" aria-label="Named first, site cited">1</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named second">2</span></td></tr>
+        <tr><td>Cheapest accounting software for a one person company</td><td><span class="cell named" aria-label="Named third">3</span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell none" aria-label="Not named"></span></td><td><span class="cell named" aria-label="Named second">2</span></td><td><span class="cell none" aria-label="Not named"></span></td></tr>
       </tbody>
     </table>
-    <div class="legend" aria-hidden="true"><span><span class="cell named"></span>Named, with its place among your rivals</span><span><span class="cell both"></span>Named and your site cited</span><span><span class="cell cited"></span>Site cited, not named</span><span><span class="cell none"></span>Not named</span></div>
+    <div class="legend" aria-hidden="true"><span><span class="cell named"></span>Named, with its place among your rivals</span><span><span class="cell both"></span>Named and your site cited</span><span><span class="cell cited"></span>Site cited, not named</span><span><span class="cell none"></span>Not named</span><span><span class="cell na"></span>No AI answer from Google</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>What the answers tell you</h2><p>Every check turns hundreds of AI answers into three things you can act on.</p></div>
+  <div class="three">
+    <div class="card"><h3>How AI describes you</h3><div class="sent" role="img" aria-label="12 positive, 5 neutral, 1 negative"><i class="pos" style="width:66%"></i><i class="neu" style="width:28%"></i><i class="neg" style="width:6%"></i></div>
+      <div class="chips"><span class="chip">simple mobile app</span><span class="chip">MTD ready</span><span class="chip">best for sole traders</span></div>
+      <p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
+    <div class="card"><h3>Where rivals win</h3><div class="gap"><b>Ledgerbird alternatives for small agencies</b><span class="chips"><span class="chip">ChatGPT</span><span class="chip">AI Mode</span><span class="chip">Gemini</span></span></div>
+      <p>Every question where an engine recommends a rival and not you, widest gaps first, with what to do next.</p></div>
+    <div class="card"><h3>What the AI searched for</h3><div class="chips"><span class="chip">best mtd software freelancers</span><span class="chip">tallyhawk reviews</span><span class="chip">ledgerbird vs sumwise</span></div>
+      <p>The web searches the engines ran before answering, and the sites they read. Your shortest list of pages to write and places to be listed.</p></div>
   </div>
 </section>
 
@@ -134,7 +176,7 @@ footer a{color:var(--muted)}
     <div class="fix"><h3>Titles and descriptions</h3><p>Suggestions written from the page itself, checked for length, saved to the page settings in Webflow.</p></div>
     <div class="fix"><h3>Structured data</h3><p>Organization, WebSite and FAQ schema in JSON-LD, merged with what the page already has and written through Webflow's schema API.</p></div>
     <div class="fix"><h3>Answers people ask for</h3><p>Turn the questions from your grid into clear answers from your own content, and add them to a CMS collection as drafts.</p></div>
-    <div class="fix"><h3>AI crawlers and llms.txt</h3><p>See which assistants your <code>robots.txt</code> blocks and download a ready <code>llms.txt</code> for Site settings.</p></div>
+    <div class="fix"><h3>AI crawlers and llms.txt</h3><p>See which engines your <code>robots.txt</code> blocks and download a ready <code>llms.txt</code> for Site settings.</p></div>
   </div>
 </section>
 
@@ -142,24 +184,25 @@ footer a{color:var(--muted)}
   <div class="sec-head"><h2>Set up in three minutes</h2></div>
   <ol class="steps">
     <li><h3>Connect Webflow</h3><p>Pick the sites AI SEO Deck may read. It writes only when you press Apply on a fix.</p></li>
-    <li><h3>Choose your questions</h3><p>We suggest questions from your homepage. Add your rivals so you can compare.</p></li>
+    <li><h3>Choose your questions</h3><p>We suggest questions from your homepage, in your language. Add your rivals so you can compare.</p></li>
     <li><h3>Get your first grid</h3><p>The first check runs right away. After that it repeats every week and emails you what changed.</p></li>
   </ol>
 </section>
 
 <section id="pricing">
-  <div class="sec-head"><h2>Pricing</h2><p>Prices in US dollars a month. Yearly plans get two months free.</p></div>
+  <div class="sec-head"><h2>Pricing</h2><p>Prices in US dollars a month. Yearly plans get two months free. Cancel any time.</p></div>
   <div class="plans">
-    <div class="plan"><h3>Free</h3><p class="price">$0</p><ul><li>1 site, 5 questions</li><li>Checked monthly on ChatGPT</li><li>Site audit and suggestions</li></ul><a class="btn sm" href="/auth">Start free</a></div>
-    <div class="plan pick"><h3>Solo</h3><p class="price">$29<span> /month</span></p><ul><li>1 site, 40 questions</li><li>Weekly on ChatGPT, Perplexity and Gemini</li><li>One-click fixes to Webflow</li><li>2 extra checks on demand a month</li></ul><a class="btn sm mark" href="/auth">Choose Solo</a></div>
-    <div class="plan"><h3>Studio</h3><p class="price">$79<span> /month</span></p><ul><li>5 sites, 120 questions</li><li>Everything in Solo</li><li>Client report links with your agency name</li></ul><a class="btn sm" href="/auth">Choose Studio</a></div>
-    <div class="plan"><h3>Agency</h3><p class="price">$199<span> /month</span></p><ul><li>20 sites, 400 questions</li><li>Everything in Studio</li><li>Priority support</li></ul><a class="btn sm" href="/auth">Choose Agency</a></div>
+    <div class="plan"><h3>Free</h3><p class="price">$0</p><ul><li>1 site, 5 questions</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked monthly</li><li>Site audit and suggestions</li></ul><a class="btn sm" href="/auth">Start free</a></div>
+    <div class="plan pick"><h3>Solo</h3><p class="price">$29<span> /month</span></p><ul><li>1 site, 25 questions</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>2 extra checks on demand a month</li></ul><a class="btn sm mark" href="/auth">Choose Solo</a></div>
+    <div class="plan"><h3>Studio</h3><p class="price">$79<span> /month</span></p><ul><li>5 sites, 75 questions</li><li>Everything in Solo</li><li>Client report links with your agency name</li></ul><a class="btn sm" href="/auth">Choose Studio</a></div>
+    <div class="plan"><h3>Agency</h3><p class="price">$199<span> /month</span></p><ul><li>20 sites, 200 questions</li><li>Everything in Studio</li><li>Priority support</li></ul><a class="btn sm" href="/auth">Choose Agency</a></div>
   </div>
 </section>
 
 <section>
   <div class="sec-head"><h2>Questions</h2></div>
-  <details><summary>How do you know what ChatGPT says?</summary><p>We send each question to the official APIs of OpenAI, Perplexity and Google Gemini with live web search turned on, the same way a person asks. Answers can differ from one person to the next, so we look at trends across many questions and weeks rather than a single answer.</p></details>
+  <details><summary>Which AI engines do you check?</summary><p>ChatGPT, Gemini, Perplexity, Claude and Grok through their official APIs with live web search on, and Google AI Overviews and AI Mode from live Google results. The free plan covers ChatGPT, Google AI Overviews and Perplexity; paid plans cover all seven.</p></details>
+  <details><summary>How do you know what the AI says?</summary><p>We ask each engine your questions the way a person would and read the full answer and its sources. Answers vary between people and days, so the grid shows trends across many questions and weeks rather than a single answer.</p></details>
   <details><summary>Does it change my site without asking?</summary><p>No. Every fix is shown first and written to Webflow only when you press Apply. Changes arrive as unpublished edits, so nothing goes live until you publish in Webflow.</p></details>
   <details><summary>Which Webflow plans does it work with?</summary><p>It works with sites on any Webflow plan. Fixes are written to static pages; for CMS pages you get the advice to apply in the collection template.</p></details>
   <details><summary>What does a question look like?</summary><p>The way your customers would type it, for example "best dentist for veneers in Antalya" or "Ledgerbird alternatives". We suggest a first set from your homepage, in your language.</p></details>
@@ -167,12 +210,68 @@ footer a{color:var(--muted)}
 </section>
 
 <section class="cta">
-  <h2>See your first grid today</h2>
+  <h2>See what every AI says about you</h2>
   <a class="btn mark" href="/auth">Connect Webflow, free</a>
 </section>
 </main>
 
-<footer><span>AI SEO Deck by Silit Labs</span><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span><span>Not affiliated with Webflow, OpenAI, Perplexity or Google.</span></footer>
+<footer><span>AI SEO Deck by Silit Labs</span><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>info@silitlabs.com</span><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span></footer>
 </div>
+<script>
+(function () {
+  var B = 'Tallyhawk', R = ['Ledgerbird', 'Sumwise'];
+  var E = [
+    { n: 'ChatGPT', s: 'both', rank: 1, t: 'For UK freelancers the tools recommended most often are Tallyhawk, Ledgerbird and Sumwise. Tallyhawk stands out for Making Tax Digital support and a simple mobile app.', src: ['tallyhawk.com', 'which.co.uk', 'reddit.com'] },
+    { n: 'AI Overviews', s: 'named', rank: 2, t: 'Popular choices include Ledgerbird for small agencies and Tallyhawk for sole traders who want to file VAT returns from their phone.', src: ['which.co.uk', 'gov.uk'] },
+    { n: 'AI Mode', s: 'none', t: 'Ledgerbird and Sumwise are recommended most often. Compare bank feeds, receipt capture and HMRC submission before you choose.', src: ['ledgerbird.io', 'money.co.uk'] },
+    { n: 'Gemini', s: 'both', rank: 1, t: 'Tallyhawk is a strong pick for UK freelancers thanks to Making Tax Digital filing and quick invoicing from the app.', src: ['tallyhawk.com', 'techradar.com'] },
+    { n: 'Perplexity', s: 'named', rank: 2, t: 'Sumwise is the cheapest option, while Tallyhawk offers the simplest invoicing on a phone.', src: ['reddit.com', 'sumwise.co'] },
+    { n: 'Claude', s: 'named', rank: 1, t: 'Tallyhawk, Ledgerbird and Sumwise all support Making Tax Digital. Tallyhawk is the most focused on freelancers.', src: ['which.co.uk'] },
+    { n: 'Grok', s: 'none', t: 'Freelancers posting on X mostly mention Ledgerbird and Sumwise for bookkeeping.', src: ['x.com', 'ledgerbird.io'] }
+  ];
+  var tabs = document.querySelector('.etabs'), who = document.getElementById('dwho'), txt = document.getElementById('dtext'), src = document.getElementById('dsrc'), dots = document.getElementById('ddots'), panel = document.getElementById('dpanel');
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function mark(t) {
+    var h = esc(t).replace(new RegExp(B, 'g'), '<mark>' + B + '</mark>');
+    R.forEach(function (r) { h = h.replace(new RegExp(r, 'g'), '<span class="rival">' + r + '</span>'); });
+    return h;
+  }
+  E.forEach(function (e, i) {
+    var b = document.createElement('button');
+    b.className = 'etab'; b.type = 'button'; b.setAttribute('role', 'tab'); b.id = 'dt' + i; b.setAttribute('aria-controls', 'dpanel');
+    b.innerHTML = '<span class="st ' + e.s + '" aria-hidden="true"></span>' + esc(e.n);
+    b.addEventListener('click', function () { stop(); show(i, true); });
+    tabs.appendChild(b);
+    var d = document.createElement('span'); d.className = 'dot ' + e.s; dots.appendChild(d);
+  });
+  var cur = 0, timer = null;
+  function show(i, fromUser) {
+    cur = i;
+    var e = E[i];
+    Array.prototype.forEach.call(tabs.children, function (b, k) { b.setAttribute('aria-selected', k === i ? 'true' : 'false'); b.tabIndex = k === i ? 0 : -1; });
+    Array.prototype.forEach.call(dots.children, function (d, k) { d.classList.toggle('cur', k === i); });
+    panel.setAttribute('aria-labelledby', 'dt' + i);
+    who.innerHTML = esc(e.n) + ' ' + (e.s === 'none' ? '<span class="pill">Not named</span>' : '<span class="pill mark">Named #' + e.rank + '</span>') + (e.s === 'both' ? '<span class="pill cite">Your site cited</span>' : '');
+    txt.innerHTML = mark(e.t);
+    src.innerHTML = e.src.map(function (s) { return '<span class="chip' + (s === 'tallyhawk.com' ? ' own' : '') + '">' + esc(s) + '</span>'; }).join('');
+    panel.classList.remove('fresh'); void panel.offsetWidth; panel.classList.add('fresh');
+    if (fromUser) tabs.children[i].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  tabs.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+    ev.preventDefault(); stop();
+    var n = (cur + (ev.key === 'ArrowRight' ? 1 : E.length - 1)) % E.length;
+    show(n, true); tabs.children[n].focus();
+  });
+  show(0);
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!still) {
+    timer = setInterval(function () { show((cur + 1) % E.length); }, 3600);
+    document.getElementById('demo').addEventListener('mouseenter', stop);
+    document.getElementById('demo').addEventListener('focusin', stop);
+  }
+})();
+</script>
 </body>
 </html>

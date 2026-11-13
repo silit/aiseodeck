@@ -2,7 +2,7 @@
 // Server-rendered pages. One CSS block with light and dark tokens.
 // Semantics used everywhere: marker yellow = the brand was named, link blue = the brand's site was cited.
 const { PLANS, FREE } = require('./plans');
-const { LABEL } = require('./engines');
+const { LABEL, LONG, ORDER } = require('./engines');
 const { PAGE_RULES, BOTS } = require('./audit');
 const { norm } = require('./analyze');
 
@@ -165,6 +165,44 @@ pre.copy{white-space:pre-wrap;word-break:break-word;background:var(--paper);bord
 .step h2{display:flex;gap:12px;align-items:center}
 .step h2::before{counter-increment:step;content:counter(step);width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-size:15px;flex:none}
 .suggest{display:grid;gap:8px}
+.cell.na::before{content:"";width:10px;height:2px;border-radius:2px;background:var(--line)}
+.cell.lock{color:var(--slate);background:repeating-linear-gradient(135deg,var(--soft) 0 4px,transparent 4px 8px)}
+.grid th.locked{color:var(--slate);font-weight:600;white-space:nowrap}
+.legend .cell.na::before{width:8px}
+.upsell{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:var(--paper);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-top:14px;font-size:14px}
+.duo{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:18px;margin-bottom:22px;align-items:stretch}
+@media(max-width:1100px){.duo{grid-template-columns:1fr 1fr}.duo>:first-child{grid-column:1/-1}}
+@media(max-width:700px){.duo{grid-template-columns:1fr}}
+svg.trend{width:100%;height:auto;display:block}
+svg.trend .gl{stroke:var(--line);stroke-width:1}
+svg.trend .ax{font-size:11px;fill:var(--muted)}
+svg.trend .ln{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+svg.trend .ar{fill:var(--mark);opacity:.28}
+svg.trend .pt{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}
+svg.trend .last{fill:var(--mark);stroke:var(--ink);stroke-width:1.8}
+svg.trend .fut{stroke:var(--slate);stroke-width:1.6;stroke-dasharray:4 5;fill:none}
+svg.trend .nx{fill:var(--surface);stroke:var(--slate);stroke-width:1.6;stroke-dasharray:3 3}
+.deltas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.delta{background:var(--soft);border-radius:10px;padding:10px 12px;display:grid;gap:2px;min-width:0}
+.delta b{font-size:20px;letter-spacing:-.01em;line-height:1.15}
+.delta em{font-style:normal;font-size:12px;font-weight:600}
+.delta em.up{color:var(--good)}.delta em.down{color:var(--bad)}.delta em.flat{color:var(--muted)}
+.sent{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--soft)}
+.sent i{display:block;height:100%}.sent .pos{background:var(--good)}.sent .neu{background:var(--slate);opacity:.6}.sent .neg{background:var(--bad)}
+.chip.word{color:var(--ink);background:var(--paper)}
+.checkit{background:var(--warn-soft);border-radius:10px;padding:10px 12px;display:grid;gap:6px}
+.checkit ul{margin:0;padding-left:18px;font-size:13.5px;display:grid;gap:4px}
+ul.gaps{list-style:none;margin:0;padding:0;display:grid}
+ul.gaps li{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+ul.gaps li:first-child{border-top:0}
+.gq{display:grid;gap:3px;min-width:0;flex:1 1 320px}
+.howto{background:var(--paper);border-radius:12px;padding:12px 14px}
+.howto ol{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
+.row.wide{grid-template-columns:minmax(120px,190px) 1fr auto}
+.row .host{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips.eng{margin-top:8px}
+.chips.eng .chip{font-size:12px;padding:1px 8px}
+.chips.eng .chip.on{background:var(--mark);border-color:var(--mark);color:var(--mark-ink);font-weight:700}
 .progress{height:8px;border-radius:999px;background:var(--soft);overflow:hidden;margin-top:10px}
 .progress i{display:block;height:100%;background:var(--cite);transition:width .6s ease}
 @media (prefers-reduced-motion:reduce){.progress i{transition:none}}
@@ -187,7 +225,7 @@ function layout(title, body, opts) {
 <style>${CSS}</style></head><body><div class="wrap">
 <header class="top"><a class="brand" href="${opts.user ? '/app' : (opts.brandName ? '#' : '/')}">${opts.brandName ? '' : LOGO}<span>${opts.brandName ? esc(opts.brandName) : 'AI SEO Deck'}</span></a>${opts.plain ? '' : nav}</header>
 ${body}
-<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Perplexity or Google.</span>'}</footer>
+<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span>'}</footer>
 </div>${opts.script ? `<script>${opts.script}</script>` : ''}</body></html>`;
 }
 
@@ -214,6 +252,7 @@ function loginConfirm(token) {
 function cellState(r) {
   if (!r) return 'pending';
   if (!r.ok) return 'failed';
+  if (r.none) return 'na';
   if (r.mentioned && r.cited) return 'both';
   if (r.mentioned) return 'named';
   if (r.cited) return 'cited';
@@ -234,7 +273,7 @@ function ringSvg(states, score, size, label) {
     if (s === 'named') return `<circle cx="${x}" cy="${y}" r="${dot}" fill="var(--mark)"/>`;
     if (s === 'both') return `<circle cx="${x}" cy="${y}" r="${dot}" fill="var(--mark)" stroke="var(--cite)" stroke-width="${Math.max(1.2, dot * 0.45).toFixed(1)}"/>`;
     if (s === 'cited') return `<circle cx="${x}" cy="${y}" r="${(dot * 0.85).toFixed(1)}" fill="none" stroke="var(--cite)" stroke-width="${Math.max(1.2, dot * 0.4).toFixed(1)}"/>`;
-    if (s === 'pending') return `<circle cx="${x}" cy="${y}" r="${(dot * 0.6).toFixed(1)}" fill="var(--line)"/>`;
+    if (s === 'pending' || s === 'na') return `<circle cx="${x}" cy="${y}" r="${(dot * 0.6).toFixed(1)}" fill="var(--line)"/>`;
     if (s === 'failed') return `<circle cx="${x}" cy="${y}" r="${(dot * 0.6).toFixed(1)}" fill="none" stroke="var(--slate)" stroke-width="1" stroke-dasharray="2 2"/>`;
     return `<circle cx="${x}" cy="${y}" r="${(dot * 0.5).toFixed(1)}" fill="var(--slate)" opacity=".55"/>`;
   }).join('');
@@ -250,19 +289,94 @@ function statesOf(prompts, engines, results) {
   return out;
 }
 
-function gridHtml(site, prompts, engines, results, linkBase) {
+const LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="4" y="10" width="16" height="11" rx="3" fill="currentColor"/></svg>';
+function gridHtml(site, prompts, engines, results, linkBase, locked) {
   if (!prompts.length) return '<div class="empty"><h3>No questions yet</h3><p>Add the questions your customers ask AI assistants, then run a check.</p><a class="btn primary" href="/app/site?id=' + encodeURIComponent(site.id) + '&tab=setup">Add questions</a></div>';
-  const head = engines.map((e) => `<th scope="col">${esc(LABEL[e] || e)}</th>`).join('');
+  locked = locked || [];
+  const head = engines.map((e) => `<th scope="col" title="${esc(LONG[e] || e)}">${esc(LABEL[e] || e)}</th>`).join('')
+    + locked.map((e) => `<th scope="col" class="locked" title="${esc(LONG[e] || e)}: paid plans">${LOCK} ${esc(LABEL[e] || e)}</th>`).join('');
   const rows = prompts.map((p) => `<tr><td class="q">${esc(p.text)}</td>${engines.map((e) => {
     const r = results[p.id + '|' + e];
     const s = cellState(r);
-    const title = s === 'pending' ? 'Waiting for the answer' : s === 'failed' ? 'Could not read this answer' : s === 'none' ? 'Not named' : (s === 'cited' ? 'Site cited, brand not named' : `Named${r.rank ? ' #' + r.rank + (r.of > 1 ? ' of ' + r.of + ' brands' : '') : ''}${s === 'both' ? ', site cited' : ''}`);
+    const title = s === 'pending' ? 'Waiting for the answer' : s === 'failed' ? 'Could not read this answer' : s === 'na' ? 'Google showed no AI answer for this question' : s === 'none' ? 'Not named' : (s === 'cited' ? 'Site cited, brand not named' : `Named${r.rank ? ' #' + r.rank + (r.of > 1 ? ' of ' + r.of + ' brands' : '') : ''}${s === 'both' ? ', site cited' : ''}`);
     const inner = (s === 'named' || s === 'both') && r.rank ? r.rank : '';
-    const href = s === 'pending' || !linkBase ? '' : `${linkBase}#a-${encodeURIComponent(p.id)}-${e}`;
+    const href = s === 'pending' || s === 'na' || !linkBase ? '' : `${linkBase}#a-${encodeURIComponent(p.id)}-${e}`;
     return `<td data-e="${esc(LABEL[e] || e)}">${href ? `<a class="cell ${s}" href="${href}" title="${esc(title)}" aria-label="${esc(LABEL[e] + ': ' + title)}">${inner}</a>` : `<span class="cell ${s}" title="${esc(title)}" aria-label="${esc(LABEL[e] + ': ' + title)}"></span>`}</td>`;
-  }).join('')}</tr>`).join('');
-  return `<div class="legend" aria-hidden="true"><span><span class="cell named"></span>Named (number = place among the brands you track)</span><span><span class="cell both"></span>Named and your site cited</span><span><span class="cell cited"></span>Site cited, not named</span><span><span class="cell none"></span>Not named</span></div>
-<div class="gridwrap"><table class="grid"><thead><tr><th scope="col">Question</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }).join('')}${locked.map((e) => `<td data-e="${esc(LABEL[e] || e)}"><span class="cell lock" title="${esc(LONG[e] || e)} is part of the paid plans" aria-label="${esc(LABEL[e])}: paid plans">${LOCK}</span></td>`).join('')}</tr>`).join('');
+  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer these questions too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p><a class="btn mark sm" href="/app/settings#plan">See every AI</a></div>` : '';
+  return `<div class="legend" aria-hidden="true"><span><span class="cell named"></span>Named (number = place among the brands you track)</span><span><span class="cell both"></span>Named and your site cited</span><span><span class="cell cited"></span>Site cited, not named</span><span><span class="cell none"></span>Not named</span>${engines.some((e) => e === 'aio' || e === 'aimode') ? '<span><span class="cell na"></span>No AI answer from Google</span>' : ''}</div>
+<div class="gridwrap"><table class="grid"><thead><tr><th scope="col">Question</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>${upsell}`;
+}
+
+/* ---------- trend, insights, rivals ---------- */
+
+// Score over time as a small line chart; history is newest first.
+function trendSvg(history) {
+  const pts = (history || []).filter((h) => typeof h.score === 'number').slice(0, 12).reverse();
+  if (pts.length < 2) return '';
+  const W = 560, H = 150, L = 34, R = 14, T = 14, B = 26;
+  const x = (i) => L + (i * (W - L - R)) / (pts.length - 1);
+  const y = (v) => T + ((100 - v) * (H - T - B)) / 100;
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p.score).toFixed(1)}`).join(' ');
+  const area = d + ` L${x(pts.length - 1).toFixed(1)} ${H - B} L${x(0).toFixed(1)} ${H - B} Z`;
+  const day = (t) => new Date(t).toISOString().slice(5, 10).replace('-', '/');
+  const grid = [0, 50, 100].map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="ax">${v}</text>`).join('');
+  const dots = pts.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.score).toFixed(1)}" r="${i === pts.length - 1 ? 5 : 3.2}" class="${i === pts.length - 1 ? 'last' : 'pt'}"><title>${esc(day(p.at))}: ${p.score}/100</title></circle>`).join('');
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visibility score over the last ${pts.length} checks, from ${pts[0].score} to ${pts[pts.length - 1].score}">${grid}<path d="${area}" class="ar"/><path d="${d}" class="ln"/>${dots}
+<text x="${L}" y="${H - 6}" class="ax">${esc(day(pts[0].at))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="ax">${esc(day(pts[pts.length - 1].at))}</text></svg>`;
+}
+
+// The trend panel: the line, then what moved since the check before. With one check it shows the starting point.
+function trendPanel(history, site) {
+  const pts = (history || []).filter((h) => typeof h.score === 'number');
+  const n = Math.min(12, pts.length);
+  const head = `<div class="actions" style="justify-content:space-between"><h3>Visibility over time</h3><span class="tiny muted">${n ? plural(n, 'check') : ''}</span></div>`;
+  const nextAt = site && site.sched && site.sched.nextRunAt;
+  const nextTxt = nextAt ? new Date(nextAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '';
+  if (pts.length >= 2) {
+    const a = pts[0], b = pts[1];
+    const pc = (v) => Math.round((v || 0) * 100);
+    const cell = (label, now, before, unit) => {
+      const dl = now - before;
+      const cls = dl > 0 ? 'up' : dl < 0 ? 'down' : 'flat';
+      const txt = dl ? (dl > 0 ? '+' : '-') + Math.abs(dl) + (unit ? ' pts' : '') : 'no change';
+      return `<div class="delta"><span class="tiny muted">${label}</span><b>${now}${unit}</b><em class="${cls}">${txt}</em></div>`;
+    };
+    return `${head}${trendSvg(history)}<div class="deltas">${cell('Score', a.score, b.score, '')}${cell('Answers naming you', pc(a.mentionRate), pc(b.mentionRate), '%')}${cell('Answers citing you', pc(a.citationRate), pc(b.citationRate), '%')}</div><p class="tiny muted">Change since the check before.${nextTxt ? ' Next check ' + esc(nextTxt) + '.' : ''}</p>`;
+  }
+  const s = pts.length ? pts[0].score : site && site.latest ? site.latest.score : null;
+  if (s == null) return head + '<p class="small muted">The line starts with the first check.</p>';
+  const W = 560, H = 150, L = 34, R = 14, T = 14, B = 26;
+  const y = (v) => T + ((100 - v) * (H - T - B)) / 100;
+  const grid = [0, 50, 100].map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="ax">${v}</text>`).join('');
+  const x0 = L + 10, x1 = W - R - 8, yy = y(s).toFixed(1);
+  const svg = `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="First check: visibility score ${s} of 100">${grid}<line x1="${x0}" x2="${x1}" y1="${yy}" y2="${yy}" class="fut"/><circle cx="${x1}" cy="${yy}" r="5" class="nx"/><circle cx="${x0}" cy="${yy}" r="5" class="last"/><text x="${x0}" y="${H - 6}" class="ax">First check</text>${nextTxt ? `<text x="${W - R}" y="${H - 6}" text-anchor="end" class="ax">Next ${esc(nextTxt)}</text>` : ''}</svg>`;
+  return `${head}${svg}<p class="small muted">This is your starting line: ${s} out of 100. Every check adds a point, so you see what your changes do.</p>`;
+}
+
+function insightsHtml(latest) {
+  const ins = latest && latest.insights;
+  if (!ins) return `<h3>How AI describes you</h3><p class="small muted">${latest && latest.mentionRate ? 'Appears after the next check.' : 'Once the AI names you, you will see the words it uses for you and whether it sounds positive.'}</p>`;
+  const s = ins.sentiment || {};
+  const tot = (s.positive || 0) + (s.neutral || 0) + (s.negative || 0) || 1;
+  const seg = (k, cls) => s[k] ? `<i class="${cls}" style="width:${((s[k] / tot) * 100).toFixed(1)}%" title="${esc(k)}: ${s[k]}"></i>` : '';
+  return `<h3>How AI describes you</h3>
+<div class="sent" role="img" aria-label="${s.positive || 0} positive, ${s.neutral || 0} neutral, ${s.negative || 0} negative">${seg('positive', 'pos')}${seg('neutral', 'neu')}${seg('negative', 'neg')}</div>
+<p class="tiny muted">${s.positive || 0} positive, ${s.neutral || 0} neutral, ${s.negative || 0} negative, from ${plural(ins.basedOn || 0, 'answer')} that name you.</p>
+${(ins.descriptors || []).length ? `<div class="chips">${ins.descriptors.map((x) => `<span class="chip word">${esc(x)}</span>`).join('')}</div>` : ''}
+${(ins.check || []).length ? `<div class="checkit"><b class="small">Worth checking</b><ul>${ins.check.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p class="tiny muted">AI repeats what it reads. If something is wrong, fix it on your site and on the pages listed under Sources.</p></div>` : ''}`;
+}
+
+function andList(a) { a = (a || []).filter(Boolean); return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+function gapsHtml(site, latest) {
+  const gaps = (latest && latest.gaps) || [];
+  if (!latest) return '<div class="panel empty"><h3>Nothing to compare yet</h3><p>After the first check, this lists the questions where the AI recommends a rival and not you.</p></div>';
+  if (!(site.project.competitors || []).length) return `<div class="panel empty"><h3>Add your rivals first</h3><p>Tell us who you compete with and we show every question where the AI picks them instead of you.</p><a class="btn primary" href="/app/site?id=${encodeURIComponent(site.id)}&tab=setup">Add rivals</a></div>`;
+  if (!gaps.length) return '<div class="panel empty"><h3>No rival beats you in the last check</h3><p>Every answer that names a rival also names you, or names nobody. Keep adding questions to find new ground.</p></div>';
+  return `<div class="panel stack"><div><h2>Where rivals win</h2><p class="small muted" style="margin-top:6px">The AI names a rival and not you for these questions. Start at the top: these are the widest gaps.</p></div>
+<ul class="gaps">${gaps.map((g) => `<li><div class="gq"><b>${esc(g.text)}</b><span class="small muted">${esc(andList(g.rivals))} named instead. ${g.named ? `You are named by ${g.named} of ${plural(g.answered, 'AI engine')} here.` : 'No AI engine names you here.'}</span></div>
+<div class="chips" aria-label="AI engines where a rival wins"><span class="tiny muted">Rival wins on</span>${g.engines.map((e) => `<span class="chip">${esc(LABEL[e] || e)}</span>`).join('')}</div></li>`).join('')}</ul>
+<div class="howto"><b class="small">How to win these back</b><ol class="small"><li>Answer the question clearly on one page of your site, in the words people use. Add it as a FAQ with schema from the Site audit tab.</li><li>Open Sources and get listed or reviewed on the sites the AI cites for these questions.</li><li>Run the check again after you publish.</li></ol></div></div>`;
 }
 
 // Highlights the brand (marker) and rivals (dotted underline) inside an answer, in one pass over the escaped text.
@@ -300,7 +414,9 @@ function dashboard(user, sites, limits, notice, opts) {
     const l = s.latest;
     const ready = s.project && s.project.ready;
     const ring = ringSvg(l ? new Array(Math.min(60, l.ok || 0)).fill('none').map((x, i) => (i < Math.round((l.ok || 0) * l.mentionRate) ? 'named' : 'none')) : [], l ? l.score : null, 72, l ? `Visibility score ${l.score}` : 'Not checked yet');
-    const line = l ? `Named in <b>${Math.round(l.mentionRate * l.ok)}</b> of ${l.ok} answers, site cited in <b>${Math.round(l.citationRate * l.ok)}</b>. Checked ${ago(l.finishedAt || l.at, now)}.`
+    const engs = l ? Object.entries(l.byEngine || {}).filter(([, v]) => v.n).sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0])) : [];
+    const strip = engs.length ? `<div class="chips eng">${engs.map(([e, v]) => `<span class="chip${v.m ? ' on' : ''}" title="${esc(LONG[e] || e)}: ${v.m ? 'names you' : 'does not name you yet'}">${esc(LABEL[e] || e)}</span>`).join('')}</div>` : '';
+    const line = l ? `Named in <b>${Math.round(l.mentionRate * l.ok)}</b> of ${l.ok} answers, site cited in <b>${Math.round(l.citationRate * l.ok)}</b>. Checked ${ago(l.finishedAt || l.at, now)}.${strip}`
       : ready ? (s.sched && s.sched.runId ? 'The first check is running.' : 'No check yet.') : 'Pick your brand, rivals and questions to start.';
     return `<div class="panel site">${ring}<div class="stack" style="gap:6px"><div class="actions" style="gap:10px"><h2 style="font-size:19px">${esc(s.name)}</h2>${siteStatus(s, limits)}</div>
 <p class="small muted">${esc(hostOf(s.url))}${s.audit ? `, site audit ${s.audit.score}/100` : ''}</p><p class="small">${line}</p></div>
@@ -308,7 +424,7 @@ function dashboard(user, sites, limits, notice, opts) {
   }).join('') : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
   const engineNote = opts.enginesOn && !opts.enginesOn.length ? '<div class="notice warn">No AI engine is connected on the server yet, so checks cannot run. If you run this app, add an engine API key.</div>' : '';
   return layout('Sites · AI SEO Deck', `${notice ? `<div class="notice">${notice}</div>` : ''}${engineNote}
-<div class="sitehead"><div><h1>Your sites</h1><p class="meta">${esc(limits.name)} plan: ${plural(limits.sites, 'site')}, ${plural(limits.prompts, 'question')} checked ${limits.plan === 'free' ? 'every month on one engine' : 'every week on every engine'}.</p></div>
+<div class="sitehead"><div><h1>Your sites</h1><p class="meta">${esc(limits.name)} plan: ${plural(limits.sites, 'site')}, ${plural(limits.prompts, 'question')} checked ${limits.plan === 'free' ? 'every month on ChatGPT, Google AI Overviews and Perplexity' : 'every week on every AI engine'}.</p></div>
 <div class="actions"><a class="btn" href="/auth">Add Webflow sites</a>${limits.plan === 'free' ? '<a class="btn primary" href="/app/settings#plan">Upgrade</a>' : ''}</div></div>
 <div class="sites">${list}</div>`, { user });
 }
@@ -362,20 +478,26 @@ function summaryHtml(site, latest, states, prev) {
   const named = Math.round(latest.mentionRate * ok);
   const cited = Math.round(latest.citationRate * ok);
   const delta = prev && typeof prev.score === 'number' ? latest.score - prev.score : null;
-  const engineRows = Object.entries(latest.byEngine || {}).map(([e, v]) => {
+  const engineRows = Object.entries(latest.byEngine || {}).sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0])).map(([e, v]) => {
     const w1 = v.n ? (v.m / v.n) * 100 : 0;
-    return `<div class="row"><span>${esc(LABEL[e] || e)}</span><span class="bar" role="img" aria-label="${esc(`${LABEL[e]}: named in ${v.m} of ${v.n}, cited in ${v.c}`)}"><i class="named" style="width:${w1.toFixed(1)}%"></i></span><span class="v">${v.m} of ${v.n} named, ${v.c} cited</span></div>`;
+    const txt = v.n ? `${v.m} of ${v.n} named, ${v.c} cited` : 'no AI answer shown';
+    return `<div class="row"><span title="${esc(LONG[e] || e)}">${esc(LABEL[e] || e)}</span><span class="bar" role="img" aria-label="${esc(`${LONG[e] || e}: ${txt}`)}"><i class="named" style="width:${w1.toFixed(1)}%"></i></span><span class="v">${txt}</span></div>`;
   }).join('');
-  const voice = (latest.voice || []).slice(0, 6).map((v) => `<div class="row"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(v.name)}">${v.own ? '<b>' + esc(v.name) + '</b>' : esc(v.name)}</span><span class="bar"><i class="${v.own ? 'named' : 'rival'}" style="width:${(v.share * 100).toFixed(1)}%"></i></span><span class="v">${pct(v.share)}</span></div>`).join('');
+  const engCount = Object.values(latest.byEngine || {}).filter((v) => v.n).length;
+  const engNamed = Object.values(latest.byEngine || {}).filter((v) => v.m).length;
   return `<div class="summary">
 <div class="panel ringbox">${ringSvg(states, latest.score)}<p class="small muted">${delta == null ? 'First measurement' : (delta === 0 ? 'Same as the check before' : `${delta > 0 ? '+' : ''}${delta} since the check before`)}</p></div>
-<div class="panel stack" style="gap:14px"><div class="facts">
+<div class="panel stack" style="gap:14px;align-content:center"><div class="facts">
 <p class="fact"><b>${named}</b><span><span class="swatch named"></span> of ${ok} answers name ${esc(site.project.brand)}</span></p>
 <p class="fact"><b>${cited}</b><span><span class="swatch cited"></span> cite your website as a source</span></p>
-<p class="fact"><b>${latest.avgRank ? '#' + latest.avgRank.toFixed(1).replace(/\.0$/, '') : '-'}</b><span>average place when named</span></p></div>
-<div class="rows">${engineRows}</div></div>
-<div class="panel stack" style="gap:12px"><h3>Share of voice</h3><p class="tiny muted">Of the answers that name any brand you track.</p><div class="rows">${voice || '<p class="small muted">Add rivals in Setup to compare.</p>'}</div></div>
+<p class="fact"><b>${engNamed}</b><span>of ${plural(engCount, 'AI engine')} name you at least once</span></p>
+<p class="fact"><b>${latest.avgRank ? '#' + latest.avgRank.toFixed(1).replace(/\.0$/, '') : '-'}</b><span>average place when named</span></p></div></div>
+<div class="panel stack" style="gap:12px"><h3>By AI engine</h3><div class="rows">${engineRows}</div></div>
 </div>`;
+}
+function voiceHtml(latest) {
+  const voice = ((latest && latest.voice) || []).slice(0, 6).map((v) => `<div class="row"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(v.name)}">${v.own ? '<b>' + esc(v.name) + '</b>' : esc(v.name)}</span><span class="bar"><i class="${v.own ? 'named' : 'rival'}" style="width:${(v.share * 100).toFixed(1)}%"></i></span><span class="v">${pct(v.share)}</span></div>`).join('');
+  return `<h3>Share of voice</h3><p class="tiny muted">Of the answers that name any brand you track.</p><div class="rows">${(latest && (latest.voice || []).length > 1) ? voice : '<p class="small muted">Add rivals in Setup to compare.</p>'}</div>`;
 }
 
 function progressHtml(site, progress) {
@@ -394,7 +516,7 @@ step();})();`;
 
 function tabsHtml(site, tab) {
   const t = (k, label) => `<a href="/app/site?id=${encodeURIComponent(site.id)}&tab=${k}"${tab === k ? ' aria-current="page"' : ''}>${label}</a>`;
-  return `<nav class="tabs" aria-label="Site sections">${t('answers', 'Answer grid')}${t('transcripts', 'What the AI said')}${t('sources', 'Sources')}${t('audit', 'Site audit')}${t('setup', 'Setup')}</nav>`;
+  return `<nav class="tabs" aria-label="Site sections">${t('answers', 'Answer grid')}${t('transcripts', 'What the AI said')}${t('rivals', 'Where rivals win')}${t('sources', 'Sources')}${t('audit', 'Site audit')}${t('setup', 'Setup')}</nav>`;
 }
 
 function transcriptsHtml(site, prompts, engines, results) {
@@ -404,14 +526,14 @@ function transcriptsHtml(site, prompts, engines, results) {
       const r = results[p.id + '|' + e];
       if (!r) return '';
       const s = cellState(r);
-      const tag = s === 'both' ? `<span class="pill mark">Named${r.rank ? ' #' + r.rank : ''}</span><span class="pill cite">Site cited</span>` : s === 'named' ? `<span class="pill mark">Named${r.rank ? ' #' + r.rank : ''}</span>` : s === 'cited' ? '<span class="pill cite">Site cited</span>' : s === 'failed' ? '<span class="pill bad">Could not read</span>' : '<span class="pill">Not named</span>';
+      const tag = s === 'both' ? `<span class="pill mark">Named${r.rank ? ' #' + r.rank : ''}</span><span class="pill cite">Site cited</span>` : s === 'named' ? `<span class="pill mark">Named${r.rank ? ' #' + r.rank : ''}</span>` : s === 'cited' ? '<span class="pill cite">Site cited</span>' : s === 'failed' ? '<span class="pill bad">Could not read</span>' : s === 'na' ? '<span class="pill">No AI answer from Google</span>' : '<span class="pill">Not named</span>';
       const own = (project.domains || []);
       const chips = (r.sources || []).map((x) => {
         const isOwn = own.some((d) => x.host === d || String(x.host || '').endsWith('.' + d));
         return x.url && /^https?:\/\//.test(x.url) && !/vertexaisearch|grounding-api/.test(x.url) ? `<a class="chip${isOwn ? ' own' : ''}" href="${esc(x.url)}" rel="noopener nofollow" target="_blank" title="${esc(x.title || x.url)}">${esc(x.host)}</a>` : `<span class="chip${isOwn ? ' own' : ''}">${esc(x.host)}</span>`;
       }).join('');
       return `<article class="answer" id="a-${esc(p.id)}-${esc(e)}"><div class="who">${esc(LABEL[e] || e)} ${tag}</div>
-${r.ok ? `<p class="quote">${highlight(r.snippet || '', project)}</p>` : `<p class="small muted">${esc(r.err || 'The engine did not answer.')}</p>`}
+${r.none ? '<p class="small muted">Google showed regular results only for this question, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(r.snippet || '', project)}</p>` : `<p class="small muted">${esc(r.err || 'The engine did not answer.')}</p>`}${r.ok && (r.queries || []).length ? `<p class="tiny muted">Searched for: ${r.queries.map(esc).join('; ')}</p>` : ''}
 ${chips ? `<div class="chips" aria-label="Sources">${chips}</div>` : ''}${r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary class="small">Full answer</summary><p class="quote" style="font-size:16px;margin-top:8px;white-space:pre-line">${highlight(r.text, project)}</p></details>` : ''}</article>`;
     }).join('');
     return items ? `<h3 class="prompt-h">${esc(p.text)}</h3><div class="panel">${items}</div>` : '';
@@ -421,10 +543,14 @@ ${chips ? `<div class="chips" aria-label="Sources">${chips}</div>` : ''}${r.ok &
 
 function sourcesHtml(latest) {
   const hosts = (latest && latest.topHosts) || [];
-  if (!hosts.length) return '<div class="panel empty"><h3>No sources yet</h3><p>After a check, this lists the websites ChatGPT, Perplexity and Gemini rely on for your questions.</p></div>';
+  if (!hosts.length) return '<div class="panel empty"><h3>No sources yet</h3><p>After a check, this lists the websites the AI engines rely on for your questions.</p></div>';
+  const max = Math.max(...hosts.map((h) => h.n), 1);
+  const own = (latest.ownCited || []);
+  const qs = (latest.topQueries || []);
   return `<div class="cols"><div class="panel stack"><h2>Websites the AI relies on for your questions</h2><p class="small muted">Being mentioned on these sites (reviews, directories, articles, lists) is the fastest way into the answers. Your own site is left out.</p>
-<ul class="plain">${hosts.map((h) => `<li><span><b>${esc(h.host)}</b></span><span class="small muted">cited in ${plural(h.n, 'answer')}</span></li>`).join('')}</ul></div>
-<div class="panel stack"><h2>What to do with this list</h2><p>Check whether you appear on each site. Where you are missing, ask for a listing or a review, or offer a guest article.</p><p class="muted small">Engines repeat what trusted sites say about you. A strong presence there often moves the score more than changes on your own site.</p></div></div>`;
+<div class="rows">${hosts.map((h) => `<div class="row wide"><span class="host" title="${esc(h.host)}">${esc(h.host)}</span><span class="bar"><i class="rival" style="width:${((h.n / max) * 100).toFixed(1)}%"></i></span><span class="v">${plural(h.n, 'answer')}</span></div>`).join('')}</div></div>
+<div class="stack"><div class="panel stack"><h2>Your pages the AI cites</h2>${own.length ? `<ul class="plain">${own.map((u) => `<li><a href="${esc(u.url)}" target="_blank" rel="noopener" class="small">${esc(u.url.replace(/^https?:\/\/(www\.)?/, ''))}</a><span class="small muted">${plural(u.n, 'answer')}</span></li>`).join('')}</ul>` : '<p class="small muted">None of your pages was cited in the last check. Clear answer pages and structured data from the Site audit help.</p>'}</div>
+<div class="panel stack"><h2>What the AI searched for</h2><p class="small muted">The web searches the engines ran to answer your questions. Pages that match these searches get read first.</p>${qs.length ? `<div class="chips">${qs.map((q) => `<span class="chip">${esc(q.q)}${q.n > 1 ? ` <b>${q.n}</b>` : ''}</span>`).join('')}</div>` : '<p class="small muted">No searches were reported in the last check.</p>'}</div></div></div>`;
 }
 
 function scoreClass(n) { return n == null ? '' : n >= 80 ? 'high' : n >= 55 ? 'mid' : 'low'; }
@@ -516,8 +642,9 @@ function sitePage(user, site, d) {
   const results = d.results || {};
   const states = statesOf(prompts, engines, results);
   let body = '';
-  if (tab === 'answers') body = `<div class="panel">${gridHtml(site, prompts, engines, results, `/app/site?id=${id}&tab=transcripts`)}</div>`;
+  if (tab === 'answers') body = `<div class="panel">${gridHtml(site, prompts, engines, results, `/app/site?id=${id}&tab=transcripts`, d.locked)}</div>`;
   else if (tab === 'transcripts') body = transcriptsHtml(site, prompts, engines, results);
+  else if (tab === 'rivals') body = gapsHtml(site, site.latest);
   else if (tab === 'sources') body = sourcesHtml(site.latest);
   else if (tab === 'audit') body = auditHtml(site, d.audit, d.limits);
   else body = setupTab(site, d.limits, d);
@@ -529,6 +656,7 @@ function sitePage(user, site, d) {
   return layout(site.name + ' · AI SEO Deck', `${d.notice ? `<div class="notice">${d.notice}</div>` : ''}${progressHtml(site, d.progress)}
 <div class="sitehead"><div><h1>${esc(site.project.brand || site.name)}</h1><p class="meta">${meta.map(esc).join(', ')}</p></div><div class="actions">${runBtn}${!canManual.ok && canManual.why ? `<span class="tiny muted" style="max-width:260px">${esc(canManual.why)}</span>` : ''}</div></div>
 ${summaryHtml(site, site.latest, states, d.prev)}
+${site.latest ? `<div class="duo"><div class="panel stack" style="gap:14px;align-content:start">${trendPanel(d.history, site)}</div><div class="panel stack" style="gap:10px">${insightsHtml(site.latest)}</div><div class="panel stack" style="gap:12px">${voiceHtml(site.latest)}</div></div>` : ''}
 ${tabsHtml(site, tab)}
 ${body}`, { user, script: site.sched && site.sched.runId ? PUMP(site.id) : '' });
 }
@@ -616,8 +744,7 @@ function reportPage(owner, site, d) {
   const engines = d.engines || [];
   const results = d.results || {};
   const states = statesOf(prompts, engines, results);
-  const hist = (d.history || []).slice(0, 12).reverse();
-  const trend = hist.length > 1 ? `<div class="panel stack"><h2>Trend</h2><div class="rows">${hist.map((h) => `<div class="row"><span>${esc(new Date(h.at).toISOString().slice(0, 10))}</span><span class="bar"><i class="named" style="width:${h.score}%"></i></span><span class="v">${h.score}/100</span></div>`).join('')}</div></div>` : '';
+  const trend = site.latest ? `<div class="duo"><div class="panel stack" style="gap:14px;align-content:start">${trendPanel(d.history, site)}</div><div class="panel stack" style="gap:10px">${insightsHtml(site.latest)}</div><div class="panel stack" style="gap:12px">${voiceHtml(site.latest)}</div></div>` : '';
   return layout('AI visibility report · ' + (site.project.brand || site.name), `<div class="sitehead"><div><h1>AI visibility of ${esc(site.project.brand || site.name)}</h1><p class="meta">${esc(hostOf(site.url))}${site.latest ? ', checked ' + esc(new Date(site.latest.finishedAt || site.latest.at).toISOString().slice(0, 10)) : ''}</p></div></div>
 ${summaryHtml(site, site.latest, states, d.prev)}
 <div class="stack">${trend}<div class="panel"><h2 style="margin-bottom:14px">Answer grid</h2>${gridHtml(site, prompts, engines, results, '')}</div></div>`,
