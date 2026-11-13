@@ -17,13 +17,23 @@ function config() {
 
 function enabled() { return !!config(); }
 
+// KV_PREFIX (e.g. "asd:") keeps this app's keys apart when it shares a database with another app.
+// Every command here names its key first, except the ones below where every argument is a key.
+const ALL_KEYS = new Set(['MGET', 'DEL', 'UNLINK', 'EXISTS', 'TOUCH']);
+function scoped(parts) {
+  const prefix = process.env.KV_PREFIX || '';
+  if (!prefix || parts.length < 2) return parts;
+  if (ALL_KEYS.has(String(parts[0]).toUpperCase())) return [parts[0], ...parts.slice(1).map((k) => prefix + k)];
+  return [parts[0], prefix + parts[1], ...parts.slice(2)];
+}
+
 async function command(...parts) {
   const cfg = config();
   if (!cfg) throw new Error('Database is not configured (KV_REST_API_URL / KV_REST_API_TOKEN)');
   const res = await fetch(cfg.url, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(parts.map((p) => (typeof p === 'string' ? p : String(p))))
+    body: JSON.stringify(scoped(parts).map((p) => (typeof p === 'string' ? p : String(p))))
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) throw new Error('KV error: ' + (data.error || res.status));
@@ -36,7 +46,7 @@ async function pipeline(commands) {
   const res = await fetch(cfg.url + '/pipeline', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(commands.map((c) => c.map((p) => (typeof p === 'string' ? p : String(p)))))
+    body: JSON.stringify(commands.map((c) => scoped(c).map((p) => (typeof p === 'string' ? p : String(p)))))
   });
   const data = await res.json().catch(() => ([]));
   if (!res.ok) throw new Error('KV pipeline error: ' + res.status);

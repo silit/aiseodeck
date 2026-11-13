@@ -483,6 +483,24 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(!db.get('site:siteA') && /uninstalled/.test(getJ('user:user_1').notice || ''), 'an uninstalled app is noticed before the next check and its sites are deleted');
   wfState.revoked = false;
 
+  console.log('shared database prefix');
+  {
+    const kv = require('../api/_lib/kv');
+    process.env.KV_PREFIX = 'asd:';
+    db.set('user:other_app', '"keep"');
+    await kv.setJSON('user:p1', { a: 1 });
+    await kv.sadd('sites:p', 'x', 'y');
+    assert(db.has('asd:user:p1') && !db.has('user:p1') && db.has('asd:sites:p'), 'keys get the prefix');
+    const got = await kv.mgetJSON(['user:p1', 'user:other_app']);
+    assert(got[0] && got[0].a === 1 && got[1] === null, 'reads stay inside the prefix and never see the other app');
+    await kv.pipeline([['SET', 'pipe:1', '"v"'], ['GET', 'pipe:1']]);
+    assert(db.get('asd:pipe:1') === '"v"', 'pipelined commands get the prefix');
+    await kv.del('user:p1', 'sites:p', 'pipe:1', 'user:other_app');
+    assert(!db.has('asd:user:p1') && !db.has('asd:sites:p') && db.get('user:other_app') === '"keep"', 'deleting never touches the other app');
+    delete process.env.KV_PREFIX;
+    db.delete('user:other_app');
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
