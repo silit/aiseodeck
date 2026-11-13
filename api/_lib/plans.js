@@ -12,6 +12,13 @@ const PLANS = {
 };
 const FREE = { name: 'Free', sites: 1, keywords: 3, rechecks: 0 };
 
+// Days of the free trial on paid plans. Polar takes the card at checkout and charges when the trial ends,
+// unless the customer cancels first. TRIAL_DAYS=0 turns the trial off.
+function trialDays() {
+  const n = parseInt(process.env.TRIAL_DAYS, 10);
+  return Number.isFinite(n) && n >= 0 && n <= 30 ? n : 7;
+}
+
 function complimentary(user) {
   // "@webflow.com" is always included so the Marketplace review team gets the highest tier.
   const list = ['@webflow.com'].concat(String(process.env.COMPLIMENTARY_EMAILS || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean));
@@ -50,4 +57,4 @@ function limitsFor(user) {
   return lim;
 }
 
-module.exports = { PLANS, FREE, DAY, QUESTIONS, limitsFor, complimentary };
+module.exports = { PLANS, FREE, DAY, QUESTIONS, limitsFor, complimentary, trialDays };

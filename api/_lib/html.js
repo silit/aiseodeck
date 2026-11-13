@@ -29,6 +29,14 @@ function until(ts, now) {
   return 'in ' + plural(Math.round(s / 86400), 'day');
 }
 const hostOf = (u) => { try { return new URL(u).host.replace(/^www\./, ''); } catch (e) { return String(u || ''); } };
+// "November 21" for a timestamp or an ISO date
+const longDay = (ts) => { const d = new Date(typeof ts === 'number' ? ts : Date.parse(ts)); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }); };
+const money = (cents) => '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const trialLeft = (user) => {
+  const b = user && user.billing;
+  const end = b && b.status === 'on_trial' && b.trialEnd ? Date.parse(b.trialEnd) : 0;
+  return end > Date.now() ? Math.max(1, Math.ceil((end - Date.now()) / 86400000)) : 0;
+};
 const SHORT = { openai: 'GPT', aio: 'AIO', aimode: 'Mode', gemini: 'Gemini', perplexity: 'Pplx', claude: 'Claude', grok: 'Grok' };
 const siteHref = (site, extra) => '/app/site?id=' + encodeURIComponent(site.id) + (extra ? '&' + extra : '');
 const kwHref = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(k.id) + (extra ? '&' + extra : '');
@@ -304,7 +312,37 @@ svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:no
 .plan.current{border-color:var(--mark);box-shadow:inset 0 0 0 1px var(--mark)}
 .plan .price{font-size:28px;font-weight:800;letter-spacing:-.03em;font-stretch:112%}
 .plan form{margin-top:auto;padding-top:6px}
-@media (prefers-reduced-motion:reduce){.c.st-run{animation:none}.progress i{transition:none}.btn,.kt tbody tr{transition:none}}
+.plan .tnote{font-size:12.5px;color:var(--muted)}
+/* trial */
+.top nav a.trialchip{font-size:12.5px;font-weight:700;color:var(--mark-ink);background:var(--mark);box-shadow:inset 0 0 0 1px var(--mark-ring);border-radius:999px;padding:4px 10px}
+.top nav a.trialchip:hover{color:var(--mark-ink)}
+.startbox{max-width:640px;margin:0 auto;gap:18px}
+.planpick{display:flex;gap:8px;flex-wrap:wrap}
+.planpick a,.planpick span{font-size:13.5px;font-weight:700;border-radius:999px;padding:6px 14px;border:1px solid var(--line);text-decoration:none;color:var(--muted)}
+.planpick span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.planpick a:hover{color:var(--ink);border-color:var(--muted)}
+.bill{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}
+.bill div{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--bg2);min-width:0}
+.bill dt{font-size:13px;color:var(--muted);font-weight:600}
+.bill dd{margin:4px 0 0;font-size:28px;font-weight:800;letter-spacing:-.03em;font-stretch:112%;font-variant-numeric:tabular-nums}
+.bill dd small{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0;font-stretch:100%}
+.bill .now dd{color:var(--mark-text)}
+.wait{max-width:520px;margin:40px auto;text-align:center;display:grid;gap:14px;justify-items:center}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--mark);animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* fix next */
+.nextfix{display:grid;gap:6px;margin-bottom:18px}
+.nextfix .nf-head{display:flex;justify-content:space-between;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
+ol.nf{list-style:none;margin:0;padding:0;counter-reset:nf;display:grid}
+ol.nf li{counter-increment:nf;display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line2)}
+ol.nf li:first-child{border-top:0}
+ol.nf li::before{content:counter(nf);font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);width:26px;height:26px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center}
+ol.nf .nk{display:grid;gap:2px;min-width:0}
+ol.nf .nk a{color:var(--ink);font-weight:700;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ol.nf .nk a:hover{text-decoration:underline}
+@media (max-width:620px){ol.nf li{grid-template-columns:28px minmax(0,1fr)}ol.nf li .btn{grid-column:2;justify-self:start}.bill{grid-template-columns:1fr}}
+@media (max-width:560px){.top nav{gap:14px}.trialchip .tw{display:none}.top .wrap:has(.trialchip) .brand span{display:none}}
+@media (prefers-reduced-motion:reduce){.c.st-run{animation:none}.progress i{transition:none}.btn,.kt tbody tr{transition:none}.spin{animation:none}}
 `;
 
 const LOGO = `<svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--ink)"/><circle cx="11" cy="11" r="4" fill="var(--mark)"/><circle cx="21" cy="11" r="4" fill="none" stroke="var(--cite)" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="var(--faint)"/><circle cx="21" cy="21" r="4" fill="var(--mark)" stroke="var(--cite)" stroke-width="2.4"/></svg>`;
@@ -316,8 +354,9 @@ const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link 
 function layout(title, body, opts) {
   opts = opts || {};
   const cur = (p) => (opts.nav === p ? ' aria-current="page"' : '');
+  const left = trialLeft(opts.user);
   const nav = opts.user
-    ? `<nav aria-label="Main"><a href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Settings</a><a href="/logout">Sign out</a></nav>`
+    ? `<nav aria-label="Main">${left ? `<a class="trialchip" href="/app/settings#plan"><span class="tw">Trial, </span>${plural(left, 'day')} left</a>` : ''}<a href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Settings</a><a href="/logout">Sign out</a></nav>`
     : `<nav aria-label="Main"><a href="/">Home</a><a href="/docs">Docs</a><a href="/login">Sign in</a></nav>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(title)}</title>
 <meta name="theme-color" content="#1E2336"><link rel="icon" href="/favicon.png">${FONTS}
@@ -442,7 +481,7 @@ function deckTable(site, opts) {
 <td class="tr r"><span class="trend">${s ? sparkline(s.trend) + delta(s.trend) : ''}</span></td></tr>`;
   }).join('');
   const legend = `<div class="legend" aria-hidden="true"><span><i class="c st-n"></i>Named</span><span><i class="c st-b"></i>Named and your site cited</span><span><i class="c st-i"></i>Your site cited, not named</span><span><i class="c st-o"></i>Not named</span>${engines.some((e) => e === 'aio' || e === 'aimode') ? '<span><i class="c st-x"></i>No AI answer on Google</span>' : ''}</div>`;
-  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${opts.link === false ? '' : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
+  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${opts.link === false ? '' : opts.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly">Try all 7 free for ${opts.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
   return `<div class="deck"><table class="kt"><thead><tr><th scope="col" class="l">Keyword</th><th scope="col" class="r">Searches a month</th>${head}<th scope="col" class="r">Visible</th><th scope="col" class="r">Trend</th></tr></thead><tbody>${rows}</tbody></table></div>${legend}${upsell}`;
 }
 
@@ -494,7 +533,7 @@ function dashboard(user, sites, limits, notice, opts) {
   const engineNote = opts.enginesOn && !opts.enginesOn.length ? noticeHtml('No AI engine is connected on the server yet, so checks cannot run. If you run this app, add an engine API key.', 'warn') : '';
   return layout('Sites · AI SEO Deck', `${noticeHtml(notice)}${engineNote}
 <div class="head"><div><h1>Your sites</h1><p class="meta"><span>${esc(limits.name)} plan</span><span>${used} of ${plural(limits.keywords, 'keyword')} in use</span><span>${limits.plan === 'free' ? 'Checked every month on ChatGPT, Google AI Overviews and Perplexity' : 'Checked every week on every AI engine'}</span></p></div>
-<div class="actions"><a class="btn" href="/auth">Add Webflow sites</a>${limits.plan === 'free' ? '<a class="btn mark" href="/app/settings#plan">Upgrade</a>' : ''}</div></div>
+<div class="actions"><a class="btn" href="/auth">Add Webflow sites</a>${limits.plan !== 'free' ? '' : opts.trialDays ? `<a class="btn mark" href="/app/start?plan=solo&amp;interval=monthly">Try Solo free for ${opts.trialDays} days</a>` : '<a class="btn mark" href="/app/settings#plan">Upgrade</a>'}</div></div>
 <div class="sites">${list}</div>`, { user, nav: 'sites' });
 }
 
@@ -574,7 +613,36 @@ function addKeywordForm(site, opts) {
 
 function keywordsTab(site, d) {
   if (!(site.keywords || []).length) return `${addKeywordForm(site, { room: d.room, prefill: d.prefill })}<div class="panel empty"><h2>Add your first keyword</h2><p>Type what your customers search for, like a service and a city. We ask every AI engine in your plan and show whether they name you.</p><a class="btn" href="${esc(siteHref(site, 'tab=discover'))}">Find keyword ideas</a></div>`;
-  return `${addKeywordForm(site, { room: d.room, prefill: d.prefill })}${deckTable(site, { engines: d.engines, locked: d.locked, running: d.running })}`;
+  return `${addKeywordForm(site, { room: d.room, prefill: d.prefill })}${fixNext(site)}${deckTable(site, { engines: d.engines, locked: d.locked, running: d.running, trialDays: d.trialDays })}`;
+}
+
+// "Fix next": the keywords where AI names you least, ranked by what fixing them is worth.
+function fixNext(site) {
+  const now = Date.now();
+  const items = [];
+  for (const k of site.keywords || []) {
+    const s = site.kw && site.kw[k.id];
+    const v = verdict(s);
+    if (!s || v === 'yes' || v === 'none') continue;
+    const kc = engineCounts(s);
+    const lostTo = [...new Set(Object.values(s.lost || {}).flat())].slice(0, 2);
+    const recent = !!(k.fixedAt && now - k.fixedAt < 14 * 86400000);
+    const miss = kc.answered ? 1 - kc.named / kc.answered : 1;
+    // searches a month (at least 10, so keywords without data still count) times the share of engines that skip
+    // you, a little more when a rival takes the place, much less when fixes were applied in the last two weeks
+    const worth = Math.max(10, k.volume || 0) * miss * (lostTo.length ? 1.3 : 1) * (recent ? 0.2 : 1);
+    items.push({ k, kc, lostTo, recent, worth });
+  }
+  if (!items.length) return '';
+  items.sort((a, b) => b.worth - a.worth);
+  const rows = items.slice(0, 3).map(({ k, kc, lostTo, recent }, i) => {
+    const why = [kc.named ? `${kc.named} of ${plural(kc.answered, 'AI engine')} name you` : `None of the ${plural(kc.answered, 'AI engine')} name you`];
+    if (lostTo.length) why.push(`<span class="rival-name">${esc(andList(lostTo))}</span> named instead`);
+    if (k.volume) why.push(`${num(k.volume)} searches a month`);
+    const line = recent ? `Fixes applied ${esc(ago(k.fixedAt, now))}. Publish in Webflow, then check it again.` : why.join('. ') + '.';
+    return `<li><div class="nk"><a href="${esc(kwHref(site, k))}">${esc(k.text)}</a><span class="small muted">${line}</span></div><a class="btn sm${recent || i ? '' : ' mark'}" href="${esc(kwHref(site, k))}">${recent ? 'Check again' : 'Open the fix plan'}</a></li>`;
+  }).join('');
+  return `<section class="panel nextfix" aria-labelledby="nf-title"><div class="nf-head"><h2 id="nf-title">Fix next</h2><p class="small muted">Where AI names you least, most searched first. Each keyword has a fix plan ready.</p></div><ol class="nf">${rows}</ol></section>`;
 }
 
 function trackButton(site, keyword, tracked, back, source) {
@@ -889,15 +957,68 @@ function fixPage(user, site, row, d) {
 
 /* ---------- account settings ---------- */
 
+const STATUS_WORDS = { active: 'active', on_trial: 'free trial', past_due: 'payment due, Polar is retrying', cancelled: 'cancelled', expired: 'ended', unpaid: 'unpaid', incomplete: 'not finished' };
+
+// The trial in one sentence: until when, and what happens next.
+function trialNote(user) {
+  const b = user.billing || {};
+  if (!trialLeft(user)) return '';
+  const p = PLANS[b.plan] || {};
+  const charge = b.amount != null ? money(b.amount) : '$' + (b.interval === 'yearly' ? p.yearly : p.monthly);
+  const per = b.interval === 'yearly' ? 'a year' : 'a month';
+  return noticeHtml(`Your ${esc(p.name || '')} trial runs until ${esc(longDay(b.trialEnd))}. ${b.cancelAtPeriodEnd
+    ? 'You cancelled it, so nothing is charged and the account moves to the free plan then.'
+    : `Then ${esc(charge)} ${per} is charged to your card, unless you cancel before. Polar emails you a reminder before the trial ends.`} <a href="/app/billing/portal">Manage billing</a>`, b.cancelAtPeriodEnd ? 'warn' : 'good');
+}
+
+// After "Start free trial" on the home page: the plan, what is paid today and when, then Polar's checkout.
+function startPage(user, d) {
+  const p = PLANS[d.plan];
+  const yearly = d.interval === 'yearly';
+  const price = yearly ? p.yearly : p.monthly;
+  const per = yearly ? 'a year' : 'a month';
+  const t = d.trialDays || 0;
+  const firstCharge = t ? longDay(Date.now() + t * 86400000) : '';
+  const kwq = d.kw ? '&amp;kw=' + encodeURIComponent(d.kw) : '';
+  const href = (plan, interval) => `/app/start?plan=${plan}&amp;interval=${interval}${kwq}`;
+  const pick = Object.entries(PLANS).map(([k, x]) => (k === d.plan ? `<span aria-current="true">${esc(x.name)}</span>` : `<a href="${href(k, d.interval)}">${esc(x.name)}</a>`)).join('');
+  const other = yearly ? `<a class="small" href="${href(d.plan, 'monthly')}">Pay monthly instead, $${num(p.monthly)} a month</a>` : `<a class="small" href="${href(d.plan, 'yearly')}">Pay yearly and get 2 months free, $${num(p.yearly)} a year</a>`;
+  return layout((t ? 'Start your free trial' : 'Start ' + p.name) + ' · AI SEO Deck', `${noticeHtml(d.notice)}
+<div class="panel stack startbox">
+<div class="planpick" role="group" aria-label="Plan">${pick}</div>
+<h1>${t ? `Try ${esc(p.name)} free for ${t} days` : `Start ${esc(p.name)}`}</h1>
+<p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all 7 AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
+<dl class="bill"><div class="now"><dt>Today</dt><dd>$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>$${num(price)}<small> ${per}</small></dd></div></dl>
+<p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from Settings and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from Settings.'}</p>
+<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${esc(d.plan)}"><input type="hidden" name="interval" value="${esc(d.interval)}"><input type="hidden" name="from" value="start"><input type="hidden" name="kw" value="${esc(d.kw || '')}"><button class="btn mark" type="submit">${t ? 'Start free trial' : 'Continue to payment'}</button>${other}</form>
+<p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ChatGPT, Google AI Overviews and Perplexity.</span></p>
+</div>`, { user, nav: 'settings' });
+}
+
+// Shown for a few seconds after checkout while Polar finishes; reloads itself.
+function waitPage(user, title, text, url) {
+  return layout(title + ' · AI SEO Deck', `<div class="panel wait" role="status"><span class="spin" aria-hidden="true"></span><h1>${esc(title)}</h1><p class="muted">${esc(text)}</p><a class="btn sm" href="${esc(url)}">Check now</a></div>`,
+    { user, nav: 'settings', script: `setTimeout(function(){location.replace(${JSON.stringify(url)})},2500);` });
+}
+
 function settingsPage(user, sites, limits, notice, opts) {
   opts = opts || {};
   const b = user.billing || {};
   const usage = opts.usage || { rechecks: 0 };
   const used = sites.reduce((a, s) => a + (s.keywords || []).length, 0);
+  const t = opts.trialDays || 0;
   const planCards = [['free', FREE]].concat(Object.entries(PLANS)).map(([k, p]) => {
     const current = limits.plan === k;
     const price = k === 'free' ? '$0' : '$' + p.monthly;
-    const btn = k === 'free' || current ? '' : (opts.billing ? `<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${k}"><button class="btn ${k === 'solo' ? 'mark' : ''} sm" name="interval" value="monthly" type="submit">Monthly</button><button class="btn sm" name="interval" value="yearly" type="submit">Yearly, 2 months free</button></form>` : '');
+    let btn = '';
+    if (k !== 'free' && !current && !limits.complimentary) {
+      // with a subscription running, a plan change goes through Polar's portal so there is never a second subscription
+      if (opts.live) btn = '<a class="btn sm" href="/app/billing/portal" style="margin-top:auto">Switch in billing</a>';
+      else if (opts.billing) {
+        btn = `<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${k}"><button class="btn ${k === 'solo' ? 'mark' : ''} sm" name="interval" value="monthly" type="submit">${t ? `Try free for ${t} days` : 'Monthly'}</button><button class="btn sm" name="interval" value="yearly" type="submit">Yearly, 2 months free</button></form>`
+          + (t ? `<span class="tnote">$0 today, then $${num(p.monthly)} a month or $${num(p.yearly)} a year. Cancel in the first ${t} days and pay nothing.</span>` : '');
+      }
+    }
     return `<div class="plan${current ? ' current' : ''}"><b>${esc(p.name)}${current ? ' <span class="pill good">Your plan</span>' : ''}</b><span class="price">${price}<span class="small muted" style="font-weight:500">${k === 'free' ? '' : ' a month'}</span></span>
 <span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? 'Checked monthly on ChatGPT, Google AI Overviews and Perplexity. Audit and suggestions; apply by copying.' : `Checked weekly on all 7 AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
   }).join('');
@@ -908,8 +1029,10 @@ function settingsPage(user, sites, limits, notice, opts) {
 <section class="panel stack" id="plan"><h2>Plan</h2>
 ${limits.complimentary ? noticeHtml('Your account has complimentary Agency access.', 'good') : ''}
 <p class="small">${used} of ${plural(limits.keywords, 'keyword')} in use. ${limits.rechecks ? `${Math.max(0, limits.rechecks - (usage.rechecks || 0))} of ${limits.rechecks} keyword checks on demand left this month.` : ''}</p>
-${b.subscriptionId ? `<p class="small">Subscription: <b>${esc(b.status || '')}</b>${b.renewsAt ? ', renews ' + esc(String(b.renewsAt).slice(0, 10)) : ''}${b.endsAt && !b.renewsAt ? ', ends ' + esc(String(b.endsAt).slice(0, 10)) : ''}. <a href="/app/billing/portal">Manage billing</a></p>` : ''}
-${opts.billing ? '' : '<p class="small muted">Paid plans open soon. Write to info@silitlabs.com if you need more now.</p>'}
+${trialNote(user)}
+${b.subscriptionId && !trialLeft(user) ? `<p class="small">Subscription: <b>${esc(STATUS_WORDS[b.status] || b.status || '')}</b>${b.renewsAt ? ', renews ' + esc(longDay(b.renewsAt)) : ''}${b.endsAt && !b.renewsAt ? ', ends ' + esc(longDay(b.endsAt)) : ''}. <a href="/app/billing/portal">Manage billing</a></p>` : ''}
+${opts.billing || limits.plan !== 'free' ? '' : '<p class="small muted">Paid plans open soon. Write to info@silitlabs.com if you need more now.</p>'}
+${t && opts.billing && limits.plan === 'free' ? `<p class="small">Every paid plan starts with ${t} days free. Polar asks for a card and charges nothing until day ${t + 1}.</p>` : ''}
 <div class="plans">${planCards}</div><p class="tiny muted">Payments are handled by ${esc(opts.providerName || 'Polar')}. Prices in US dollars; taxes may apply.</p></section>
 <form class="panel stack" method="post" action="/app/settings"><h2>Emails and reports</h2>
 <div class="field"><label for="reportEmail">Send reports to</label><input type="email" id="reportEmail" name="reportEmail" maxlength="254" value="${esc((user.settings && user.settings.reportEmail) || user.email || '')}"></div>
@@ -932,4 +1055,4 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
   { plain: true, brandName: brandName || '', footer: brandName ? `<span>Prepared by ${esc(brandName)}</span>` : '<span>Made with AI SEO Deck</span><a href="/">aiseodeck.silitlabs.com</a>' });
 }
 
-module.exports = { esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, reportPage, deckTable, highlight, lineChart, verdictText, BUSINESS_TYPES, COUNTRIES, LANGS };
+module.exports = { esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, BUSINESS_TYPES, COUNTRIES, LANGS };

@@ -14,7 +14,8 @@ Live address (planned): https://aiseodeck.silitlabs.com
 - `api/_lib/jobs.js`: runs are queues of `keyword question x engine` tasks in Redis; a run covers all keywords (weekly) or some (a keyword checked on demand, keywords just added). The cron tick and the open site page both work through them; each engine has its own parallel limit; failed calls are retried up to 3 times.
 - `api/_lib/audit.js` + `fetcher.js`: reads live pages, robots.txt, llms.txt, sitemap.xml (only the site's own hosts, private addresses refused).
 - `api/_lib/fixes.js` + `llm.js`: suggestions (questions, meta, FAQ answers), schema building and merging, llms.txt.
-- `api/_lib/billing.js` + `polar.js`: Polar subscriptions. Only Polar products named "AI SEO Deck ..." (or with metadata `app=aiseodeck`) are used.
+- `api/_lib/billing.js` + `polar.js`: Polar subscriptions. Only Polar products named "AI SEO Deck ..." (or with metadata `app=aiseodeck`) are used. Free trial: every checkout of an account that never had a trial or a subscription gets `trial_interval: day`, `trial_interval_count: TRIAL_DAYS` (default 7, 0 turns it off); the others get `allow_trial: false`. Back from checkout, `/app/billing/return` reads the checkout and its subscription so the plan is on before the webhook arrives.
+- Trial flow: home page "Start free trial" -> `/auth?plan=solo&interval=monthly` -> Webflow -> `/app/start` (today $0, first charge date) -> Polar checkout -> `/app/billing/return` -> site setup.
 - `test/app.js`: end-to-end test with mock Webflow, Redis, AI engines, Resend and Polar. Run `npm test`.
 
 ## Plans
@@ -27,6 +28,8 @@ Live address (planned): https://aiseodeck.silitlabs.com
 | Agency | $149/mo, $1490/yr | 20 | 100 | as Studio with 100 checks on demand |
 
 New keywords get a first check right away, up to the plan's number of keywords in new keywords a month.
+
+Every paid plan starts with a 7-day free trial (card taken by Polar, charged on day 8 unless cancelled; one trial per account, and Polar's "Prevent trial abuse" also blocks a second trial with the same email or card). A Solo trial costs at most about $4 in AI calls.
 
 Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (web search $10 per 1,000 calls), AI Overviews 0.4 and AI Mode 0.4 (DataForSEO live), Gemini about 0.2 within the 5,000 free grounded prompts a month and about 3 after ($14 per 1,000 search queries), Perplexity about 0.5 to 0.8, Claude about 1.2 to 3 (web search $10 per 1,000), Grok about 2.5 to 4 (web search $5 per 1,000 calls plus tokens). One keyword check (12 answers) is about 19 cents (12 to 26), so about $0.82 a keyword a month with weekly checks. Worst case per month (every keyword, every check on demand and every new keyword check used): Solo about $12, Studio about $36, Agency about $120. DataForSEO Labs lookups cost 1.2 cents plus 0.012 cents per keyword. `MAX_DAILY_CALLS` (default 1500, at most about $22 a day) stops all checks for the day once reached; work continues the next day.
 
@@ -47,8 +50,9 @@ Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (w
    - "AI SEO Deck Solo" aylık $19, "AI SEO Deck Solo Yearly" yıllık $190
    - "AI SEO Deck Studio" aylık $49, "AI SEO Deck Studio Yearly" yıllık $490
    - "AI SEO Deck Agency" aylık $149, "AI SEO Deck Agency Yearly" yıllık $1490
-   - Yeni bir Organization Access Token (products:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write)
+   - Yeni bir Organization Access Token (products:read, checkouts:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write)
    - Webhook: `https://aiseodeck.silitlabs.com/billing/webhook`, API version 2026-10, olaylar: subscription.*
+   - Settings > Subscriptions > "Prevent trial abuse" açık (14 Kasım 2026'da açıldı). Ürünlere deneme süresi girmeye gerek yok, deneme her checkout'ta koddan veriliyor.
 7. **Zamanlayıcı**: Vercel Pro'da `vercel.json` içindeki cron her 5 dakikada `/cron/tick` çağırır ve `CRON_SECRET` değerini kendisi `Authorization: Bearer` olarak gönderir. Hobby planda bunun yerine cron-job.org kullanın: her 5 dakikada `https://aiseodeck.silitlabs.com/cron/tick`, header `x-cron-secret: <CRON_SECRET>`.
 8. Vercel ortam değişkenlerini girip yeniden deploy et (listesi `.env.example` dosyasında).
 

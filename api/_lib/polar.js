@@ -2,7 +2,8 @@
 // Paid plans through Polar (merchant of record), the payment account for every Silit Labs product.
 // Env: POLAR_ACCESS_TOKEN (organization access token), POLAR_WEBHOOK_SECRET (whsec_...),
 //      POLAR_API_BASE (optional; https://sandbox-api.polar.sh for the sandbox), POLAR_PORTAL_URL (optional fallback)
-// Token scopes: products:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write
+// Token scopes: products:read, checkouts:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write
+// Free trials are set per checkout (trial_interval day, trial_interval_count TRIAL_DAYS), so the products need no trial.
 // The Polar organization also sells other products, so only products whose name contains "AI SEO Deck"
 // (or with metadata app = aiseodeck) are used.
 // Each is matched to a plan by its metadata "plan" (solo, studio, agency) or its name, and to monthly or yearly
@@ -96,20 +97,28 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
     }
   }
 
-  async function checkoutUrl(user, plan, interval, appUrl) {
+  // opts: { trialDays (0 for none), next: 'setup' after the start page or 'settings', kw: a keyword to carry to setup }
+  async function checkoutUrl(user, plan, interval, appUrl, opts) {
+    opts = opts || {};
     if (!PLANS[plan]) throw new Error('Unknown plan');
     interval = interval === 'yearly' ? 'yearly' : 'monthly';
     const map = await products();
     const productId = map[plan + ':' + interval];
     if (!productId) throw new Error(`No ${PLANS[plan].name} ${interval} product found. Polar returned ${map._seen}.`);
     if (isSandbox() && !isTester(user)) throw new Error('Paid plans are not open yet.');
+    const next = opts.next === 'setup' ? 'setup' : 'settings';
+    const back = '/app/billing/return?next=' + next + (opts.kw ? '&kw=' + encodeURIComponent(String(opts.kw).slice(0, 80)) : '');
     const body = {
       products: [productId],
-      success_url: appUrl + '/app/settings?upgraded=1',
-      return_url: appUrl + '/app/settings#plan',
+      // Polar puts the checkout id in place of {CHECKOUT_ID}, so the return page can switch the plan on at once
+      success_url: appUrl + back + '&checkout_id={CHECKOUT_ID}',
+      return_url: appUrl + (next === 'setup' ? '/app' : '/app/settings#plan'),
       // copied by Polar to the subscription, so the webhook knows whose plan to change
       metadata: { user_id: String(user.id), sig: sign(user.id), app: 'aiseodeck' }
     };
+    // The trial is set here, not on the product, so an account that already had one never gets another
+    if (opts.trialDays > 0) { body.trial_interval = 'day'; body.trial_interval_count = Math.min(30, Math.round(opts.trialDays)); }
+    else body.allow_trial = false;
     const email = String((user.settings && user.settings.reportEmail) || user.email || '').trim();
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) body.customer_email = email;
     const d = await api('POST', '/v1/checkouts/', body);
@@ -161,13 +170,54 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
       status,
       plan: m ? m.plan : '',
       interval: m ? m.interval : '',
-      renewsAt: ACTIVE.includes(status) ? sub.current_period_end || null : null,
+      // a trial cancelled before its end stays on_trial until then, but it will not renew
+      renewsAt: ACTIVE.includes(status) && !sub.cancel_at_period_end ? sub.current_period_end || null : null,
       endsAt,
+      trialEnd: sub.trial_end || null,
+      cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+      amount: typeof sub.amount === 'number' ? sub.amount : null, // cents, charged when the trial or period ends
+      currency: String(sub.currency || 'usd').toLowerCase(),
       portalUrl: '',
       updatedAt: Date.now()
     };
+    // remembered for good, so the account never gets a second trial
+    if (!user.trialUsedAt && (sub.trial_start || sub.trial_end || status === 'on_trial')) user.trialUsedAt = Date.parse(sub.trial_start || '') || Date.now();
     user.plan = stillPaid && m ? m.plan : 'free';
     return user;
+  }
+
+  // The rules every subscription update goes through, from a webhook or from the checkout return.
+  // Returns why an update is ignored, or '' to apply it.
+  function refuse(user, data) {
+    const b = user.billing || {};
+    const incomingStatus = normStatus(data);
+    // Only one subscription drives the plan: ignore events for an older one once a newer one is active
+    if (b.subscriptionId && b.subscriptionId !== String(data.id) && ACTIVE.includes(b.status) && !ACTIVE.includes(incomingStatus)) return 'other subscription active';
+    // Webhooks can arrive late or out of order: never let an older state overwrite a newer one
+    const incoming = Date.parse(data.modified_at || data.created_at || '') || 0;
+    const stored = Date.parse(b.providerUpdatedAt || '') || 0;
+    if (b.subscriptionId === String(data.id) && incoming && stored && incoming < stored) return 'stale event';
+    return '';
+  }
+
+  // Polar sends the browser back before its webhook may have arrived. The return page reads the checkout and its
+  // subscription directly, so the plan is on when the customer lands. deps: { saveUser, enforce }.
+  async function syncCheckout(user, checkoutId, deps) {
+    const id = String(checkoutId || '');
+    if (!enabled() || !/^[A-Za-z0-9-]{8,64}$/.test(id)) return { ok: false, why: 'no checkout' };
+    const co = await api('GET', '/v1/checkouts/' + encodeURIComponent(id));
+    const meta = co.metadata || {};
+    if (String(meta.user_id || '') !== String(user.id) || meta.sig !== sign(String(user.id))) return { ok: false, why: 'another account' };
+    if (co.status !== 'succeeded' || !co.subscription_id) return { ok: false, pending: co.status === 'confirmed' || co.status === 'succeeded', why: co.status || 'unknown' };
+    const sub = await api('GET', '/v1/subscriptions/' + encodeURIComponent(co.subscription_id));
+    if (!planFromProduct(sub.product)) return { ok: false, why: 'not an AI SEO Deck product' };
+    const why = refuse(user, sub);
+    if (why) return { ok: user.plan !== 'free', why };
+    await kv.setJSON('polarsub:' + sub.id, { userId: String(user.id) });
+    apply(user, sub);
+    await deps.saveUser(user);
+    if (deps.enforce) await deps.enforce(user);
+    return { ok: user.plan !== 'free', plan: user.plan };
   }
 
   // Webhook: verifies the signature, finds the user and applies the subscription.
@@ -190,16 +240,8 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
     const user = await deps.getUser(userId);
     if (!user) return { status: 202, body: { ignored: 'user gone' } };
     if (isSandbox() && !isTester(user)) return { status: 202, body: { ignored: 'test mode' } };
-    const b = user.billing || {};
-    const incomingStatus = normStatus(data);
-    // Only one subscription drives the plan: ignore events for an older one once a newer one is active
-    if (b.subscriptionId && b.subscriptionId !== String(data.id) && ACTIVE.includes(b.status) && !ACTIVE.includes(incomingStatus)) {
-      return { status: 202, body: { ignored: 'other subscription active' } };
-    }
-    // Webhooks can arrive late or out of order: never let an older state overwrite a newer one
-    const incoming = Date.parse(data.modified_at || data.created_at || '') || 0;
-    const stored = Date.parse(b.providerUpdatedAt || '') || 0;
-    if (b.subscriptionId === String(data.id) && incoming && stored && incoming < stored) return { status: 202, body: { ignored: 'stale event' } };
+    const why = refuse(user, data);
+    if (why) return { status: 202, body: { ignored: why } };
 
     await kv.setJSON('polarsub:' + data.id, { userId });
     apply(user, data);
@@ -235,6 +277,6 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
     return cfg().portal;
   }
 
-  return { name: 'Polar', enabled, mode, planFromProduct, checkoutUrl, verify, apply, handleWebhook, cancelSubscription, portalUrl, _reset: () => { productCache = null; } };
+  return { name: 'Polar', enabled, mode, planFromProduct, checkoutUrl, syncCheckout, verify, apply, handleWebhook, cancelSubscription, portalUrl, _reset: () => { productCache = null; } };
 };
 module.exports.normStatus = normStatus;

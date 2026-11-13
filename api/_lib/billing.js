@@ -2,7 +2,7 @@
 // Paid plans through Polar (merchant of record). See polar.js for the API and webhook details.
 const crypto = require('crypto');
 const kv = require('./kv');
-const { PLANS } = require('./plans');
+const { PLANS, trialDays } = require('./plans');
 
 const ACTIVE = ['active', 'on_trial', 'past_due'];
 
@@ -26,12 +26,21 @@ function hasLiveSubscription(user) {
   const b = user && user.billing;
   return !!(b && b.subscriptionId && ACTIVE.includes(b.status));
 }
+// One free trial per account: never for someone who already had a trial or any subscription.
+// Polar's "Prevent trial abuse" setting also blocks a second trial with the same email or card.
+function trialEligible(user) {
+  if (!user || !trialDays()) return false;
+  if (user.trialUsedAt) return false;
+  return !(user.billing && user.billing.subscriptionId);
+}
 async function cancelSubscription(user) { return hasLiveSubscription(user) ? polar.cancelSubscription(user) : true; }
 
 module.exports = {
-  PLANS, ACTIVE, isTester, sign, canCheckout, hasLiveSubscription, cancelSubscription,
+  PLANS, ACTIVE, isTester, sign, canCheckout, hasLiveSubscription, trialEligible, trialDays, cancelSubscription,
   mode: () => polar.mode(),
-  checkoutUrl: (user, plan, interval, appUrl) => polar.checkoutUrl(user, plan, interval, appUrl),
+  // opts: { next: 'setup' | 'settings', kw }. The trial is added when the account can still have one.
+  checkoutUrl: (user, plan, interval, appUrl, opts) => polar.checkoutUrl(user, plan, interval, appUrl, Object.assign({}, opts, { trialDays: trialEligible(user) ? trialDays() : 0 })),
+  syncCheckout: (user, checkoutId, deps) => polar.syncCheckout(user, checkoutId, deps),
   portalUrl: (user, appUrl) => polar.portalUrl(user, appUrl),
   handleWebhook: (raw, headers, deps) => polar.handleWebhook(raw, headers, deps),
   polar,

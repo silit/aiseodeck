@@ -19,7 +19,7 @@ const email = require('./_lib/email');
 const kwLib = require('./_lib/keywords');
 const analyze = require('./_lib/analyze');
 const insights = require('./_lib/insights');
-const { limitsFor, QUESTIONS } = require('./_lib/plans');
+const { limitsFor, QUESTIONS, PLANS } = require('./_lib/plans');
 const { seal, open, random, timingEqual } = require('./_lib/crypto');
 const crypto = require('crypto');
 const net = require('net');
@@ -130,15 +130,30 @@ async function currentUser(req) {
 }
 const sessionCookie = (userId) => cookie(COOKIE, seal({ u: userId, exp: Date.now() + SESSION_TTL * 1000 }), SESSION_TTL);
 
+// A plan picked on the home page ("solo:monthly"), carried through Webflow sign in to the start page.
+function wantedPlan(plan, interval) {
+  const p = String(plan || '').toLowerCase();
+  return PLANS[p] ? p + ':' + (interval === 'yearly' ? 'yearly' : 'monthly') : '';
+}
+function startUrl(want, kw) {
+  const [plan, interval] = String(want).split(':');
+  return '/app/start?plan=' + plan + '&interval=' + interval + (kw ? '&kw=' + encodeURIComponent(kw) : '');
+}
+const withNotice = (url, user, text) => url + (url.includes('?') ? '&' : '?') + noticeQuery(user, text);
+
 // /auth?kw=... comes from the keyword box on the home page: the keyword waits in a cookie until the site is set up.
+// /auth?plan=solo&interval=monthly comes from a "Start free trial" button: after Webflow it opens the start page.
 async function handleAuth(req, res) {
   const env = ENV();
-  const kw = kwLib.clean(queryOf(req).kw || '');
-  if (kw && (await currentUser(req))) return redirect(res, '/app?kw=' + encodeURIComponent(kw));
+  const q = queryOf(req);
+  const kw = kwLib.clean(q.kw || '');
+  const want = wantedPlan(q.plan, q.interval);
+  if ((kw || want) && (await currentUser(req))) return redirect(res, want ? startUrl(want, kw) : '/app?kw=' + encodeURIComponent(kw));
   if (!env.clientId || !env.appUrl) return send(res, 500, html.errorPage('Not configured', 'WEBFLOW_CLIENT_ID and APP_URL must be set.', '/'));
   const state = random(16);
   const cookies = [cookie('ad_state', state, 600)];
   if (kw) cookies.push(cookie('ad_kw', kw, 3600));
+  if (want) cookies.push(cookie('ad_plan', want, 3600));
   redirect(res, wf.authorizeUrl({ clientId: env.clientId, redirectUri: env.appUrl + '/callback', state }), { 'Set-Cookie': cookies });
 }
 
@@ -182,9 +197,13 @@ async function handleCallback(req, res) {
     const still = (await store.getSites(user.siteIds)).some((s) => s.connectionId === old.id);
     if (!still) { const removed = await store.removeConnection(user, old.id); if (removed) await wf.revokeToken({ clientId: env.clientId, clientSecret: env.clientSecret, token: store.tokenOf(removed) }); }
   }
-  await store.saveUser(user);
   const kw = kwLib.clean(c.ad_kw || '');
-  res.setHeader('Set-Cookie', [sessionCookie(user.id), cookie('ad_state', '', 0), cookie('ad_kw', '', 0)]);
+  const want = wantedPlan(...String(c.ad_plan || '').split(':'));
+  // the start page comes first; notices about sites wait on the account and show on the next page
+  if (want && notices.length) user.notice = notices.join(' ');
+  await store.saveUser(user);
+  res.setHeader('Set-Cookie', [sessionCookie(user.id), cookie('ad_state', '', 0), cookie('ad_kw', '', 0), cookie('ad_plan', '', 0)]);
+  if (want) return redirect(res, startUrl(want, kw));
   const kwq = kw ? '&kw=' + encodeURIComponent(kw) : '';
   // One new site and nothing set up yet: go straight to its setup
   const sites = await store.getSites(user.siteIds);
@@ -329,7 +348,29 @@ async function handleApp(req, res, user) {
   if (added > 0) notice = `${added} site${added === 1 ? '' : 's'} connected. Set one up to start checking.`;
   if (kw && !notice) notice = `Open a site to track "${html.esc(kw)}".`;
   if (user.notice) { notice = html.esc(user.notice); delete user.notice; await store.saveUser(user); }
-  send(res, 200, html.dashboard(user, sites, user._limits, notice, { enginesOn: engines.enabled() }));
+  send(res, 200, html.dashboard(user, sites, user._limits, notice, { enginesOn: engines.enabled(), trialDays: user._limits.plan === 'free' && billing.trialEligible(user) ? billing.trialDays() : 0 }));
+}
+
+// Where someone goes once the plan question is settled: the setup of their one new site, or the sites list.
+function afterStart(sites, kw) {
+  const ready = sites.filter((s) => s.project.ready);
+  const kwq = kw ? 'kw=' + encodeURIComponent(kw) : '';
+  if (!ready.length && sites.length === 1) return '/app/setup?id=' + encodeURIComponent(sites[0].id) + (kwq ? '&' + kwq : '');
+  return '/app' + (kwq ? '?' + kwq : '');
+}
+
+// After "Start free trial" on the home page and Webflow sign in: what the plan costs and when, before the payment page.
+async function handleStart(req, res, user) {
+  const q = queryOf(req);
+  const plan = PLANS[q.plan] ? q.plan : 'solo';
+  const interval = q.interval === 'yearly' ? 'yearly' : 'monthly';
+  const kw = kwLib.clean(q.kw || '');
+  const next = afterStart(await store.getSites(user.siteIds || []), kw);
+  if (user._limits.plan !== 'free' || billing.hasLiveSubscription(user)) return redirect(res, next);
+  if (!(await billing.canCheckout(user))) return redirect(res, withNotice(next, user, 'Paid plans open soon. You are on the free plan for now: 3 keywords, checked on ChatGPT, Google AI Overviews and Perplexity.'));
+  const notice = user.notice ? html.esc(user.notice) : '';
+  if (user.notice) { delete user.notice; await store.saveUser(user); }
+  send(res, 200, html.startPage(user, { plan, interval, kw, next, notice, trialDays: billing.trialEligible(user) ? billing.trialDays() : 0 }));
 }
 
 async function handleSetupPage(req, res, user) {
@@ -426,7 +467,8 @@ async function handleSitePage(req, res, user) {
   const room = Math.max(0, limits.keywords - (await store.keywordCount(user)));
   send(res, 200, html.sitePage(user, site, {
     tab, limits, progress, running, history: hist, audit, notice, room, prefill: kwLib.clean(q.kw || ''),
-    engines: engines.forLimits(limits), locked: engines.lockedFor(limits), canRun: canRun(site, limits, store.usageOf(user))
+    engines: engines.forLimits(limits), locked: engines.lockedFor(limits), canRun: canRun(site, limits, store.usageOf(user)),
+    trialDays: limits.plan === 'free' && billing.trialEligible(user) ? billing.trialDays() : 0
   }));
 }
 
@@ -967,7 +1009,10 @@ async function handleSettingsPage(req, res, user) {
   const q = queryOf(req);
   const sites = await store.getSites(user.siteIds || []);
   const notice = q.upgraded ? 'Thanks! Your plan updates as soon as the payment is confirmed, usually within a minute.' : (q.saved ? 'Saved.' : html.esc(noticeFrom(q, user)));
-  send(res, 200, html.settingsPage(user, sites, user._limits, notice, { billing: await billing.canCheckout(user), providerName: 'Polar', usage: store.usageOf(user) }));
+  send(res, 200, html.settingsPage(user, sites, user._limits, notice, {
+    billing: await billing.canCheckout(user), providerName: 'Polar', usage: store.usageOf(user),
+    live: billing.hasLiveSubscription(user), trialDays: billing.trialEligible(user) ? billing.trialDays() : 0
+  }));
 }
 async function handleSettingsSave(req, res, user) {
   const b = await readBody(req);
@@ -983,8 +1028,38 @@ async function handleSettingsSave(req, res, user) {
 async function handleCheckout(req, res, user) {
   const b = await readBody(req);
   if (!(await billing.canCheckout(user))) return send(res, 503, html.errorPage('Upgrades are not open yet', 'Write to info@silitlabs.com and we will raise your limits.', '/app/settings'));
-  try { redirect(res, await billing.checkoutUrl(user, String(b.plan || ''), String(b.interval || ''), ENV().appUrl)); }
+  // A second checkout would start a second subscription: plan changes go through the billing portal
+  if (billing.hasLiveSubscription(user)) return redirect(res, '/app/billing/portal');
+  const opts = b.from === 'start' ? { next: 'setup', kw: kwLib.clean(b.kw || '') } : { next: 'settings' };
+  try { redirect(res, await billing.checkoutUrl(user, String(b.plan || ''), String(b.interval || ''), ENV().appUrl, opts)); }
   catch (e) { console.error('[billing]', e.message); send(res, 502, html.errorPage('Could not open checkout', e.message, '/app/settings')); }
+}
+
+// Polar's success page sends the customer here with the checkout id. The plan is switched on from the checkout
+// itself, so it is on before the webhook arrives; while Polar is still finishing, the page waits a few seconds.
+async function handleBillingReturn(req, res, user) {
+  const q = queryOf(req);
+  const kw = kwLib.clean(q.kw || '');
+  const tries = Math.min(10, parseInt(q.t, 10) || 0);
+  const paid = () => user.plan && user.plan !== 'free' && billing.hasLiveSubscription(user);
+  if (!paid() && q.checkout_id) {
+    try { await billing.syncCheckout(user, String(q.checkout_id), { saveUser: store.saveUser, enforce: (u) => store.enforceLimit(u) }); }
+    catch (e) { console.error('[billing] return', e.message); }
+  }
+  if (!paid() && q.checkout_id && tries < 5) {
+    const again = new URLSearchParams();
+    for (const k of ['next', 'kw', 'checkout_id']) if (q[k]) again.set(k, String(q[k]).slice(0, 120));
+    again.set('t', String(tries + 1));
+    return send(res, 200, html.waitPage(user, 'Switching your plan on','Polar is confirming your checkout. This takes a few seconds.', '/app/billing/return?' + again.toString()));
+  }
+  user._limits = limitsFor(user);
+  const b = user.billing || {};
+  const name = (PLANS[user.plan] || {}).name || 'your plan';
+  const text = !paid() ? 'Thanks! Your plan switches on as soon as Polar confirms the checkout, usually within a minute.'
+    : b.status === 'on_trial' && b.trialEnd ? `Your ${name} trial is on until ${html.longDay(b.trialEnd)}. All 7 AI engines and ${user._limits.keywords} keywords are open.`
+      : `You are on ${name}. All 7 AI engines and ${user._limits.keywords} keywords are open.`;
+  if (q.next === 'setup') return redirect(res, withNotice(afterStart(await store.getSites(user.siteIds || []), kw), user, text));
+  redirect(res, '/app/settings?' + noticeQuery(user, text));
 }
 async function handlePortal(req, res, user) {
   const url = await billing.portalUrl(user, ENV().appUrl);
@@ -1131,7 +1206,9 @@ module.exports = async function handler(req, res) {
       if (r === 'POST /app/fix/schema') return await handleFixSchema(req, res, user);
       if (r === 'GET /app/settings') return await handleSettingsPage(req, res, user);
       if (r === 'POST /app/settings') return await handleSettingsSave(req, res, user);
+      if (r === 'GET /app/start') return await handleStart(req, res, user);
       if (r === 'POST /app/billing/checkout') return await handleCheckout(req, res, user);
+      if (r === 'GET /app/billing/return') return await handleBillingReturn(req, res, user);
       if (r === 'GET /app/billing/portal') return await handlePortal(req, res, user);
       if (r === 'POST /app/delete') return await handleDelete(req, res, user);
       if (r === 'POST /app/connection/remove') return await handleDisconnect(req, res, user);

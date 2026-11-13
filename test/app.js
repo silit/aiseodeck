@@ -205,10 +205,13 @@ const webflow = http.createServer(async (req, res) => {
 });
 
 /* ---- mock Polar ---- */
-const polarState = { checkouts: [] };
+const polarState = { checkouts: [], checkout: null, subs: {} };
 const polar = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const body = await readJSON(req);
+  let pm;
+  if (req.method === 'GET' && (pm = u.pathname.match(/^\/v1\/checkouts\/([\w-]+)$/))) return polarState.checkout && polarState.checkout.id === pm[1] ? json(res, 200, polarState.checkout) : json(res, 404, { detail: 'not found' });
+  if (req.method === 'GET' && (pm = u.pathname.match(/^\/v1\/subscriptions\/([\w-]+)$/))) return polarState.subs[pm[1]] ? json(res, 200, polarState.subs[pm[1]]) : json(res, 404, { detail: 'not found' });
   if (u.pathname === '/v1/products/') return json(res, 200, { items: [
     { id: 'p_other', name: 'Flowdeck Solo Monthly', recurring_interval: 'month', metadata: {} },
     { id: 'p_solo_m', name: 'AI SEO Deck Solo', recurring_interval: 'month', metadata: { app: 'aiseodeck', plan: 'solo' } },
@@ -276,6 +279,14 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   ];
 
   console.log('unit: analysis, audit, fixes, plans, keywords');
+  {
+    const html = require('../api/_lib/html');
+    const fsite = { id: 's1', keywords: [{ id: 'a', text: 'alpha', volume: 100 }, { id: 'b', text: 'beta', volume: 5000 }, { id: 'c', text: 'gamma', volume: 900, fixedAt: Date.now() - 86400000 }, { id: 'd', text: 'delta', volume: 50 }],
+      kw: { a: { eng: { openai: 'o', aio: 'n', perplexity: 'o' } }, b: { eng: { openai: 'o', aio: 'o', perplexity: 'o' }, lost: { openai: ['Rivalco'] } }, c: { eng: { openai: 'o', aio: 'o', perplexity: 'o' } }, d: { eng: { openai: 'n', aio: 'n', perplexity: 'o' } } } };
+    const fx = html.fixNext(fsite);
+    assert(fx.indexOf('>beta<') < fx.indexOf('>gamma<') && fx.indexOf('>gamma<') < fx.indexOf('>alpha<') && !fx.includes('>delta<') && fx.includes('Rivalco') && fx.includes('Check again'), 'fix next ranks by searches and gap, puts fresh fixes lower and skips keywords AI already names');
+    assert(html.fixNext({ id: 's2', keywords: [{ id: 'x', text: 'x' }], kw: {} }) === '', 'no fix next before the first check');
+  }
   {
     const a = require('../api/_lib/analyze');
     const proj = { brand: 'Lumen Dental', aliases: [], domains: ['lumendental.com'], competitors: [{ name: 'Bright Smile Clinic', domain: 'brightsmile.com' }] };
@@ -518,10 +529,33 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 302 && decodeURIComponent(r.headers.location).includes('no longer tracked'), 'an unknown keyword goes back to the deck');
   r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('name="plan" value="solo"') && r.body.includes('10 keywords') && r.body.includes('$19'), 'settings show upgrade buttons and keyword plans');
+  assert(r.body.includes('Try free for 7 days') && r.body.includes('$0 today, then $19 a month'), 'settings offer the 7 day trial on paid plans');
   r = await post('/app/billing/checkout', cookie, 'plan=solo&interval=yearly');
   assert(r.headers.location === 'https://polar.test/checkout/1' && polarState.checkouts[0].products[0] === 'p_solo_y' && polarState.checkouts[0].metadata.app === 'aiseodeck', 'checkout uses the AI SEO Deck yearly product, never the Flowdeck one');
+  assert(polarState.checkouts[0].trial_interval === 'day' && polarState.checkouts[0].trial_interval_count === 7 && polarState.checkouts[0].success_url === 'https://app.test/app/billing/return?next=settings&checkout_id={CHECKOUT_ID}', 'checkout carries a 7 day trial and returns with the checkout id');
+  r = await request(port, 'GET', '/app/start?plan=studio&interval=monthly', { headers: { cookie } });
+  assert(r.status === 200 && r.body.includes('Try Studio free for 7 days') && r.body.includes('<dd>$0</dd>') && r.body.includes('Not now, continue on the free plan') && r.body.includes('name="from" value="start"'), 'start page shows the trial, today and the first charge');
   const billingLib = require('../api/_lib/billing');
   const store = require('../api/_lib/store');
+  {
+    const coId = '3f1c9a52-0d7e-4c55-9e57-2b6f4d1a8c11';
+    const trialEnd = new Date(Date.now() + 7 * 86400000).toISOString();
+    polarState.checkout = { id: coId, status: 'succeeded', subscription_id: 'sub_t1', metadata: { user_id: 'user_1', sig: billingLib.sign('user_1'), app: 'aiseodeck' } };
+    polarState.subs.sub_t1 = { id: 'sub_t1', status: 'trialing', amount: 1900, currency: 'usd', cancel_at_period_end: false, trial_start: new Date().toISOString(), trial_end: trialEnd, current_period_end: trialEnd, modified_at: new Date().toISOString(), customer_id: 'cus_1', product: { id: 'p_solo_m', name: 'AI SEO Deck Solo', recurring_interval: 'month', metadata: { app: 'aiseodeck', plan: 'solo' } }, metadata: { user_id: 'user_1', sig: billingLib.sign('user_1') } };
+    r = await request(port, 'GET', '/app/billing/return?next=setup&checkout_id=' + coId, { headers: { cookie } });
+    const u3 = getJ('user:user_1');
+    assert(r.status === 302 && decodeURIComponent(r.headers.location).includes('trial is on until') && u3.plan === 'solo' && u3.billing.status === 'on_trial' && u3.billing.trialEnd === trialEnd && u3.trialUsedAt, 'back from checkout, the trial is on at once without waiting for the webhook');
+    assert(!billingLib.trialEligible(u3), 'one trial per account');
+    r = await request(port, 'GET', '/app', { headers: { cookie } });
+    assert(r.body.includes('class="trialchip"') && r.body.includes('Trial, </span>7 days left') && !r.body.includes('Try Solo free'), 'the header shows the days left of the trial');
+    r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
+    assert(r.body.includes('trial runs until') && r.body.includes('$19 a month is charged') && r.body.includes('Switch in billing') && !r.body.includes('Try free for'), 'settings explain the trial and switch plans through billing');
+    r = await post('/app/billing/checkout', cookie, 'plan=studio&interval=monthly');
+    assert(r.headers.location === '/app/billing/portal' && polarState.checkouts.length === 1, 'no second checkout while a subscription runs');
+    polarState.checkout.metadata = { user_id: 'someone_else', sig: billingLib.sign('someone_else') };
+    const other = await billingLib.syncCheckout(Object.assign({}, u3, { billing: {}, plan: 'free' }), coId, { saveUser: async () => {} });
+    assert(!other.ok && other.why === 'another account', 'a checkout of another account is never applied');
+  }
   const sub = { id: 'sub_1', status: 'active', cancel_at_period_end: false, current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(), modified_at: new Date().toISOString(), customer_id: 'cus_1', product: { id: 'p_solo_m', name: 'AI SEO Deck Solo', recurring_interval: 'month', metadata: { app: 'aiseodeck', plan: 'solo' } }, metadata: { user_id: 'user_1', sig: billingLib.sign('user_1') } };
   const raw = JSON.stringify({ type: 'subscription.active', data: sub });
   const id = 'msg_1', ts = Math.floor(Date.now() / 1000);
@@ -572,6 +606,13 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await post('/app/setup', cookie2, { id: 'siteA', brand: 'Lumen Dental', domains: host, language: 'en', pick: ['veneers in antalya'] });
   const firstRun = getJ('site:siteA').sched.runId;
   assert(!!firstRun, 'reconnected site starts its first check');
+  r = await request(port, 'GET', '/auth?plan=studio&interval=yearly', { headers: { cookie: cookie2 } });
+  assert(r.headers.location === '/app/start?plan=studio&interval=yearly', 'a signed in user goes from a plan button straight to the start page');
+  r = await request(port, 'GET', '/auth?plan=solo');
+  const st3 = new URL(r.headers.location).searchParams.get('state');
+  assert(cookiesFrom(r).includes('ad_plan='), 'the plan waits in a cookie during Webflow sign in');
+  r = await request(port, 'GET', '/callback?code=good-code&state=' + st3, { headers: { cookie: cookiesFrom(r) } });
+  assert(r.headers.location === '/app/start?plan=solo&interval=monthly', 'after Webflow the plan opens the start page');
   r = await request(port, 'GET', '/auth?kw=all%20on%204%20antalya', { headers: { cookie: cookie2 } });
   assert(r.headers.location === '/app?kw=all%20on%204%20antalya', 'a signed in user skips Webflow and goes to the app with the keyword');
   r = await request(port, 'GET', r.headers.location, { headers: { cookie: cookie2 } });

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>AI SEO Deck: does AI recommend you?</title>
-<meta name="description" content="Type a keyword and see whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend you. Then fix your Webflow site in one click and track every keyword week by week.">
+<meta name="description" content="Type a keyword and see whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend you. Then fix your Webflow site in one click and track every keyword week by week. Every paid plan starts with 7 days free.">
 <link rel="icon" href="/favicon.png">
 <meta property="og:title" content="AI SEO Deck: every AI, one deck">
 <meta property="og:description" content="Keyword by keyword, see whether seven AI engines recommend you, then fix your Webflow site in one click.">
@@ -232,7 +232,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeri
 .plan.pick{border-color:var(--mark);box-shadow:0 0 0 1px var(--mark) inset}
 .plan h3{font-size:18px}
 .price{font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1;font-stretch:115%}
-.price span{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;font-stretch:100%}
+.price .per{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;font-stretch:100%}
 .kwcount{font-size:15px;font-weight:700}
 .kwcount b{font-size:22px;font-weight:800;color:var(--mark);font-stretch:112%}
 .plan ul{margin:0;padding:0;list-style:none;color:var(--muted);font-size:14.5px;display:grid;gap:7px}
@@ -251,6 +251,39 @@ summary::-webkit-details-marker{display:none}
 summary svg{flex:none;color:var(--faint);transition:transform .2s}
 details[open] summary svg{transform:rotate(45deg)}
 details p{color:var(--muted);margin-top:12px;max-width:72ch}
+
+/* hero gains */
+.gains{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.gains li{display:grid;grid-template-columns:16px minmax(0,1fr);gap:12px;align-items:baseline;font-size:16.5px;line-height:1.45}
+.gains li::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--mark);box-shadow:0 0 0 4px rgba(255,228,92,.14);transform:translateY(-1px)}
+
+/* why band */
+.whyband{background:linear-gradient(180deg,var(--bg2),var(--bg) 85%)}
+.whyband h2{max-width:24ch;font-size:clamp(30px,4vw,52px)}
+.whycols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 48px;margin-top:36px;max-width:1000px}
+.whycols p{color:var(--muted);font-size:18px;line-height:1.6}
+
+/* pricing: billing period, trial note, comparison */
+.pricehead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 32px;margin-bottom:40px}
+.pricehead .sec-head{margin-bottom:0}
+.billing{display:inline-flex;padding:4px;border:1px solid var(--line);border-radius:13px;background:var(--panel)}
+.billing button{font:inherit;font-size:14.5px;font-weight:700;color:var(--muted);background:transparent;border:0;border-radius:9px;padding:9px 14px;cursor:pointer}
+.billing button:hover{color:var(--ink)}
+.billing button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.tnote{font-size:13px;color:var(--faint);margin-top:-6px}
+.compare{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:20px 48px;align-items:center;margin-top:56px;padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
+.compare h3{font-size:22px}
+.compare > div p{color:var(--muted);font-size:15px;margin-top:6px}
+.compare .fine{grid-column:1 / -1;margin-top:0}
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.bars li{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) 48px;gap:14px;align-items:center;font-size:14.5px}
+.bars span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bars i{display:block;height:10px;border-radius:999px;background:var(--line2);position:relative;overflow:hidden}
+.bars i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--faint);border-radius:inherit}
+.bars b{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.bars li.us span{color:var(--ink);font-weight:700}
+.bars li.us i::after{background:var(--mark)}
+.bars li.us b{color:var(--mark)}
 
 .cta{text-align:left;display:grid;gap:26px;justify-items:start}
 .cta h2{font-size:clamp(40px,6vw,80px);font-stretch:118%;letter-spacing:-.04em}
@@ -272,6 +305,7 @@ footer a{color:var(--muted)}
   .ins > div,.ins > div + div{padding:24px 0;border-left:0;border-top:1px solid var(--line2)}
   .ins > div:first-child{border-top:0}
   .plans{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .compare,.whycols{grid-template-columns:1fr}
 }
 @media (max-width:640px){
   section{padding:76px 0}
@@ -293,6 +327,9 @@ footer a{color:var(--muted)}
   .stage:first-child{border-top:0}
   .stage::after{display:none}
   .plans{grid-template-columns:1fr}
+  .compare{padding:20px}
+  .bars li{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+  .bars i{grid-column:1 / -1;grid-row:2}
   .rk li{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}
   .rk .vol{grid-column:1;grid-row:2;text-align:left}
   .rk .track{grid-column:2;grid-row:1 / span 2}
@@ -332,7 +369,7 @@ footer a{color:var(--muted)}
 <header class="top" id="top">
   <div class="wrap">
     <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#F1F2FF"/><circle cx="11" cy="11" r="4" fill="#E8C300"/><circle cx="21" cy="11" r="4" fill="none" stroke="#2F5BFF" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="#8A93B8"/><circle cx="21" cy="21" r="4" fill="#E8C300" stroke="#2F5BFF" stroke-width="2.4"/></svg>AI SEO Deck</a>
-    <nav aria-label="Main"><a class="hide-s" href="#how">How it works</a><a class="hide-s" href="#pricing">Pricing</a><a class="hide-s" href="/docs">Docs</a><a href="/login">Sign in</a><a class="btn sm mark" href="/auth">Connect Webflow</a></nav>
+    <nav aria-label="Main"><a class="hide-s" href="#how">How it works</a><a class="hide-s" href="#pricing">Pricing</a><a class="hide-s" href="/docs">Docs</a><a href="/login">Sign in</a><a class="btn sm mark" href="/auth?plan=solo&amp;interval=monthly">Start free trial</a></nav>
   </div>
 </header>
 
@@ -342,9 +379,14 @@ footer a{color:var(--muted)}
     <div class="hero-text">
       <h1>Does AI recommend you?</h1>
       <div class="hero-side">
-        <p class="lede">Type a keyword your customers search for. AI SEO Deck asks <b>ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok</b> the way people do, shows where you are named and where a rival takes your place, then fixes your Webflow site in one click.</p>
-        <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#how">How it works</a></div>
-        <p class="note">Free plan, no card. Works on every Webflow plan.</p>
+        <p class="lede">For every keyword your customers search, AI SEO Deck asks <b>ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok</b> the way people do, then fixes your Webflow site where they skip you.</p>
+        <ul class="gains">
+          <li>Yes or no for every keyword, on every AI engine</li>
+          <li>The fix to make next, applied to Webflow in one click</li>
+          <li>Checked every week, with a report your clients can open</li>
+        </ul>
+        <div class="actions"><a class="btn mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><a class="btn" href="#how">How it works</a></div>
+        <p class="note">Every paid plan starts with 7 days free. Prefer no card? <a href="/auth">Start on the free plan</a>.</p>
       </div>
     </div>
 
@@ -391,7 +433,7 @@ footer a{color:var(--muted)}
 
 <section id="table">
   <div class="wrap">
-    <div class="sec-head"><h2>All your keywords on one deck</h2><p>One row per keyword, one column per AI engine. Search volume, visibility and the trend at a glance. Open a keyword to read every answer and see what to fix.</p></div>
+    <div class="sec-head"><h2>See where you stand on every AI</h2><p>One row per keyword, one column per AI engine. Search volume, visibility and the trend at a glance. Open a keyword to read every answer and see what to fix.</p></div>
     <div class="tablecard">
       <table class="kt">
         <thead><tr><th scope="col">Keyword</th><th scope="col" class="v">Searches a month</th><th scope="col">ChatGPT</th><th scope="col">AI Overviews</th><th scope="col">AI Mode</th><th scope="col">Gemini</th><th scope="col">Perplexity</th><th scope="col">Claude</th><th scope="col">Grok</th><th scope="col" class="v">Visible</th><th scope="col" class="v">4 weeks</th></tr></thead>
@@ -405,8 +447,9 @@ footer a{color:var(--muted)}
 <section id="fix">
   <div class="wrap fixgrid">
     <div>
-      <div class="sec-head" style="margin-bottom:30px"><h2>Not there yet? Fix it in one click</h2><p>For every keyword, AI SEO Deck finds the page that should win, writes what is missing and applies it to Webflow when you say so.</p></div>
+      <div class="sec-head" style="margin-bottom:30px"><h2>Know exactly what to fix next</h2><p>AI SEO Deck puts your biggest gaps first, finds the page that should win, writes what is missing and applies it to Webflow when you say so.</p></div>
       <div class="points">
+        <div><h3>Biggest gaps first</h3><p>Keywords with the most searches where AI skips you, or names a rival instead, go to the top of your list.</p></div>
         <div><h3>The right page for each keyword</h3><p>We match the keyword to your best page. If there is none, we draft a new one in your CMS.</p></div>
         <div><h3>You review, Webflow stays in charge</h3><p>Every change shows the current value next to the new one. It lands in Webflow as an unpublished edit, and nothing goes live until you publish.</p></div>
         <div><h3>Then check the keyword again</h3><p>After you publish, re-check the keyword with one click and follow the score on the weekly trend.</p></div>
@@ -440,7 +483,7 @@ footer a{color:var(--muted)}
 
 <section>
   <div class="wrap">
-    <div class="sec-head"><h2>What else every check tells you</h2><p>Hundreds of AI answers a month, turned into three short lists you can act on.</p></div>
+    <div class="sec-head"><h2>Checked every week, so you see it move</h2><p>Every keyword is asked again each week. You get an email with what changed, a trend for every keyword, a report link your clients can open, and three short lists you can act on.</p></div>
     <div class="ins">
       <div><h3>How AI describes you</h3><div class="sent" role="img" aria-label="14 positive, 5 neutral, 1 negative"><i class="pos" style="width:70%"></i><i class="neu" style="width:25%"></i><i class="neg" style="width:5%"></i></div><div class="chips"><span class="chip">simple mobile app</span><span class="chip">tax-ready reports</span><span class="chip">good for sole traders</span></div><p>The tone of every answer that names you, the words the engines use for you, and claims worth checking, such as an old price.</p></div>
       <div><h3>Where rivals win</h3><div class="gapline"><b>invoicing software for small business</b><span class="muted" style="font-size:14px"><span class="rival">Ledgerbird</span> is named by ChatGPT, AI Mode and Claude, you are not.</span></div><p>Keywords where an engine recommends a rival instead of you, widest gaps first.</p></div>
@@ -449,36 +492,64 @@ footer a{color:var(--muted)}
   </div>
 </section>
 
+<section class="whyband">
+  <div class="wrap">
+    <h2>Rankings show where you are on Google. AI SEO Deck shows whether AI recommends you.</h2>
+    <div class="whycols">
+      <p>People now ask ChatGPT, Gemini and Google's AI which business to choose, and they get one answer instead of ten links. If that answer names a rival, your ranking does not help.</p>
+      <p>AI SEO Deck reads those answers for your keywords every week, tells you plainly where you are missing, and fixes the pages that should win, right in Webflow.</p>
+    </div>
+  </div>
+</section>
+
 <section id="pricing">
   <div class="wrap">
-    <div class="sec-head"><h2>Pricing</h2><p>US dollars a month. Yearly plans get two months free. Cancel any time.</p></div>
-    <div class="plans">
-      <div class="plan"><h3>Free</h3><p class="price">$0</p><p class="kwcount"><b>3</b> keywords</p><ul><li>1 site</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked every month</li><li>Site audit and fix suggestions</li></ul><a class="btn sm" href="/auth">Start free</a></div>
-      <div class="plan pick"><h3>Solo</h3><p class="price">$19<span> /month</span></p><p class="kwcount"><b>10</b> keywords</p><ul><li>1 site</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>10 keyword re-checks a month</li></ul><a class="btn sm mark" href="/auth">Choose Solo</a></div>
-      <div class="plan"><h3>Studio</h3><p class="price">$49<span> /month</span></p><p class="kwcount"><b>30</b> keywords</p><ul><li>5 sites</li><li>Everything in Solo</li><li>Client report links with your agency name</li><li>30 keyword re-checks a month</li></ul><a class="btn sm" href="/auth">Choose Studio</a></div>
-      <div class="plan"><h3>Agency</h3><p class="price">$149<span> /month</span></p><p class="kwcount"><b>100</b> keywords</p><ul><li>20 sites</li><li>Everything in Studio</li><li>100 keyword re-checks a month</li><li>Priority support</li></ul><a class="btn sm" href="/auth">Choose Agency</a></div>
+    <div class="pricehead">
+      <div class="sec-head"><h2>Pricing</h2><p>Every paid plan starts with 7 days free. Cancel in the first week and you pay nothing.</p></div>
+      <div class="billing" role="group" aria-label="Billing period"><button type="button" aria-pressed="true" data-int="monthly">Monthly</button><button type="button" aria-pressed="false" data-int="yearly">Yearly, 2 months free</button></div>
     </div>
-    <p class="fine">On paid plans each keyword gets 12 AI answers a week: two questions on ChatGPT, Gemini, Perplexity, Claude and Grok, and the keyword itself on Google AI Overviews and AI Mode. Keywords you only look at, such as ideas and keywords found in AI Overviews, do not count until you track them.</p>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><p class="price">$0</p><p class="kwcount"><b>3</b> keywords</p><ul><li>1 site</li><li>ChatGPT, Google AI Overviews and Perplexity</li><li>Checked every month</li><li>Site audit and fix suggestions</li></ul><a class="btn sm" href="/auth">Start free, no card</a><p class="tnote">Free for as long as you like</p></div>
+      <div class="plan pick" data-plan="solo" data-m="19" data-y="190"><h3>Solo</h3><p class="price"><span class="amt">$19</span><span class="per"> /month</span></p><p class="kwcount"><b>10</b> keywords</p><ul><li>1 site</li><li>All 7 AI engines, every week</li><li>One-click fixes to Webflow</li><li>10 keyword re-checks a month</li></ul><a class="btn sm mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $19 a month</p></div>
+      <div class="plan" data-plan="studio" data-m="49" data-y="490"><h3>Studio</h3><p class="price"><span class="amt">$49</span><span class="per"> /month</span></p><p class="kwcount"><b>30</b> keywords</p><ul><li>5 sites</li><li>Everything in Solo</li><li>Client report links with your agency name</li><li>30 keyword re-checks a month</li></ul><a class="btn sm" href="/auth?plan=studio&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $49 a month</p></div>
+      <div class="plan" data-plan="agency" data-m="149" data-y="1490"><h3>Agency</h3><p class="price"><span class="amt">$149</span><span class="per"> /month</span></p><p class="kwcount"><b>100</b> keywords</p><ul><li>20 sites</li><li>Everything in Studio</li><li>100 keyword re-checks a month</li><li>Priority support</li></ul><a class="btn sm" href="/auth?plan=agency&amp;interval=monthly">Start 7-day free trial</a><p class="tnote">$0 today, then $149 a month</p></div>
+    </div>
+    <p class="fine">US dollars. On paid plans each keyword gets 12 AI answers a week: two questions on ChatGPT, Gemini, Perplexity, Claude and Grok, and the keyword itself on Google AI Overviews and AI Mode. Keywords you only look at, such as ideas and keywords found in AI Overviews, do not count until you track them. One free trial per customer.</p>
+
+    <div class="compare">
+      <div><h3>Every AI engine, for less</h3><p>Entry plans of popular AI visibility trackers, billed monthly.</p></div>
+      <ul class="bars">
+        <li><span>Semrush AI Visibility Toolkit</span><i style="--w:100%"></i><b>$99</b></li>
+        <li><span>Peec AI Starter</span><i style="--w:96%"></i><b>$95</b></li>
+        <li><span>Otterly.AI Lite</span><i style="--w:29%"></i><b>$29</b></li>
+        <li class="us"><span>AI SEO Deck Solo</span><i style="--w:19%"></i><b>$19</b></li>
+      </ul>
+      <p class="fine">List prices from each company's pricing, November 2026. Plans differ in engines, prompts and features.</p>
+    </div>
   </div>
 </section>
 
 <section>
   <div class="wrap faq">
     <div class="sec-head"><h2>Questions</h2></div>
+    <details><summary>How does the free trial work?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Pick a plan and connect Webflow. Polar, our payment provider, asks for a card but charges nothing for 7 days, and every feature of the plan is open from the first minute. Cancel any time in those 7 days from Settings and you pay nothing; otherwise the plan starts on day 8. Polar emails you a reminder before the trial ends. One trial per customer.</p></details>
+    <details><summary>How is this different from an SEO tool?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>SEO tools track where your pages rank in Google's list of links. AI SEO Deck tracks whether AI answers name you and link to you, keyword by keyword and engine by engine, and fixes the page that should win. Many teams use both.</p></details>
     <details><summary>Why keywords and not prompts?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Keywords are how you already plan SEO and content, and they are what the AI searches for before it answers. Each keyword is checked with the questions people really ask, so you get a steady score instead of one lucky or unlucky answer. You can read and edit those questions at any time.</p></details>
     <details><summary>Which AI engines do you check?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>ChatGPT, Gemini, Perplexity, Claude and Grok through their official APIs with live web search on, and Google AI Overviews and AI Mode from live Google results. The free plan covers ChatGPT, Google AI Overviews and Perplexity; paid plans cover all seven.</p></details>
     <details><summary>How do you know what the AI says?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>We ask each engine the way a person would and read the full answer and its sources. Answers vary between people and days, so scores are built from many answers and followed over weeks rather than taken from a single reply.</p></details>
     <details><summary>Where do keyword ideas and search volumes come from?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Search volumes, keyword ideas and the keywords where Google's AI Overviews cite your site come from DataForSEO, a search data provider. Related searches also come from the AI engines themselves, from the web searches they run while answering.</p></details>
     <details><summary>Does it change my site without asking?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>No. Every fix is shown first and written to Webflow only when you press Apply. Changes arrive as unpublished edits and CMS drafts, so nothing goes live until you publish in Webflow.</p></details>
     <details><summary>Which Webflow plans does it work with?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Any Webflow plan. Titles, descriptions and schema are written to static pages; for CMS template pages you get the change to make in the collection, and answers and new pages are added to your CMS as drafts.</p></details>
-    <details><summary>Can I cancel any time?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Yes. Paid plans run through Polar and can be cancelled from Settings. Deleting your account removes all stored data and revokes Webflow access.</p></details>
+    <details><summary>Will it slow down my site?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>No. AI SEO Deck adds no tracking code or widgets to your site. Fixes are page text and structured data, and they wait in Webflow until you publish.</p></details>
+    <details><summary>Can I cancel any time?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></summary><p>Yes, during the trial and after it. Paid plans run through Polar and can be cancelled from Settings; a cancelled plan stays on until the end of the period you paid for. Deleting your account removes all stored data and revokes Webflow access.</p></details>
   </div>
 </section>
 
 <section>
   <div class="wrap cta">
     <h2>Every AI.<br>One deck.</h2>
-    <div class="actions"><a class="btn mark" href="/auth">Connect Webflow, free</a><a class="btn" href="#pricing">See pricing</a></div>
+    <div class="actions"><a class="btn mark" href="/auth?plan=solo&amp;interval=monthly">Start 7-day free trial</a><a class="btn" href="/auth">Start on the free plan</a></div>
+    <p class="note">Connect Webflow in a minute. Works on every Webflow plan.</p>
   </div>
 </section>
 </main>
@@ -647,6 +718,26 @@ footer a{color:var(--muted)}
   var top = $('top');
   function onScroll() { top.classList.toggle('scrolled', window.scrollY > 8); }
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+})();
+
+// Monthly or yearly prices; the trial buttons carry the choice to the start page
+(function () {
+  var group = document.querySelector('.billing');
+  if (!group) return;
+  var cards = document.querySelectorAll('.plan[data-plan]');
+  function money(n) { return '$' + Number(n).toLocaleString('en-US'); }
+  function set(int) {
+    var y = int === 'yearly';
+    group.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-int') === int)); });
+    cards.forEach(function (c) {
+      var amt = c.getAttribute(y ? 'data-y' : 'data-m');
+      c.querySelector('.amt').textContent = money(amt);
+      c.querySelector('.per').textContent = y ? ' /year' : ' /month';
+      c.querySelector('.tnote').textContent = '$0 today, then ' + money(amt) + (y ? ' a year' : ' a month');
+      c.querySelector('.btn').setAttribute('href', '/auth?plan=' + c.getAttribute('data-plan') + '&interval=' + int);
+    });
+  }
+  group.addEventListener('click', function (e) { var b = e.target.closest('button[data-int]'); if (b) set(b.getAttribute('data-int')); });
 })();
 </script>
 </body>
