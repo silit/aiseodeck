@@ -197,7 +197,9 @@ ul.gaps li{display:flex;justify-content:space-between;gap:14px;align-items:cente
 ul.gaps li:first-child{border-top:0}
 .gq{display:grid;gap:3px;min-width:0;flex:1 1 320px}
 .howto{background:var(--paper);border-radius:12px;padding:12px 14px}
-.howto ol{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
+.howto ol{margin:6px 0 0;padding:0;list-style:none;counter-reset:h;display:grid;gap:4px}
+.howto li{counter-increment:h;display:grid;grid-template-columns:18px minmax(0,1fr)}
+.howto li::before{content:counter(h) '.';font-weight:600;color:var(--muted)}
 .row.wide{grid-template-columns:minmax(120px,190px) 1fr auto}
 .row .host{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chips.eng{margin-top:8px}
