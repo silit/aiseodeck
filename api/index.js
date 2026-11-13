@@ -757,7 +757,9 @@ async function handleReport(req, res, token) {
 function cronAuthorized(req) {
   const env = ENV();
   if (!env.cronSecret) return false;
-  const given = req.headers['x-cron-secret'] || queryOf(req).key || '';
+  // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>"; cron-job.org and manual calls use x-cron-secret
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const given = req.headers['x-cron-secret'] || bearer || queryOf(req).key || '';
   return !!given && timingEqual(given, env.cronSecret);
 }
 

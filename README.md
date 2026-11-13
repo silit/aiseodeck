@@ -46,7 +46,7 @@ Rough AI cost per answer (Nov 2026 list prices), averaged over the 7 engines, is
    - "AI SEO Deck Agency" aylık $199, "AI SEO Deck Agency Yearly" yıllık $1990
    - Yeni bir Organization Access Token (products:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write)
    - Webhook: `https://aiseodeck.silitlabs.com/billing/webhook`, API version 2026-10, olaylar: subscription.*
-7. **cron-job.org**: her 5 dakikada `https://aiseodeck.silitlabs.com/cron/tick`, header `x-cron-secret: <CRON_SECRET>`.
+7. **Zamanlayıcı**: Vercel Pro'da `vercel.json` içindeki cron her 5 dakikada `/cron/tick` çağırır ve `CRON_SECRET` değerini kendisi `Authorization: Bearer` olarak gönderir. Hobby planda bunun yerine cron-job.org kullanın: her 5 dakikada `https://aiseodeck.silitlabs.com/cron/tick`, header `x-cron-secret: <CRON_SECRET>`.
 8. Vercel ortam değişkenlerini girip yeniden deploy et (listesi `.env.example` dosyasında).
 
 Not: Vercel Hobby ticari kullanıma kapalı; ücretli plan satmaya başlamadan önce Pro'ya geçmek gerekir.
