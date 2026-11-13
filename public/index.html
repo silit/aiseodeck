@@ -9,14 +9,14 @@
 <meta property="og:title" content="AI SEO Deck: every AI, one deck">
 <meta property="og:description" content="Keyword by keyword, see whether seven AI engines recommend you, then fix your Webflow site in one click.">
 <meta property="og:image" content="/og.png">
-<meta name="theme-color" content="#0D1130">
+<meta name="theme-color" content="#222B5E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
 <style>
 :root{
-  --bg:#0D1130;--bg2:#10153A;--panel:#141A45;--panel2:#1A2153;--lift:#212A63;
-  --line:#283070;--line2:#1E2560;--grid:rgba(140,155,255,.07);
-  --ink:#F1F2FF;--muted:#A6ABD4;--faint:#6F76AE;
+  --bg:#222B5E;--bg2:#262F66;--panel:#2B3571;--panel2:#313C7C;--lift:#3A4689;
+  --line:#434F93;--line2:#36417F;--grid:rgba(160,172,255,.08);--shade:rgba(14,18,52,.28);
+  --ink:#F0F2FF;--muted:#BCC1E6;--faint:#9AA1D1;
   --mark:#FFE45C;--mark-ink:#1B1600;--cite:#86AEFF;--cite-soft:rgba(134,174,255,.14);
   --rival:#FF93A8;--good:#5DE3A9;--bad:#FF8080;
   --sans:"Archivo","Archivo Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
@@ -39,7 +39,7 @@ p{margin:0}
 
 /* header */
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:rgba(13,17,48,.82);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
 .top.scrolled{border-bottom-color:var(--line2)}
 .top .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:14px;padding-bottom:14px}
 .brand{display:inline-flex;gap:10px;align-items:center;font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;font-stretch:112%;white-space:nowrap}
@@ -66,7 +66,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .note{font-size:14px;color:var(--faint)}
 
 /* the deck (live demo) */
-.deck{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel) 120px);border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 50px 120px -40px rgba(3,6,30,.9);margin-bottom:96px;min-width:0}
+.deck{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel) 120px);border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 50px 120px -40px rgba(10,14,46,.7);margin-bottom:96px;min-width:0}
 .deck-bar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line2)}
 .kw{flex:1 1 360px;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 16px;min-width:0}
 .kw:focus-within{border-color:var(--cite)}
@@ -106,7 +106,7 @@ mark{color:inherit;padding:0 2px;border-radius:3px;background:linear-gradient(va
 .lane.busy .say{color:var(--faint)}
 .fresh mark{animation:sweep .7s .1s cubic-bezier(.3,.7,.2,1) both}
 @keyframes sweep{from{background-size:0 80%}to{background-size:100% 80%}}
-.verdict{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 28px;align-items:center;padding:20px;border-top:1px solid var(--line);background:rgba(8,11,36,.35);border-radius:0 0 21px 21px}
+.verdict{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 28px;align-items:center;padding:20px;border-top:1px solid var(--line);background:var(--shade);border-radius:0 0 21px 21px}
 .vnum{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.04em;font-stretch:118%;font-variant-numeric:tabular-nums}
 .vnum small{font-size:22px;color:var(--faint);font-weight:700;letter-spacing:-.02em}
 .vtext{display:grid;gap:4px;min-width:0}
@@ -122,11 +122,12 @@ section{padding:112px 0;border-top:1px solid var(--line2)}
 
 /* how a keyword is checked */
 .flow{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr);gap:0;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
-.stage{position:relative;padding:24px 22px 26px;display:grid;gap:14px;align-content:start;border-left:1px solid var(--line2)}
+.stage{position:relative;padding:24px 22px 26px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-content:start;border-left:1px solid var(--line2)}
 .stage:first-child{border-left:0}
 .stage:not(:last-child)::after{content:"";position:absolute;right:-7px;top:50%;width:12px;height:12px;background:var(--panel);border-top:1px solid var(--line);border-right:1px solid var(--line);transform:translateY(-50%) rotate(45deg);z-index:1}
 .stage h3{font-size:15px;color:var(--muted);font-weight:600;font-stretch:100%}
-.chipkw{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:16px;white-space:nowrap;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;justify-self:start}
+.chipkw{display:inline-flex;align-items:flex-start;gap:8px;font-weight:700;font-size:16px;line-height:1.35;max-width:100%;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;justify-self:start}
+.chipkw svg{flex:none;margin-top:2px}
 .bubbles{display:grid;gap:8px}
 .bubble{background:var(--lift);border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14.5px;line-height:1.45}
 .bubble.g{background:transparent;border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--muted)}
@@ -192,7 +193,7 @@ table.kt{border-collapse:collapse;width:100%;min-width:900px;font-variant-numeri
 .diff b{font-weight:600}
 .status{font-size:13px;color:var(--good);font-weight:600;margin-top:6px;display:none}
 .fx li.done .status{display:block}
-.plan-foot{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 22px;border-top:1px solid var(--line);background:rgba(8,11,36,.35)}
+.plan-foot{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:18px 22px;border-top:1px solid var(--line);background:var(--shade)}
 .plan-foot p{font-size:14px;color:var(--muted);flex:1 1 260px}
 
 /* related keywords */
