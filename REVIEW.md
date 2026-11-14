@@ -15,3 +15,14 @@ Webflow stays the source of truth: every fix is shown with the current value rea
 Reviewers: any @webflow.com account gets the Agency plan for free.
 
 Test flow: Connect Webflow > set up a site (brand, rivals, keywords; ideas are suggested) > the first check runs on the Keywords tab > open a keyword (yes, sometimes or no per AI engine, every answer) > What to do: Run the site audit, then Write the fixes > Apply to Webflow (title and description, FAQ schema, optional CMS drafts) > publish in Webflow > Check again.
+
+Localization: before every write the app reads the site's locales (GET /v2/sites/{id}) and names the primary locale. Titles and descriptions: PUT /v2/pages/{id}?localeId=<primary locale id>. CMS drafts: cmsLocaleId=<primary cmsLocaleId>. Schema markup is written without localeId, which the schema markup API documents as the primary locale (its localeId names a secondary locale). Secondary locales are never written. On sites with more than one language, the keyword and fix pages say next to Apply that fixes go to the primary language only.
+
+Security:
+- OAuth tokens are encrypted at rest (AES-256-GCM) in the app's server-side database and never reach the browser.
+- Tokens are deleted on Disconnect and on account deletion (both also call /oauth/revoke_authorization), and when Webflow answers 401 (uninstall or revocation), which is checked before every scheduled check and on every write.
+- The state parameter is created and verified for every sign in the app starts. Installs started from the Marketplace arrive without state and are exchanged without redirect_uri.
+- Authorization codes are used once and never stored or logged.
+- No CORS headers are sent.
+- Every site route checks that the site belongs to the signed in user.
+- The site audit only fetches the connected site's own domains (an allowlist), refuses private and special IP addresses inside the DNS lookup, and caps response size.

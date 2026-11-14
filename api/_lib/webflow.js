@@ -100,7 +100,8 @@ async function listPages(token, siteId, max) {
 }
 
 // SEO title and description of a static page (Webflow ignores slug changes for home and templates; we never send a slug).
-async function updatePageSeo(token, pageId, { title, description, ogTitle, ogDescription }) {
+// localeId names the locale written (the site's primary locale); it is left out only when Webflow sent no locales.
+async function updatePageSeo(token, pageId, { title, description, ogTitle, ogDescription }, localeId) {
   const body = { seo: {} };
   if (title != null) body.seo.title = title;
   if (description != null) body.seo.description = description;
@@ -109,12 +110,14 @@ async function updatePageSeo(token, pageId, { title, description, ogTitle, ogDes
     if (ogTitle != null) { body.openGraph.title = ogTitle; body.openGraph.titleCopied = false; }
     if (ogDescription != null) { body.openGraph.description = ogDescription; body.openGraph.descriptionCopied = false; }
   }
-  return call(token, 'PUT', '/pages/' + pageId, body);
+  return call(token, 'PUT', '/pages/' + pageId + (localeId ? '?localeId=' + encodeURIComponent(localeId) : ''), body);
 }
 
 // JSON-LD schema markup (Data API v2 beta). One JSON-LD value per page; several types go in an @graph.
-const getSchema = (token, pageId) => beta(token, 'GET', `/pages/${pageId}/schema-markup`);
-const putSchema = (token, pageId, jsonLdSchema) => beta(token, 'PUT', `/pages/${pageId}/schema-markup`, { jsonLdSchema });
+// The API writes and reads the primary locale when localeId is left out; its localeId names a secondary locale, which
+// AI SEO Deck never writes. So the primary locale is targeted by leaving it out, as Webflow documents.
+const getSchema = (token, pageId, secondaryLocaleId) => beta(token, 'GET', `/pages/${pageId}/schema-markup` + (secondaryLocaleId ? '?localeId=' + encodeURIComponent(secondaryLocaleId) : ''));
+const putSchema = (token, pageId, jsonLdSchema, secondaryLocaleId) => beta(token, 'PUT', `/pages/${pageId}/schema-markup` + (secondaryLocaleId ? '?localeId=' + encodeURIComponent(secondaryLocaleId) : ''), { jsonLdSchema });
 async function querySchemas(token, siteId, pageIds) {
   const out = [];
   for (let i = 0; i < pageIds.length; i += 100) {
@@ -130,7 +133,8 @@ async function listCollections(token, siteId) {
 }
 const getCollection = (token, collectionId) => call(token, 'GET', `/collections/${collectionId}`);
 // New CMS items are always created as drafts: the user reviews and publishes them in Webflow.
-const createDraftItem = (token, collectionId, fieldData) => call(token, 'POST', `/collections/${collectionId}/items`, { isArchived: false, isDraft: true, fieldData });
+// cmsLocaleId names the locale of the item (the site's primary locale); it is left out only when Webflow sent no locales.
+const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
   SCOPES, call, beta, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, tokenStatus, listSites, getSite,

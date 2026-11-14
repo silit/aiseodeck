@@ -95,6 +95,16 @@ function primaryUrl(meta) {
 }
 const bareHost = (u) => String(u || '').replace(/^[a-z]+:\/\//i, '').replace(/\/.*$/, '').replace(/^www\./i, '').toLowerCase();
 
+// Webflow Localization: the site's primary locale (the language AI SEO Deck reads, checks and writes) and the names
+// of its other enabled languages. null when Webflow sends no locales.
+function localeOf(meta) {
+  const l = meta && meta.locales;
+  const p = l && l.primary;
+  if (!p || !p.id) return null;
+  const others = (Array.isArray(l.secondary) ? l.secondary : []).filter((s) => s && s.id && s.enabled !== false);
+  return { id: String(p.id), cmsId: String(p.cmsLocaleId || ''), tag: String(p.tag || ''), name: String(p.displayName || p.tag || ''), others: others.map((s) => String(s.displayName || s.tag || s.id)).slice(0, 30) };
+}
+
 function newSite(meta, userId, connectionId) {
   const url = primaryUrl(meta);
   const domains = (meta.customDomains || []).map((d) => bareHost(d.url)).filter(Boolean);
@@ -107,6 +117,7 @@ function newSite(meta, userId, connectionId) {
     shortName: meta.shortName || '',
     domains: (meta.customDomains || []).map((d) => d.url).filter(Boolean),
     url,
+    locale: localeOf(meta),
     createdAt: Date.now(),
     tracked: false,
     pausedByUser: false,
@@ -124,6 +135,7 @@ function refreshMeta(site, meta) {
   site.shortName = meta.shortName || site.shortName;
   site.domains = (meta.customDomains || []).map((d) => d.url).filter(Boolean);
   site.url = primaryUrl(meta) || site.url;
+  if (meta.locales) site.locale = localeOf(meta);
   return site;
 }
 // Sites saved before keywords existed tracked questions ("prompts"): each question becomes a keyword asked as itself.
@@ -330,7 +342,7 @@ async function unlock(name) { return kv.del('lock:' + name); }
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
   getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, newUser, addConnection, tokenOf, tokenForSite,
-  primaryUrl, bareHost, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
+  primaryUrl, bareHost, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock
 };

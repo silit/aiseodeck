@@ -192,10 +192,11 @@ const webflow = http.createServer(async (req, res) => {
   let m;
   if (p === '/v2/token/authorized_by') return json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' });
   if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
+  if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') { wfState.pageUpdates.push({ id: m[1], body }); return json(res, 200, Object.assign({ id: m[1] }, body)); }
+  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') { wfState.pageUpdates.push({ id: m[1], body, localeId: u.searchParams.get('localeId') }); return json(res, 200, Object.assign({ id: m[1] }, body)); }
   if ((m = p.match(/^\/beta\/pages\/(\w+)\/schema-markup$/))) {
-    if (req.method === 'PUT') { wfState.schemaPuts.push({ id: m[1], body }); wfState.schemas[m[1]] = body.jsonLdSchema; return json(res, 200, { id: m[1], jsonLdSchema: body.jsonLdSchema }); }
+    if (req.method === 'PUT') { wfState.schemaPuts.push({ id: m[1], body, localeId: u.searchParams.get('localeId') }); wfState.schemas[m[1]] = body.jsonLdSchema; return json(res, 200, { id: m[1], jsonLdSchema: body.jsonLdSchema }); }
     return json(res, 200, { id: m[1], jsonLdSchema: wfState.schemas[m[1]] || null });
   }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/collections$/))) return json(res, 200, { collections: [{ id: 'colFaq', displayName: 'FAQs', slug: 'faqs' }] });
@@ -507,12 +508,33 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2Fabout', { headers: { cookie } });
   assert(r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('FAQPage'), 'AI FAQ answers feed the FAQPage proposal');
 
+  console.log('localized sites: writes name the primary locale');
+  assert(wfState.pageUpdates.every((x) => !x.localeId) && wfState.items.every((x) => !x.cmsLocaleId), 'a site without locales is written exactly as before');
+  wfState.sites[0].locales = { primary: { id: 'loc_en', cmsLocaleId: 'cms_en', displayName: 'English', tag: 'en', enabled: true }, secondary: [{ id: 'loc_tr', cmsLocaleId: 'cms_tr', displayName: 'Turkish', tag: 'tr', enabled: true }, { id: 'loc_de', cmsLocaleId: 'cms_de', displayName: 'German', tag: 'de', enabled: false }] };
+  r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'Lumen Dental | Veneers and implants in Antalya', description: 'Emax veneers, implants and digital smile design in Antalya for patients from the UK and Ireland.' });
+  assert(wfState.pageUpdates[wfState.pageUpdates.length - 1].localeId === 'loc_en', 'the title and description are written to the primary locale by id');
+  r = await post('/app/fix/faq', cookie, { id: 'siteA', path: '/about', action: 'cms', collection: 'colFaq', faq: 'Q: Do you speak English?\nA: Yes, every coordinator does.' });
+  const lastItem = wfState.items[wfState.items.length - 1];
+  assert(lastItem.cmsLocaleId === 'cms_en' && lastItem.isDraft === true, 'CMS drafts are created in the primary locale by id');
+  r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/about', schema: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[]}' });
+  assert(wfState.schemaPuts[wfState.schemaPuts.length - 1].localeId === null, 'schema markup goes to the primary locale (Webflow documents localeId there for secondary locales only)');
+  assert(getJ('site:siteA').locale && getJ('site:siteA').locale.id === 'loc_en' && getJ('site:siteA').locale.others.join() === 'Turkish', 'the site keeps its languages; a disabled one is left out');
+  r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
+  assert(r.body.includes('data-locale-note') && r.body.includes('one more language (Turkish)') && r.body.includes('primary language, English, only'), 'the fix page says only the primary language is written');
+  r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
+  assert(r.body.includes('data-locale-note'), 'the keyword page says it too, next to Apply');
+  delete wfState.sites[0].locales;
+  await require('../api/_lib/store').updateSite('siteA', (s) => { s.locale = null; });
+  r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
+  assert(!r.body.includes('data-locale-note'), 'no note on a site with one language');
+
   console.log('free plan limits on fixes');
   const u2 = getJ('user:user_1'); u2.plan = 'free'; db.set('user:user_1', JSON.stringify(u2));
+  const updatesBefore = wfState.pageUpdates.length;
   r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
-  assert(wfState.pageUpdates.length === 1 && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot write to Webflow');
+  assert(wfState.pageUpdates.length === updatesBefore && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot write to Webflow');
   r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
-  assert(wfState.pageUpdates.length === 1 && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot apply keyword fixes');
+  assert(wfState.pageUpdates.length === updatesBefore && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot apply keyword fixes');
 
   console.log('reports, security, billing');
   r = await post('/app/site/report', cookie, 'id=siteA');

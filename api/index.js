@@ -662,7 +662,20 @@ async function handleKeywordPlan(req, res, user) {
   redirect(res, kwUrl(site, k, noticeQuery(user, 'Fixes ready. Review them, change what you like, then apply.')));
 }
 
-async function addCmsItems(token, site, collectionId, items) {
+// Webflow Localization: AI SEO Deck reads and checks the primary language, so every write names the primary locale and
+// other languages are never written. The locales are read fresh before a write and kept on the site for the notes.
+async function primaryLocale(token, site) {
+  try {
+    const loc = store.localeOf(await wf.getSite(token, site.id));
+    if (JSON.stringify(loc) !== JSON.stringify(site.locale || null)) { site.locale = loc; await store.updateSite(site.id, (s) => { s.locale = loc; }); }
+    return loc;
+  } catch (e) {
+    if (wf.isRevoked(e)) throw e;
+    return site.locale || null;
+  }
+}
+
+async function addCmsItems(token, site, collectionId, items, cmsLocaleId) {
   const cols = await wf.listCollections(token, site.id);
   const col = cols.find((c) => c.id === String(collectionId || ''));
   if (!col) return { error: 'Pick one of this site\'s CMS collections.' };
@@ -674,7 +687,7 @@ async function addCmsItems(token, site, collectionId, items) {
   let made = 0;
   for (const it of items) {
     const slug = (it.slug || it.name).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) + '-' + random(3).toLowerCase().replace(/[^a-z0-9]/g, 'x');
-    await wf.createDraftItem(token, col.id, { name: it.name, slug, [textField.slug]: textField.type === 'RichText' ? it.html : it.text });
+    await wf.createDraftItem(token, col.id, { name: it.name, slug, [textField.slug]: textField.type === 'RichText' ? it.html : it.text }, cmsLocaleId);
     made++;
   }
   return { made, name: col.displayName };
@@ -693,12 +706,13 @@ async function handleKeywordApply(req, res, user) {
   const draft = (await store.getDraft(site.id, 'kwfix:' + k.id)) || {};
   const done = [];
   try {
+    const loc = await primaryLocale(token, site);
     if (b.what === 'newpage') {
       const np = draft.newPage;
       if (!np) return back('Draft the page first.');
       const htmlBody = '<p>' + html.esc(np.intro) + '</p>' + np.faq.map((x) => '<h3>' + html.esc(x.q) + '</h3><p>' + html.esc(x.a) + '</p>').join('');
       const text = np.intro + '\n\n' + np.faq.map((x) => x.q + '\n' + x.a).join('\n\n');
-      const r = await addCmsItems(token, site, b.collection, [{ name: np.title, slug: np.slug, html: htmlBody, text }]);
+      const r = await addCmsItems(token, site, b.collection, [{ name: np.title, slug: np.slug, html: htmlBody, text }], loc && loc.cmsId);
       if (r.error) return back(r.error);
       done.push(`a draft page in ${r.name}`);
     } else {
@@ -712,7 +726,7 @@ async function handleKeywordApply(req, res, user) {
         const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
         if (title.length < 5 || description.length < 20) return back('Write a title of at least 5 characters and a description of at least 20.');
         if (target.pageId) {
-          await wf.updatePageSeo(token, target.pageId, { title, description });
+          await wf.updatePageSeo(token, target.pageId, { title, description }, loc && loc.id);
           row.title = title; row.description = description;
           row.issues = (row.issues || []).filter((x) => !/^(title|desc)_/.test(x));
           done.push('the title and description');
@@ -729,7 +743,7 @@ async function handleKeywordApply(req, res, user) {
         done.push('FAQ schema');
       }
       if (b.do_cms === '1' && pairs.length) {
-        const r = await addCmsItems(token, site, b.collection, pairs.map((p) => ({ name: p.q, html: '<p>' + html.esc(p.a) + '</p>', text: p.a })));
+        const r = await addCmsItems(token, site, b.collection, pairs.map((p) => ({ name: p.q, html: '<p>' + html.esc(p.a) + '</p>', text: p.a })), loc && loc.cmsId);
         if (r.error) return back(r.error);
         done.push(`${r.made} answer${r.made === 1 ? '' : 's'} as drafts in ${r.name}`);
       }
@@ -895,7 +909,7 @@ async function handleFixMeta(req, res, user) {
   const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (title.length < 5 || description.length < 20) return redirect(res, back + '&' + noticeQuery(user, 'Write a title of at least 5 characters and a description of at least 20.'));
   if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
-  try { await wf.updatePageSeo(token, row.pageId, { title, description }); }
+  try { const loc = await primaryLocale(token, site); await wf.updatePageSeo(token, row.pageId, { title, description }, loc && loc.id); }
   catch (e) { return webflowFailed(res, user, site, e, back); }
   // reflect the change in the stored audit until the next run
   row.title = title; row.description = description;
@@ -936,6 +950,7 @@ async function handleFixFaq(req, res, user) {
   if (!user._limits.canApply) return redirect(res, back + '&' + noticeQuery(user, 'Adding CMS items is part of the paid plans.'));
   if (!pairs.length) return redirect(res, back + '&' + noticeQuery(user, 'Write at least one question and answer first.'));
   try {
+    const loc = await primaryLocale(token, site);
     const cols = await wf.listCollections(token, site.id);
     const col = cols.find((c) => c.id === String(b.collection || ''));
     if (!col) return redirect(res, back + '&' + noticeQuery(user, 'Pick one of this site\'s CMS collections.'));
@@ -948,7 +963,7 @@ async function handleFixFaq(req, res, user) {
     for (const pr of pairs) {
       const slug = pr.q.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) + '-' + random(3).toLowerCase().replace(/[^a-z0-9]/g, 'x');
       const value = answerField.type === 'RichText' ? '<p>' + html.esc(pr.a) + '</p>' : pr.a;
-      await wf.createDraftItem(token, col.id, { name: pr.q, slug, [answerField.slug]: value });
+      await wf.createDraftItem(token, col.id, { name: pr.q, slug, [answerField.slug]: value }, loc && loc.cmsId);
       made++;
     }
     redirect(res, back + '&' + noticeQuery(user, `Added ${made} draft item${made === 1 ? '' : 's'} to ${col.displayName}. Review and publish them in Webflow.`));

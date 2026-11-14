@@ -372,6 +372,13 @@ function layout(title, body, opts) {
 </main>${opts.script ? `<script>${opts.script}</script>` : ''}</body></html>`;
 }
 const noticeHtml = (n, cls) => (n ? `<div class="notice${cls ? ' ' + cls : ''}" role="status">${n}</div>` : '');
+// Webflow Localization: fixes are written to the primary language only, and the user is told so where they apply them.
+function localeNote(site) {
+  const l = site && site.locale;
+  if (!l || !Array.isArray(l.others) || !l.others.length) return '';
+  const more = l.others.length === 1 ? 'one more language' : l.others.length + ' more languages';
+  return `<p class="small muted" data-locale-note>This site has ${more} (${esc(l.others.join(', '))}). Fixes are written to the primary language${l.name ? ', ' + esc(l.name) + ',' : ''} only. The other languages keep their own text in Webflow.</p>`;
+}
 
 function errorPage(title, message, back) {
   return layout(title, `<div class="panel stack" role="alert" style="max-width:640px"><h1>${esc(title)}</h1><p class="muted">${esc(message)}</p><div class="actions"><a class="btn" href="${esc(back || '/app')}">Go back</a></div></div>`);
@@ -883,7 +890,7 @@ ${faq.length ? `<textarea name="faq" form="applyform" style="min-height:160px;ma
   const cmsNote = isStatic ? '' : '<p class="small" style="padding:0 22px 16px;color:var(--warn)">This is a CMS page. Copy the title and description into the collection item in Webflow; the answers can still go to your CMS as drafts.</p>';
   const foot = meta || faq.length
     ? `<form method="post" action="/app/keyword/apply" class="plan-foot" id="applyform"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><input type="hidden" name="what" value="page">
-<p>${k.fixedAt ? `Applied ${esc(ago(k.fixedAt))}. Publish in Webflow, then check the keyword again.` : 'Everything lands in Webflow as unpublished changes. Nothing goes live until you publish.'}</p><button class="btn mark" type="submit"${can ? '' : ' disabled'}>Apply to Webflow</button></form>${writeBtn('Write new suggestions').replace('class="actions"', 'class="actions" style="padding:0 22px 18px"')}`
+<p>${k.fixedAt ? `Applied ${esc(ago(k.fixedAt))}. Publish in Webflow, then check the keyword again.` : 'Everything lands in Webflow as unpublished changes. Nothing goes live until you publish.'}</p>${localeNote(site)}<button class="btn mark" type="submit"${can ? '' : ' disabled'}>Apply to Webflow</button></form>${writeBtn('Write new suggestions').replace('class="actions"', 'class="actions" style="padding:0 22px 18px"')}`
     : `<div class="plan-foot"><p>We write the title, description and answers from the page itself. You review everything before it goes to Webflow.</p>${writeBtn('Write the fixes')}</div>`;
   return `<section class="panel plan-card">${head}<ul class="fx">${titleItem}${faqItem}${whereItem}</ul>${cmsNote}${foot}${can ? '' : '<p class="tiny muted" style="padding:0 22px 16px">Applying to Webflow is part of the paid plans. You can copy everything on the free plan.</p>'}</section>`;
 }
@@ -939,7 +946,7 @@ function fixPage(user, site, row, d) {
   const existingTypes = d.existingTypes || [];
   return layout('Fix ' + row.path + ' · AI SEO Deck', `${noticeHtml(d.notice)}
 <a class="back" href="${esc(siteHref(site, 'tab=audit'))}">Back to the site audit</a>
-<div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div></div>
+<div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div></div>${localeNote(site)}
 <div class="stack">
 <section class="panel stack"><h2>Title and description</h2><p class="small muted">What search engines and AI assistants read first about this page.</p>
 <div class="cols"><div class="stack" style="gap:6px"><b class="small">Now</b><p>${esc(row.title || '(no title)')}</p><p class="small muted">${esc(row.description || '(no description)')}</p></div>

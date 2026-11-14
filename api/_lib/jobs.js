@@ -261,10 +261,13 @@ async function runAudit(site, user, budgetMs) {
   const token = store.tokenForSite(user, site);
   let pages = [];
   if (token) { try { pages = await wf.listPages(token, site.id, 500); } catch (e) { if (wf.isRevoked(e)) throw e; pages = []; } }
+  // the site's languages (Webflow Localization), for the notes next to every Apply button
+  let locale;
+  if (token) { try { locale = store.localeOf(await wf.getSite(token, site.id)); } catch (e) { if (wf.isRevoked(e)) throw e; } }
   const audit = await auditLib.auditSite(site, pages, { maxPages: limits.auditPages, budgetMs: budgetMs || 35000 });
   await store.saveAudit(site.id, audit);
   const issues = audit.pages.reduce((a, p) => a + (p.issues || []).length, 0) + audit.siteIssues.length;
-  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, score: audit.score, issues, pages: audit.pagesChecked }; });
+  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, score: audit.score, issues, pages: audit.pagesChecked }; if (locale !== undefined) s.locale = locale; });
   return audit;
 }
 
