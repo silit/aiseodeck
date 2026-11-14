@@ -263,7 +263,8 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     WEBFLOW_API_BASE: 'http://127.0.0.1:' + wfPort, WEBFLOW_AUTH_BASE: 'http://127.0.0.1:' + wfPort,
     RESEND_API_KEY: 'rk', RESEND_API_BASE: 'http://127.0.0.1:' + resendPort, EMAIL_FROM: 'AI SEO Deck <t@test>',
     OPENAI_API_KEY: 'ok', OPENAI_API_BASE: 'http://127.0.0.1:' + aiPort,
-    PERPLEXITY_API_KEY: 'pk', PERPLEXITY_API_BASE: 'http://127.0.0.1:' + aiPort,
+    // Perplexity is off in the app until PERPLEXITY_ENABLED=1; the end-to-end runs keep it on to test the engine
+    PERPLEXITY_API_KEY: 'pk', PERPLEXITY_API_BASE: 'http://127.0.0.1:' + aiPort, PERPLEXITY_ENABLED: '1',
     GEMINI_API_KEY: 'gk', GEMINI_API_BASE: 'http://127.0.0.1:' + aiPort,
     ANTHROPIC_API_KEY: 'ak', ANTHROPIC_API_BASE: 'http://127.0.0.1:' + aiPort,
     XAI_API_KEY: 'xk', XAI_API_BASE: 'http://127.0.0.1:' + aiPort + '/xai',
@@ -591,6 +592,19 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(out.status === 200 && getJ('user:user_1').plan === 'solo', 'signed Polar webhook upgrades the plan');
   const bad = await billingLib.handleWebhook(raw, Object.assign({}, hdrs, { 'webhook-signature': 'v1,AAAA' }), { getUser: store.getUser, saveUser: store.saveUser });
   assert(bad.status === 401, 'bad webhook signature refused');
+
+  console.log('perplexity stays off until switched on');
+  {
+    const engines = require('../api/_lib/engines');
+    const htmlLib = require('../api/_lib/html');
+    assert(engines.enabled().includes('perplexity') && engines.freeEngines().join() === 'openai,aio,perplexity', 'with PERPLEXITY_ENABLED=1 the engine is on and the free plan keeps it');
+    delete process.env.PERPLEXITY_ENABLED;
+    assert(!engines.enabled().includes('perplexity') && engines.enabled().length === 6, 'without the switch Perplexity is off, even with its key set');
+    assert(engines.freeEngines().join() === 'openai,aio,gemini', 'the free plan then uses ChatGPT, Google AI Overviews and Gemini');
+    assert(engines.forLimits({ allEngines: false }).join() === 'openai,aio,gemini' && engines.lockedFor({ allEngines: false }).join() === 'aimode,claude,grok', 'free plan engines and locked columns follow');
+    assert(htmlLib.freeEnginesText() === 'ChatGPT, Google AI Overviews and Gemini' && htmlLib.allEnginesCount() === 6, 'the copy says six engines and names the free ones');
+    process.env.PERPLEXITY_ENABLED = '1';
+  }
 
   console.log('perplexity agent api');
   {

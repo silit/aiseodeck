@@ -3,13 +3,16 @@
 // light theme. Colours carry meaning everywhere: marker yellow = the brand was named, blue = the brand's site was
 // cited, rose = a rival took the place.
 const { PLANS, FREE, QUESTIONS } = require('./plans');
-const { LABEL, LONG, ORDER } = require('./engines');
+const { LABEL, LONG, ORDER, enabled: enginesOn, freeEngines } = require('./engines');
 const { PAGE_RULES, BOTS } = require('./audit');
 const { engineCounts, verdict } = require('./analyze');
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pct = (x) => Math.round((x || 0) * 100) + '%';
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
+// Engine numbers and names in the copy come from the engines that are on (Perplexity stays off for now).
+const allEnginesCount = () => enginesOn().length || 6;
+const freeEnginesText = () => { const f = freeEngines(); return f.length ? andList(f.map((e) => LONG[e] || e)) : 'ChatGPT, Google AI Overviews and Gemini'; };
 const num = (n) => (n == null ? '' : Number(n).toLocaleString('en-US'));
 
 function ago(ts, now) {
@@ -368,7 +371,7 @@ function layout(title, body, opts) {
 <style>${CSS}</style></head><body>
 <header class="top"><div class="wrap"><a class="brand" href="${opts.user ? '/app' : (opts.brandName ? '#' : '/')}">${opts.brandName ? '' : LOGO}<span>${opts.brandName ? esc(opts.brandName) : 'AI SEO Deck'}</span></a>${opts.plain ? '' : nav}</div></header>
 <main class="wrap">${body}
-<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Perplexity, Anthropic or xAI.</span>'}</footer>
+<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.</span>'}</footer>
 </main>${opts.script ? `<script>${opts.script}</script>` : ''}</body></html>`;
 }
 const noticeHtml = (n, cls) => (n ? `<div class="notice${cls ? ' ' + cls : ''}" role="status">${n}</div>` : '');
@@ -493,7 +496,7 @@ function deckTable(site, opts) {
 <td class="tr r"><span class="trend">${s ? sparkline(s.trend) + delta(s.trend) : ''}</span></td></tr>`;
   }).join('');
   const legend = `<div class="legend" aria-hidden="true"><span><i class="c st-n"></i>Named</span><span><i class="c st-b"></i>Named and your site cited</span><span><i class="c st-i"></i>Your site cited, not named</span><span><i class="c st-o"></i>Not named</span>${engines.some((e) => e === 'aio' || e === 'aimode') ? '<span><i class="c st-x"></i>No AI answer on Google</span>' : ''}</div>`;
-  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${opts.link === false ? '' : opts.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly">Try all 7 free for ${opts.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
+  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${opts.link === false ? '' : opts.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly">Try all ${allEnginesCount()} free for ${opts.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
   return `<div class="deck"><table class="kt"><thead><tr><th scope="col" class="l">Keyword</th><th scope="col" class="r">Searches a month</th>${head}<th scope="col" class="r">Visible</th><th scope="col" class="r">Trend</th></tr></thead><tbody>${rows}</tbody></table></div>${legend}${upsell}`;
 }
 
@@ -508,7 +511,7 @@ function statStrip(site, history, limits) {
   if (!l) {
     return `<div class="stats"><div class="stat"><span class="k">Visible in AI answers</span><span class="v">-</span><span class="s">${site.sched && site.sched.runId ? 'The first check is running.' : 'No check yet.'}</span></div>
 <div class="stat"><span class="k">Keywords</span><span class="v">${kws}<small>/${limits ? limits.keywords : ''}</small></span><span class="s">on your plan</span></div>
-<div class="stat"><span class="k">AI engines</span><span class="v">${limits && limits.allEngines ? 7 : 3}</span><span class="s">${limits && limits.allEngines ? 'every week' : 'every month on the free plan'}</span></div>
+<div class="stat"><span class="k">AI engines</span><span class="v">${limits && limits.allEngines ? allEnginesCount() : freeEngines().length || 3}</span><span class="s">${limits && limits.allEngines ? 'every week' : 'every month on the free plan'}</span></div>
 <div class="stat"><span class="k">How long it takes</span><span class="v">2<small> min</small></span><span class="s">for a few keywords, while this page is open</span></div></div>`;
   }
   return `<div class="stats">
@@ -544,7 +547,7 @@ function dashboard(user, sites, limits, notice, opts) {
   }).join('') : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
   const engineNote = opts.enginesOn && !opts.enginesOn.length ? noticeHtml('No AI engine is connected on the server yet, so checks cannot run. If you run this app, add an engine API key.', 'warn') : '';
   return layout('Sites · AI SEO Deck', `${noticeHtml(notice)}${engineNote}
-<div class="head"><div><h1>Your sites</h1><p class="meta"><span>${esc(limits.name)} plan</span><span>${used} of ${plural(limits.keywords, 'keyword')} in use</span><span>${limits.plan === 'free' ? 'Checked every month on ChatGPT, Google AI Overviews and Perplexity' : 'Checked every week on every AI engine'}</span></p></div>
+<div class="head"><div><h1>Your sites</h1><p class="meta"><span>${esc(limits.name)} plan</span><span>${used} of ${plural(limits.keywords, 'keyword')} in use</span><span>${limits.plan === 'free' ? 'Checked every month on ' + freeEnginesText() : 'Checked every week on every AI engine'}</span></p></div>
 <div class="actions"><a class="btn" href="/auth">Add Webflow sites</a>${limits.plan !== 'free' ? '' : opts.trialDays ? `<a class="btn mark" href="/app/start?plan=solo&amp;interval=monthly">Try Solo free for ${opts.trialDays} days</a>` : '<a class="btn mark" href="/app/settings#plan">Upgrade</a>'}</div></div>
 <div class="sites">${list}</div>`, { user, nav: 'sites' });
 }
@@ -999,11 +1002,11 @@ function startPage(user, d) {
 <div class="panel stack startbox">
 <div class="planpick" role="group" aria-label="Plan">${pick}</div>
 <h1>${t ? `Try ${esc(p.name)} free for ${t} days` : `Start ${esc(p.name)}`}</h1>
-<p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all 7 AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
+<p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all ${allEnginesCount()} AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
 <dl class="bill"><div class="now"><dt>Today</dt><dd>$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>$${num(price)}<small> ${per}</small></dd></div></dl>
 <p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from Settings and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from Settings.'}</p>
 <form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${esc(d.plan)}"><input type="hidden" name="interval" value="${esc(d.interval)}"><input type="hidden" name="from" value="start"><input type="hidden" name="kw" value="${esc(d.kw || '')}"><button class="btn mark" type="submit">${t ? 'Start free trial' : 'Continue to payment'}</button>${other}</form>
-<p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ChatGPT, Google AI Overviews and Perplexity.</span></p>
+<p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ${freeEnginesText()}.</span></p>
 </div>`, { user, nav: 'settings' });
 }
 
@@ -1032,7 +1035,7 @@ function settingsPage(user, sites, limits, notice, opts) {
       }
     }
     return `<div class="plan${current ? ' current' : ''}"><b>${esc(p.name)}${current ? ' <span class="pill good">Your plan</span>' : ''}</b><span class="price">${price}<span class="small muted" style="font-weight:500">${k === 'free' ? '' : ' a month'}</span></span>
-<span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? 'Checked monthly on ChatGPT, Google AI Overviews and Perplexity. Audit and suggestions; apply by copying.' : `Checked weekly on all 7 AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
+<span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? `Checked monthly on ${freeEnginesText()}. Audit and suggestions; apply by copying.` : `Checked weekly on all ${allEnginesCount()} AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
   }).join('');
   const conns = (user.connections || []).map((c) => `<li><span>${esc(c.label || 'Webflow')}<span class="tiny muted">, connected ${ago(c.authorizedAt)}</span></span><form method="post" action="/app/connection/remove"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn sm ghost" type="submit">Disconnect</button></form></li>`).join('');
   return layout('Settings · AI SEO Deck', `${noticeHtml(notice)}
@@ -1067,4 +1070,4 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
   { plain: true, brandName: brandName || '', footer: brandName ? `<span>Prepared by ${esc(brandName)}</span>` : '<span>Made with AI SEO Deck</span><a href="/">aiseodeck.silitlabs.com</a>' });
 }
 
-module.exports = { esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, BUSINESS_TYPES, COUNTRIES, LANGS };
+module.exports = { allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, BUSINESS_TYPES, COUNTRIES, LANGS };

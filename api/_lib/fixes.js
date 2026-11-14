@@ -40,7 +40,7 @@ async function questionsFor(project, keywords, perKeyword) {
   const n = perKeyword || 2;
   const lang = langName(project.language);
   const j = await llm.generateJSON({
-    system: `You write the questions real customers type into ChatGPT, Gemini or Perplexity. ${RULES}`,
+    system: `You write the questions real customers type into ChatGPT, Gemini or Claude. ${RULES}`,
     prompt: `Business: ${project.brand}\nMarket: ${project.country || 'not given'}\nKeywords:\n${kws.map((k) => '- ' + k).join('\n')}\n\n` +
       `For each keyword write ${n} different questions in ${lang} that a potential customer would ask an AI assistant while searching for it: one asking which provider or option is best, and one about price, how to choose or what to expect. ` +
       `Keep the place or product from the keyword. Do not name ${project.brand} or any brand. Each under 120 characters. Return {"items": [{"keyword": "...", "questions": ["...", "..."]}]}.`,

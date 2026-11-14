@@ -1,5 +1,5 @@
 /*
- * AI SEO Deck: is your brand named and cited by ChatGPT, Perplexity and Gemini, and what on your
+ * AI SEO Deck: is your brand named and cited by ChatGPT, Gemini and Claude, and what on your
  * Webflow site keeps it out of their answers. Single serverless entry point; vercel.json rewrites
  * every non-static path here with the original path in req.query.path.
  */
@@ -367,7 +367,7 @@ async function handleStart(req, res, user) {
   const kw = kwLib.clean(q.kw || '');
   const next = afterStart(await store.getSites(user.siteIds || []), kw);
   if (user._limits.plan !== 'free' || billing.hasLiveSubscription(user)) return redirect(res, next);
-  if (!(await billing.canCheckout(user))) return redirect(res, withNotice(next, user, 'Paid plans open soon. You are on the free plan for now: 3 keywords, checked on ChatGPT, Google AI Overviews and Perplexity.'));
+  if (!(await billing.canCheckout(user))) return redirect(res, withNotice(next, user, 'Paid plans open soon. You are on the free plan for now: 3 keywords, checked on ' + html.freeEnginesText() + '.'));
   const notice = user.notice ? html.esc(user.notice) : '';
   if (user.notice) { delete user.notice; await store.saveUser(user); }
   send(res, 200, html.startPage(user, { plan, interval, kw, next, notice, trialDays: billing.trialEligible(user) ? billing.trialDays() : 0 }));
@@ -1071,8 +1071,8 @@ async function handleBillingReturn(req, res, user) {
   const b = user.billing || {};
   const name = (PLANS[user.plan] || {}).name || 'your plan';
   const text = !paid() ? 'Thanks! Your plan switches on as soon as Polar confirms the checkout, usually within a minute.'
-    : b.status === 'on_trial' && b.trialEnd ? `Your ${name} trial is on until ${html.longDay(b.trialEnd)}. All 7 AI engines and ${user._limits.keywords} keywords are open.`
-      : `You are on ${name}. All 7 AI engines and ${user._limits.keywords} keywords are open.`;
+    : b.status === 'on_trial' && b.trialEnd ? `Your ${name} trial is on until ${html.longDay(b.trialEnd)}. All ${html.allEnginesCount()} AI engines and ${user._limits.keywords} keywords are open.`
+      : `You are on ${name}. All ${html.allEnginesCount()} AI engines and ${user._limits.keywords} keywords are open.`;
   if (q.next === 'setup') return redirect(res, withNotice(afterStart(await store.getSites(user.siteIds || []), kw), user, text));
   redirect(res, '/app/settings?' + noticeQuery(user, text));
 }

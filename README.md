@@ -1,13 +1,13 @@
 # AI SEO Deck
 
-Webflow app by Silit Labs. "Every AI. One deck." Keyword by keyword, every week, it checks whether seven AI engines (ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Perplexity, Claude, Grok) name and cite a brand. Each keyword is asked as two customer questions on the chat engines and as the search itself on Google AI Overviews and AI Mode (12 answers a check). For each keyword it shows yes, sometimes or no, the answers, the rivals named instead and a fix plan (best page, title and description, FAQ schema, CMS drafts, a new page draft when no page fits) applied to Webflow in one click. Related keywords come from the AI's own searches and DataForSEO Labs (keywords where Google's AI Overviews already cite the site, related searches, monthly volumes).
+Webflow app by Silit Labs. "Every AI. One deck." Keyword by keyword, every week, it checks whether six AI engines (ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude, Grok) name and cite a brand. Each keyword is asked as two customer questions on the chat engines and as the search itself on Google AI Overviews and AI Mode (10 answers a check). Perplexity is kept in the code for a later release and stays off until `PERPLEXITY_ENABLED=1`. For each keyword it shows yes, sometimes or no, the answers, the rivals named instead and a fix plan (best page, title and description, FAQ schema, CMS drafts, a new page draft when no page fits) applied to Webflow in one click. Related keywords come from the AI's own searches and DataForSEO Labs (keywords where Google's AI Overviews already cite the site, related searches, monthly volumes).
 
 Live address (planned): https://aiseodeck.silitlabs.com
 
 ## How it works
 
 - `api/index.js`: one serverless entry point (pages, OAuth, fixes, cron). `vercel.json` rewrites every app path to it.
-- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API + web_search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Perplexity (Sonar, switching by itself to the Agent API that replaces it), Claude (Messages API + web search tool), Grok (xAI Responses API + web_search). An engine is on when its key is set. Free plan: ChatGPT, AI Overviews, Perplexity; the others show as locked columns.
+- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API + web_search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Claude (Messages API + web search tool), Grok (xAI Responses API + web_search), and Perplexity for later (Sonar, switching by itself to the Agent API, which needs paid credits; off until `PERPLEXITY_ENABLED=1`). An engine is on when its key is set. Free plan: the first three of ChatGPT, AI Overviews, Perplexity and Gemini that are on, so ChatGPT, AI Overviews and Gemini today; the others show as locked columns.
 - `api/_lib/analyze.js`: brand and rival detection in answers (case, accents, dashes and Turkish letters ignored), citations, share of voice, score (50% named, 30% cited, 20% place).
 - `api/_lib/insights.js`: "Where rivals win" gaps and "How AI describes you" (sentiment, words, claims worth checking; one small LLM call per run).
 - `api/_lib/keywords.js`: keyword cleaning, matching a keyword to the best page, DataForSEO Labs (volumes, related searches, keywords cited in AI Overviews).
@@ -22,8 +22,8 @@ Live address (planned): https://aiseodeck.silitlabs.com
 
 | Plan | Price | Sites | Keywords | Checks |
 |---|---|---|---|---|
-| Free | $0 | 1 | 3 | monthly, 3 engines (ChatGPT, AI Overviews, Perplexity), no Apply to Webflow |
-| Solo | $19/mo, $190/yr | 1 | 10 | weekly, all 7 engines, Apply, 10 keyword checks on demand a month |
+| Free | $0 | 1 | 3 | monthly, 3 engines (ChatGPT, AI Overviews, Gemini), no Apply to Webflow |
+| Solo | $19/mo, $190/yr | 1 | 10 | weekly, all 6 engines, Apply, 10 keyword checks on demand a month |
 | Studio | $49/mo, $490/yr | 5 | 30 | as Solo with 30 checks on demand, client report links with agency name |
 | Agency | $149/mo, $1490/yr | 20 | 100 | as Studio with 100 checks on demand |
 
@@ -31,7 +31,7 @@ New keywords get a first check right away, up to the plan's number of keywords i
 
 Every paid plan starts with a 7-day free trial (card taken by Polar, charged on day 8 unless cancelled; one trial per account, and Polar's "Prevent trial abuse" also blocks a second trial with the same email or card). A Solo trial costs at most about $4 in AI calls.
 
-Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (web search $10 per 1,000 calls), AI Overviews 0.4 and AI Mode 0.4 (DataForSEO live), Gemini about 0.2 within the 5,000 free grounded prompts a month and about 3 after ($14 per 1,000 search queries), Perplexity about 0.5 to 0.8, Claude about 1.2 to 3 (web search $10 per 1,000), Grok about 2.5 to 4 (web search $5 per 1,000 calls plus tokens). One keyword check (12 answers) is about 19 cents (12 to 26), so about $0.82 a keyword a month with weekly checks. Worst case per month (every keyword, every check on demand and every new keyword check used): Solo about $12, Studio about $36, Agency about $120. DataForSEO Labs lookups cost 1.2 cents plus 0.012 cents per keyword. `MAX_DAILY_CALLS` (default 1500, at most about $22 a day) stops all checks for the day once reached; work continues the next day.
+Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (web search $10 per 1,000 calls), AI Overviews 0.4 and AI Mode 0.4 (DataForSEO live), Gemini about 0.2 within the 5,000 free grounded prompts a month and about 3 after ($14 per 1,000 search queries), Claude about 1.2 to 3 (web search $10 per 1,000), Grok about 2.5 to 4 (web search $5 per 1,000 calls plus tokens). One keyword check (10 answers) is about 18 cents (11 to 25), so about $0.78 a keyword a month with weekly checks. Worst case per month (every keyword, every check on demand and every new keyword check used): Solo about $11, Studio about $34, Agency about $114. DataForSEO Labs lookups cost 1.2 cents plus 0.012 cents per keyword. `MAX_DAILY_CALLS` (default 1500, at most about $22 a day) stops all checks for the day once reached; work continues the next day.
 
 ## Kurulum (Batuhan için, sırayla)
 
@@ -44,7 +44,8 @@ Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (w
    - Scopes: Authorized user read; Sites read; Pages read and write; CMS read and write
    - Client ID ve Client Secret'ı Vercel'e gir (bana gönderme).
 5. **AI anahtarları** (ödeme ve şartları sen onaylarsın, her birinde bütçe limiti koy):
-   - OpenAI (platform.openai.com), Perplexity (perplexity.ai > API), Google AI Studio (Gemini), Anthropic (console.anthropic.com), xAI (console.x.ai)
+   - OpenAI (platform.openai.com), Google AI Studio (Gemini, ödeme hesabı bağlı olmalı), Anthropic (console.anthropic.com), xAI (console.x.ai)
+   - Perplexity şimdilik kapalı. Açmak için ücretli API kredisi gerekiyor (kayıt kredisi Agent API'de geçmiyor), sonra `PERPLEXITY_API_KEY` ve `PERPLEXITY_ENABLED=1`.
    - DataForSEO (app.dataforseo.com, en az $50 yükleme): API login ve API password (Google AI Overviews ve AI Mode için)
 6. **Polar**: Silit Labs organizasyonunda ürünler:
    - "AI SEO Deck Solo" aylık $19, "AI SEO Deck Solo Yearly" yıllık $190

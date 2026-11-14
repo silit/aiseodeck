@@ -2,7 +2,7 @@
   "name": "aiseodeck",
   "version": "0.1.0",
   "private": true,
-  "description": "AI SEO Deck: track whether ChatGPT, Perplexity and Gemini name and cite a Webflow site's brand, audit the site for AI answers and apply fixes to Webflow.",
+  "description": "AI SEO Deck: track whether ChatGPT, Gemini and Claude name and cite a Webflow site's brand, audit the site for AI answers and apply fixes to Webflow.",
   "scripts": {
     "test": "node test/app.js"
   },

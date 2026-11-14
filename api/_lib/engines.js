@@ -3,7 +3,8 @@
 // and returns { text, sources: [{ url, title, host }], queries: [what the AI searched for], model }.
 // Google AI Overviews and AI Mode come from the live Google results (DataForSEO); when Google shows no
 // AI answer for a question the engine returns { none: true }.
-// An engine is on when its key is set. ENGINES=openai,aio limits the list.
+// An engine is on when its key is set. ENGINES=openai,aio limits the list. Perplexity is kept for a later release
+// and stays off until PERPLEXITY_ENABLED=1 is set, whatever its key.
 
 const ORDER = ['openai', 'aio', 'aimode', 'gemini', 'perplexity', 'claude', 'grok'];
 const LABEL = { openai: 'ChatGPT', aio: 'AI Overviews', aimode: 'AI Mode', gemini: 'Gemini', perplexity: 'Perplexity', claude: 'Claude', grok: 'Grok' };
@@ -11,21 +12,29 @@ const LONG = { openai: 'ChatGPT', aio: 'Google AI Overviews', aimode: 'Google AI
 const KEY = { openai: 'OPENAI_API_KEY', aio: 'DATAFORSEO_LOGIN', aimode: 'DATAFORSEO_LOGIN', gemini: 'GEMINI_API_KEY', perplexity: 'PERPLEXITY_API_KEY', claude: 'ANTHROPIC_API_KEY', grok: 'XAI_API_KEY' };
 // How many calls to one engine may run at the same time (stays under each provider's rate limits)
 const PARALLEL = { openai: 4, aio: 4, aimode: 4, gemini: 3, perplexity: 2, claude: 2, grok: 2 };
-// The free plan gets the three engines that cost the least per answer
-const FREE = ['openai', 'aio', 'perplexity'];
+// Engines that stay off until switched on: { engine: env flag that must be "1" }
+const OPT_IN = { perplexity: 'PERPLEXITY_ENABLED' };
+// The free plan gets the first three of these that are on: cheap per answer and widely used
+const FREE = ['openai', 'aio', 'perplexity', 'gemini'];
+const FREE_COUNT = 3;
 
 const env = (k, d) => String(process.env[k] || d || '').trim();
 const base = (k, d) => env(k, d).replace(/\/+$/, '');
 
 function enabled() {
   const only = env('ENGINES').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
-  return ORDER.filter((e) => env(KEY[e]) && (e !== 'aio' && e !== 'aimode' || env('DATAFORSEO_PASSWORD')) && (!only.length || only.includes(e)));
+  return ORDER.filter((e) => env(KEY[e]) && (!OPT_IN[e] || env(OPT_IN[e]) === '1') && (e !== 'aio' && e !== 'aimode' || env('DATAFORSEO_PASSWORD')) && (!only.length || only.includes(e)));
+}
+// The engines of the free plan, in order (ChatGPT, Google AI Overviews and Gemini while Perplexity is off)
+function freeEngines() {
+  const on = enabled();
+  return FREE.filter((e) => on.includes(e)).slice(0, FREE_COUNT);
 }
 // Engines a plan may use, and the ones it shows as locked
 function forLimits(limits) {
   const on = enabled();
   if (limits.allEngines) return on;
-  const free = on.filter((e) => FREE.includes(e));
+  const free = freeEngines();
   return free.length ? free : on.slice(0, 1);
 }
 function lockedFor(limits) {
@@ -257,4 +266,4 @@ async function ask(engine, prompt, opts) {
   return out;
 }
 
-module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, LOCATION, enabled, forLimits, lockedFor, ask, hostOf, EngineError };
+module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, OPT_IN, LOCATION, enabled, freeEngines, forLimits, lockedFor, ask, hostOf, EngineError };

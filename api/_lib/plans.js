@@ -1,7 +1,8 @@
 'use strict';
 // Plans and what each one allows. Keywords are a pool shared by all of a user's sites.
-// Each keyword is asked as QUESTIONS customer questions on every chat engine (ChatGPT, Gemini, Perplexity,
-// Claude, Grok); Google AI Overviews and AI Mode get the keyword itself. With all 7 engines: 12 answers a check.
+// Each keyword is asked as QUESTIONS customer questions on every chat engine (ChatGPT, Gemini, Claude, Grok);
+// Google AI Overviews and AI Mode get the keyword itself. With all 6 engines: 10 answers a check.
+// (Perplexity is kept in the code for a later release and stays off until PERPLEXITY_ENABLED=1.)
 const DAY = 86400000;
 const QUESTIONS = 2;
 
@@ -38,7 +39,7 @@ function limitsFor(user) {
     sites: p.sites,
     keywords: p.keywords,
     questions: QUESTIONS,
-    allEngines: paid, // free: ChatGPT, Google AI Overviews and Perplexity; paid: every engine
+    allEngines: paid, // free: the engines in engines.freeEngines() (ChatGPT, Google AI Overviews and Gemini); paid: every engine
     everyMs: (paid ? 7 : 30) * DAY,
     rechecks: p.rechecks, // keyword checks on demand per account and month
     newChecks: p.keywords, // free first checks of newly added keywords per month

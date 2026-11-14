@@ -1,8 +1,8 @@
 # AI SEO Deck
 
-> AI SEO Deck checks, keyword by keyword, whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Perplexity, Claude and Grok recommend a business, and fixes its Webflow site where they do not. It is made by Silit Labs.
+> AI SEO Deck checks, keyword by keyword, whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Claude and Grok recommend a business, and fixes its Webflow site where they do not. It is made by Silit Labs.
 
-Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, Perplexity, Claude and Grok (live web search on), and as the keyword itself on Google AI Overviews and AI Mode: 12 answers a week per keyword on paid plans. The deck shows yes, sometimes or no per engine, the rivals named instead, the sources cited and the searches the engines ran. Fixes (titles, descriptions, FAQ answers with FAQPage schema, CMS drafts) are written to Webflow only when the user presses Apply, as unpublished changes.
+Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, Claude and Grok (live web search on), and as the keyword itself on Google AI Overviews and AI Mode: 10 answers a week per keyword on paid plans. The deck shows yes, sometimes or no per engine, the rivals named instead, the sources cited and the searches the engines ran. Fixes (titles, descriptions, FAQ answers with FAQPage schema, CMS drafts) are written to Webflow only when the user presses Apply, as unpublished changes.
 
 ## Docs
 
@@ -12,8 +12,8 @@ Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, 
 
 ## Plans (US dollars)
 
-- Free: 3 keywords on 1 site, ChatGPT, Google AI Overviews and Perplexity, checked monthly
-- Solo, $19 a month or $190 a year: 10 keywords on 1 site, all 7 AI engines weekly, one-click fixes to Webflow
+- Free: 3 keywords on 1 site, ChatGPT, Google AI Overviews and Gemini, checked monthly
+- Solo, $19 a month or $190 a year: 10 keywords on 1 site, all 6 AI engines weekly, one-click fixes to Webflow
 - Studio, $49 a month or $490 a year: 30 keywords on 5 sites, client report links with your agency name
 - Agency, $149 a month or $1,490 a year: 100 keywords on 20 sites
 - Every paid plan starts with 7 days free
