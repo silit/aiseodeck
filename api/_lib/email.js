@@ -13,7 +13,8 @@ async function send({ to, subject, html, text }) {
   const res = await fetch(base + '/emails', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html, text })
+    body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html, text }),
+    signal: AbortSignal.timeout(10000)
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const err = new Error('Email failed: ' + (data.message || res.status)); err.status = res.status; throw err; }

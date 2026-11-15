@@ -509,7 +509,7 @@ function layout(title, body, opts) {
   const cur = (p) => (opts.nav === p ? ' aria-current="page"' : '');
   const left = trialLeft(opts.user);
   const nav = opts.user
-    ? `<nav aria-label="Main">${left ? `<a class="trialchip" href="/app/settings#plan"><span class="tw">Trial, </span>${plural(left, 'day')} left</a>` : ''}<a class="navsites" href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Settings</a><a href="/logout">Sign out</a></nav>`
+    ? `<nav aria-label="Main">${left ? `<a class="trialchip" href="/app/settings#plan"><span class="tw">Trial, </span>${plural(left, 'day')} left</a>` : ''}<a class="navsites" href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Account</a><a href="/logout">Sign out</a></nav>`
     : `<nav aria-label="Main"><a href="/">Home</a><a href="/docs">Docs</a><a href="/login">Sign in</a></nav>`;
   const foot = `<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.</span>'}</footer>`;
   const head = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(title)}</title>
@@ -999,7 +999,7 @@ ${qs.length ? relatedList(site, qs, tracked, 'discover', 'search') : '<p class="
 
 function insightsHtml(latest) {
   const ins = latest && latest.insights;
-  if (!ins) return `<h2>How AI describes you</h2><p class="small muted">${latest && latest.mentionRate ? 'Appears after the next weekly check.' : 'Once the AI names you, you will see the words it uses for you and whether it sounds positive.'}</p>`;
+  if (!ins) return `<h2>How AI describes you</h2><p class="small muted">${latest && latest.mentionRate ? 'Appears after the next scheduled check.' : 'Once the AI names you, you will see the words it uses for you and whether it sounds positive.'}</p>`;
   const s = ins.sentiment || {};
   const tot = (s.positive || 0) + (s.neutral || 0) + (s.negative || 0) || 1;
   const seg = (k, cls) => (s[k] ? `<i class="${cls}" style="width:${((s[k] / tot) * 100).toFixed(1)}%" title="${esc(k)}: ${s[k]}"></i>` : '');
@@ -1358,7 +1358,7 @@ function startPage(user, d) {
 <h1>${t ? `Try ${esc(p.name)} free for ${t} days` : `Start ${esc(p.name)}`}</h1>
 <p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all ${allEnginesCount()} AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
 <dl class="bill"><div class="now"><dt>Today</dt><dd>$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>$${num(price)}<small> ${per}</small></dd></div></dl>
-<p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from Settings and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from Settings.'}</p>
+<p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from your Account page and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from Settings.'}</p>
 <form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${esc(d.plan)}"><input type="hidden" name="interval" value="${esc(d.interval)}"><input type="hidden" name="from" value="start"><input type="hidden" name="kw" value="${esc(d.kw || '')}"><button class="btn mark" type="submit">${t ? 'Start free trial' : 'Continue to payment'}</button>${other}</form>
 <p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ${freeEnginesText()}.</span></p>
 </div>`, { user, nav: 'settings' });
@@ -1392,8 +1392,8 @@ function settingsPage(user, sites, limits, notice, opts) {
 <span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? `Checked monthly on ${freeEnginesText()}. Audit and suggestions; apply by copying.` : `Checked weekly on all ${allEnginesCount()} AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
   }).join('');
   const conns = (user.connections || []).map((c) => `<li><span>${esc(c.label || 'Webflow')}<span class="tiny muted">, connected ${ago(c.authorizedAt)}</span></span><form method="post" action="/app/connection/remove"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn sm ghost" type="submit">Disconnect</button></form></li>`).join('');
-  return layout('Settings · AI SEO Deck', `${noticeHtml(notice)}
-<div class="head"><div><h1>Settings</h1><p class="meta"><span>${esc(user.email)}</span></p></div></div>
+  return layout('Account · AI SEO Deck', `${noticeHtml(notice)}
+<div class="head"><div><h1>Account</h1><p class="meta"><span>${esc(user.email)}</span></p></div></div>
 <div class="stack">
 <section class="panel stack" id="plan"><h2>Plan</h2>
 ${limits.complimentary ? noticeHtml('Your account has complimentary Agency access.', 'good') : ''}

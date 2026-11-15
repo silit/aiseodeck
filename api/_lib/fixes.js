@@ -14,9 +14,10 @@ const RULES = 'Write plainly. Never invent facts, prices, awards, numbers or gua
 const lowerKw = (k) => clean(k, 80).toLowerCase().replace(/[?!.,;:]+$/g, '').trim();
 
 // Search keywords people use to find what the business sells, from its homepage.
-async function suggestKeywords(project, home, count) {
+async function suggestKeywords(project, home, count, opts) {
   const lang = langName(project.language);
   const j = await llm.generateJSON({
+    budgetMs: opts && opts.budgetMs,
     system: `You are an SEO specialist who picks the keywords a business should track in Google and AI search. ${RULES}`,
     prompt: `Business: ${project.brand}\nWebsite: ${(project.domains || [])[0] || ''}\nMarket: ${project.country || 'not given'}\nCompetitors: ${(project.competitors || []).map((c) => c.name).join(', ') || 'not given'}\nHome page title: ${clean(home.title, 200)}\nHome page description: ${clean(home.description, 300)}\nHome page text: ${clean(home.text, 2500)}\n\n` +
       `List ${count || 12} search keywords, written in ${lang}, that potential customers type into Google or ChatGPT when they look for what this business sells. ` +
@@ -34,12 +35,13 @@ async function suggestKeywords(project, home, count) {
 }
 
 // For each keyword, the questions a customer would ask an AI assistant. Returns { keyword: [questions] }.
-async function questionsFor(project, keywords, perKeyword) {
+async function questionsFor(project, keywords, perKeyword, opts) {
   const kws = (keywords || []).slice(0, 25);
   if (!kws.length) return {};
   const n = perKeyword || 2;
   const lang = langName(project.language);
   const j = await llm.generateJSON({
+    budgetMs: opts && opts.budgetMs,
     system: `You write the questions real customers type into ChatGPT, Gemini or Claude. ${RULES}`,
     prompt: `Business: ${project.brand}\nMarket: ${project.country || 'not given'}\nKeywords:\n${kws.map((k) => '- ' + k).join('\n')}\n\n` +
       `For each keyword write ${n} different questions in ${lang} that a potential customer would ask an AI assistant while searching for it: one asking which provider or option is best, and one about price, how to choose or what to expect. ` +

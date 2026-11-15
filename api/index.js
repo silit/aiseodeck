@@ -258,16 +258,20 @@ async function prepareKeywords(siteId, user, ids) {
   const kws = (site.keywords || []).filter((k) => ids.includes(k.id));
   if (!kws.length) return;
   const qs = {};
+  let vols = {};
+  // The questions (in batches of 20) and the monthly searches are fetched side by side, so the page answers in time.
+  const asks = [];
   if (llm.available()) {
     for (let i = 0; i < kws.length; i += 20) {
-      try { Object.assign(qs, await fixes.questionsFor(site.project, kws.slice(i, i + 20).map((k) => k.text), QUESTIONS)); } catch (e) { console.error('[aiseodeck] questions', e.message); }
+      const batch = kws.slice(i, i + 20).map((k) => k.text);
+      asks.push(fixes.questionsFor(site.project, batch, QUESTIONS, { budgetMs: 30000 }).then((f) => { Object.assign(qs, f); }, (e) => { console.error('[aiseodeck] questions', e.message); }));
     }
   }
-  let vols = {};
   const needVol = kws.filter((k) => k.volume == null).map((k) => k.text);
   if (needVol.length && kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400))) {
-    try { vols = await kwLib.volumes(needVol, site.project.country, site.project.language); } catch (e) { console.error('[aiseodeck] volumes', e.message); await alerts.report('dataforseo', e, 'monthly searches'); }
+    asks.push(kwLib.volumes(needVol, site.project.country, site.project.language).then((v) => { vols = v; }, async (e) => { console.error('[aiseodeck] volumes', e.message); await alerts.report('dataforseo', e, 'monthly searches'); }));
   }
+  await Promise.all(asks);
   await store.updateSite(siteId, (s) => {
     for (const k of s.keywords || []) {
       if (!ids.includes(k.id)) continue;
@@ -387,21 +391,29 @@ async function handleSetupPage(req, res, user) {
 
 // Keyword ideas from the homepage and the keywords where Google's AI Overviews already cite the site, with volumes.
 async function discoverFor(site, user) {
-  const out = { at: Date.now(), cited: [], ideas: [], error: '' };
+  const t0 = Date.now();
+  const out = { at: t0, cited: [], ideas: [], error: '' };
   const p = site.project;
   const labs = kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400));
-  if (labs) {
+  // The cited keywords and the ideas are looked up side by side, so the page answers in time.
+  const cited = labs ? (async () => {
     const dom = (p.domains || [])[0] || hostOfUrl(site.url);
     try { out.cited = (await kwLib.inAiOverviews(dom, p.country, p.language, 40)).map((x) => ({ keyword: x.keyword, volume: x.volume })); }
     catch (e) { await alerts.report('dataforseo', e, 'keywords cited in AI Overviews'); out.error = alerts.KEYWORD_DATA_TEXT; }
-  }
+  })() : Promise.resolve();
+  let ideas = [];
   if (llm.available() && (await store.rateOk('suggest:' + user.id, 20, 3600))) {
     const r = site.url ? await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 8000 }) : { ok: false };
     const home = r.ok ? auditLib.readPage(r.text) : { title: site.name, description: '', text: '' };
+    try { ideas = await fixes.suggestKeywords(p, home, 12, { budgetMs: 30000 }); } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
+  }
+  await cited;
+  if (ideas.length) {
     try {
-      const ideas = await fixes.suggestKeywords(p, home, 12);
       let vols = {};
-      if (labs && ideas.length) { try { vols = await kwLib.volumes(ideas, p.country, p.language); } catch (e) { await alerts.report('dataforseo', e, 'monthly searches'); vols = {}; } }
+      // the searches of the ideas only while the page still has time; without them the ideas still show
+      const left = 50000 - (Date.now() - t0);
+      if (labs && ideas.length && left > 4000) { try { vols = await kwLib.volumes(ideas, p.country, p.language, Math.min(20000, left)); } catch (e) { await alerts.report('dataforseo', e, 'monthly searches'); vols = {}; } }
       out.ideas = ideas.filter((k) => !out.cited.some((c) => c.keyword === k)).map((k) => ({ keyword: k, volume: vols[k] ? vols[k].volume : null }));
     } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
   }
@@ -666,8 +678,8 @@ async function handleKeywordPlan(req, res, user) {
   try {
     if (!target) {
       const paths = ['/'].concat((audit.pages || []).filter((p) => p.ok && p.path !== '/' && !p.noindex).slice(0, 3).map((p) => p.path));
-      let source = '';
-      for (const p of paths) { const r = await fetcher.getText(audit.origin + p, { allowedHosts: allowed, timeoutMs: 7000 }); if (r.ok) source += '\n' + auditLib.readPage(r.text).text.slice(0, 2500); }
+      const reads = await Promise.all(paths.map((p) => fetcher.getText(audit.origin + p, { allowedHosts: allowed, timeoutMs: 7000 })));
+      const source = reads.filter((r) => r.ok).map((r) => '\n' + auditLib.readPage(r.text).text.slice(0, 2500)).join('');
       if (source.trim().length < 200) return back('Your pages have too little text to draft from. Add content first.');
       draft.newPage = await fixes.suggestNewPage(site.project, k.text, k.questions, source);
     } else {
@@ -1264,7 +1276,7 @@ async function handleDelete(req, res, user) {
   const env = ENV();
   if (billing.hasLiveSubscription(user)) {
     try { await billing.cancelSubscription(user); }
-    catch (e) { return send(res, 502, html.errorPage('Cancel your plan first', 'We could not cancel your subscription automatically. Use Manage billing in Settings, then delete your account.', '/app/settings#plan')); }
+    catch (e) { return send(res, 502, html.errorPage('Cancel your plan first', 'We could not cancel your subscription automatically. Use Manage billing on your Account page, then delete your account.', '/app/settings#plan')); }
   }
   for (const c of user.connections || []) await wf.revokeToken({ clientId: env.clientId, clientSecret: env.clientSecret, token: store.tokenOf(c) });
   await store.deleteUser(user);

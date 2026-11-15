@@ -201,7 +201,7 @@ async function claude(prompt, opts) {
   if (opts.country && /^[A-Z]{2}$/.test(opts.country)) tool.user_location = { type: 'approximate', country: opts.country };
   const d = await post(base('ANTHROPIC_API_BASE', 'https://api.anthropic.com') + '/v1/messages',
     { 'x-api-key': env('ANTHROPIC_API_KEY'), 'anthropic-version': env('ANTHROPIC_VERSION', '2023-06-01') },
-    { model, max_tokens: 1200, messages: [{ role: 'user', content: prompt }], tools: [tool] }, opts.timeoutMs);
+    { model, max_tokens: 2048, messages: [{ role: 'user', content: prompt }], tools: [tool] }, opts.timeoutMs);
   const out = { text: '', sources: [], consulted: [], queries: [], model: d.model || model };
   for (const b of d.content || []) {
     if (b.type === 'text') {

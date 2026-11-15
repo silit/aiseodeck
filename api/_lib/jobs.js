@@ -260,13 +260,13 @@ function digestHtml(site, s, prev) {
     }).join('');
   const top = (s.voice || []).filter((v) => !v.own && v.n > 0).slice(0, 3).map((v) => esc(v.name) + ' (' + pct(v.share) + ')').join(', ');
   return `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#0F1433;max-width:560px">
-<p style="font-size:13px;color:#5A6080;margin:0 0 6px">AI SEO Deck weekly check</p>
+<p style="font-size:13px;color:#5A6080;margin:0 0 6px">AI SEO Deck scheduled check</p>
 <h2 style="margin:0 0 8px;font-size:21px">${esc(site.project.brand || site.name)}: visible in ${s.score}% of AI answers${delta == null ? '' : ` (${delta >= 0 ? '+' : ''}${delta})`}</h2>
 <p style="font-size:14px;margin:0 0 14px;color:#5A6080">Named by at least one AI engine for ${s.kwNamed || 0} of ${s.keywords || 0} keywords. Your site was cited in ${pct(s.citationRate)} of answers.</p>
 ${rows ? `<table style="border-collapse:collapse;font-size:14px;margin-bottom:14px;min-width:320px"><tr><th style="text-align:left;font-size:12px;color:#5A6080;padding-bottom:4px">Keyword</th><th style="text-align:right;font-size:12px;color:#5A6080">Visible</th><th></th></tr>${rows}</table>` : ''}
 ${top ? `<p style="font-size:14px;margin:0 0 14px">Rivals named most: ${top}</p>` : ''}
 <p><a href="${esc(url)}" style="display:inline-block;background:#FFE45C;color:#1B1600;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700">Open your deck</a></p>
-<p style="font-size:12px;color:#5A6080">You get this email after each scheduled check. Turn it off in Settings.</p></div>`;
+<p style="font-size:12px;color:#5A6080">You get this email after each scheduled check. Turn it off on your Account page in AI SEO Deck.</p></div>`;
 }
 async function sendDigest(user, site, summary, prev) {
   const to = (user.settings && user.settings.reportEmail) || user.email;

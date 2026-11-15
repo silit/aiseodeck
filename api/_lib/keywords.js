@@ -93,10 +93,10 @@ async function labs(path, task, timeoutMs) {
 const vol = (info) => (info && typeof info.search_volume === 'number' ? info.search_volume : null);
 
 // Monthly searches for up to 700 keywords: { keyword: { volume, intent } }
-async function volumes(list, country, language) {
+async function volumes(list, country, language, timeoutMs) {
   const kws = cleanList(list, 700);
   if (!kws.length) return {};
-  const r = await labs('keyword_overview', Object.assign({ keywords: kws }, where(country, language)));
+  const r = await labs('keyword_overview', Object.assign({ keywords: kws }, where(country, language)), timeoutMs);
   const out = {};
   for (const it of r.items || []) {
     if (!it || !it.keyword) continue;

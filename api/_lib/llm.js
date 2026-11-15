@@ -22,8 +22,9 @@ function cutShort(provider, reason) {
   return Object.assign(new Error('AI provider: reply cut short (' + (reason || 'incomplete') + ')'), { cutShort: true, provider });
 }
 
-// The writing providers in order. One that fails fast (a refused account, busy, an error) hands over to the next, so an
-// empty balance at one provider does not stop the writing of fixes. A timeout does not hand over: no time is left.
+// The writing providers in order. One that fails (a refused account, busy, an error) hands over to the next, so an
+// empty balance at one provider does not stop the writing of fixes. generate() stops at a timeout; generateJSON() hands
+// over while its time budget lasts.
 const PROVIDERS = [
   { id: 'openai', key: 'OPENAI_API_KEY', async run({ system, prompt, maxTokens, timeoutMs }) {
     const d = await post(base('OPENAI_API_BASE', 'https://api.openai.com') + '/v1/responses', { Authorization: 'Bearer ' + env('OPENAI_API_KEY') },
@@ -81,28 +82,31 @@ const UNREADABLE = 'The AI reply could not be read. Try again.';
 
 // JSON from the first provider whose reply parses. The token limit leaves room for reasoning models, which spend part
 // of it before they write; a reply that is cut short or is not JSON hands over to the next provider.
+// budgetMs caps the whole call, every provider included, so a page that waits for it stays inside the 60 second
+// function limit. Each provider gets at most 30 seconds of it.
 async function generateJSON(opts) {
+  const deadline = Date.now() + ((opts && opts.budgetMs) || 40000);
   const o = Object.assign({}, opts, {
     system: opts.system + '\nReply with JSON only, no prose, no code fence.',
-    maxTokens: Math.max(4000, ((opts && opts.maxTokens) || 900) * 4),
-    timeoutMs: (opts && opts.timeoutMs) || 25000
+    maxTokens: Math.max(4000, ((opts && opts.maxTokens) || 900) * 4)
   });
   const list = PROVIDERS.filter((p) => env(p.key));
   if (!list.length) throw new Error('No AI provider is set up.');
   let last = null;
   for (const p of list) {
+    const left = deadline - Date.now();
+    if (last && left < 6000) break; // the first provider always gets its turn
     let text;
-    try { text = await p.run(o); } catch (e) {
+    try { text = await p.run(Object.assign({}, o, { timeoutMs: Math.max(1000, Math.min((opts && opts.timeoutMs) || 30000, left)) })); } catch (e) {
       last = e.cutShort ? Object.assign(new Error(UNREADABLE), { public: true }) : e;
-      if (e.cutShort) continue;
-      if ((await alerts.report(p.id, e, 'writing fixes and suggestions')) === 'timeout') break;
-      continue;
+      if (!e.cutShort) await alerts.report(p.id, e, 'writing fixes and suggestions');
+      continue; // the next provider, while the budget lasts
     }
     const j = parseJSON(text);
     if (j != null) return j;
     last = Object.assign(new Error(UNREADABLE), { public: true });
   }
-  throw last;
+  throw last || Object.assign(new Error(UNREADABLE), { public: true });
 }
 
 module.exports = { available, generate, generateJSON, parseJSON };

@@ -99,6 +99,7 @@ const ai = http.createServer(async (req, res) => {
       engineCalls.push({ e: 'gen', ins: ins.slice(0, 80) });
       if (/CUTSHORT/.test(ins)) { engineCalls.push({ e: 'gen-max', max: body.max_output_tokens }); return json(res, 200, { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output: [{ type: 'reasoning', summary: [] }] }); }
       if (/NOJSON/.test(ins)) return json(res, 200, { output_text: 'I could not find enough facts on the page.' });
+      if (/SLOWGEN/.test(ins)) { await new Promise((r) => setTimeout(r, 1500)); return json(res, 200, { output_text: '{"from": "openai"}' }); }
       if (/List \d+ search keywords/.test(ins)) return json(res, 200, { output_text: '{"keywords": ["Veneers in Antalya", "dental implants antalya", "veneers cost turkey", "Lumen Dental reviews"]}' });
       if (/For each keyword write/.test(ins)) {
         const kws = String(body.input).split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2));
@@ -137,7 +138,7 @@ const ai = http.createServer(async (req, res) => {
   let m;
   if ((m = u.pathname.match(/^\/v1beta\/models\/([^/:]+):generateContent$/))) {
     const prompt = body.contents[0].parts[0].text;
-    if (!body.tools && /CUTSHORT|NOJSON/.test(prompt)) return json(res, 200, { candidates: [{ content: { parts: [{ text: 'thinking', thought: true }, { text: '{"from": "gemini"}' }] }, finishReason: 'STOP' }] });
+    if (!body.tools && /CUTSHORT|NOJSON|SLOWGEN/.test(prompt)) return json(res, 200, { candidates: [{ content: { parts: [{ text: 'thinking', thought: true }, { text: '{"from": "gemini"}' }] }, finishReason: 'STOP' }] });
     engineCalls.push({ e: 'gemini', p: prompt, key: req.headers['x-goog-api-key'] });
     if (/price|cost/i.test(prompt)) return json(res, 400, { error: { message: 'API key not valid' } });
     const a = answerFor(prompt);
@@ -763,6 +764,9 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(cutReply && cutReply.from === 'gemini' && cutCall && cutCall.max >= 4000 && emails.length === mailsBefore, 'writing: a reply cut short at the token limit goes to the next provider without an alert, and the limit leaves room for reasoning');
     const proseReply = await llm.generateJSON({ system: 'Test writer.', prompt: 'NOJSON please' });
     assert(proseReply && proseReply.from === 'gemini', 'writing: a reply that is not JSON goes to the next provider');
+    const t0 = Date.now();
+    const slowReply = await llm.generateJSON({ system: 'Test writer.', prompt: 'SLOWGEN please', timeoutMs: 400, budgetMs: 8000 });
+    assert(slowReply && slowReply.from === 'gemini' && Date.now() - t0 < 1400, 'writing: a provider that takes too long hands over to the next one while the time budget lasts');
     const k = (message, status) => alerts.kindOf({ message, status });
     assert(k('You exceeded your current quota, please check your plan and billing details.', 429) === 'account' && k('Rate limit reached for gpt-6 in organization org-1 on requests per min. Please try again in 1s.', 429) === 'busy', 'OpenAI: an empty balance needs the owner, a rate limit passes');
     assert(k('Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.', 400) === 'account' && k('Overloaded', 529) === 'busy', 'Anthropic: low credit balance, overload');
