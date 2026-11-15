@@ -2,9 +2,12 @@
 """Burn the English captions into the silent AI SEO Deck demo recording.
 
 Usage:
-  make_video.py --input rec.mp4 --starts 0,12.5,31,... [--end 230] [--crop W:H:X:Y] --out demo.mp4
+  make_video.py --input rec.mp4 --starts 0,12.5,31,... [--end 230] [--crop W:H:X:Y] [--delogo X:Y:W:H] --out demo.mp4
+  make_video.py --input rec.mp4 --ranges 0-12.6,13.6-18.8,... [--captions other.json] --out demo.mp4
 
---starts are the seconds (in the input) where each of the 10 scenes in captions.json begins.
+--starts are the seconds (in the input) where each scene in captions.json begins; the scenes follow each other.
+--ranges gives each scene its own start-end instead, so the parts between two ranges are cut out.
+--delogo hides a fixed overlay (such as an operating system watermark) in the cropped frame.
 A scene that is too short for its captions is lengthened by holding its last frame.
 """
 import argparse, json, os, subprocess, sys
@@ -39,13 +42,26 @@ def ass_escape(text):
 def build(args):
     scenes = json.load(open(args.captions))['scenes']
     W0, H0, fps, dur = probe(args.input)
-    starts = [float(x) for x in args.starts.split(',')]
-    if len(starts) != len(scenes):
-        sys.exit('need %d scene starts, got %d' % (len(scenes), len(starts)))
-    end = float(args.end) if args.end else dur
-    bounds = starts + [end]
-    if any(bounds[i + 1] <= bounds[i] for i in range(len(starts))):
-        sys.exit('scene starts must increase and stay before the end')
+    if args.ranges:
+        ranges = []
+        for part in args.ranges.split(','):
+            a, b = part.split('-')
+            ranges.append((float(a), float(b)))
+        if len(ranges) != len(scenes):
+            sys.exit('need %d scene ranges, got %d' % (len(scenes), len(ranges)))
+        if any(b <= a for a, b in ranges) or any(ranges[i + 1][0] < ranges[i][1] for i in range(len(ranges) - 1)):
+            sys.exit('each range must end after it starts, and the ranges must not overlap')
+        if ranges[-1][1] > dur + 0.05:
+            sys.exit('the last range ends after the recording (%.1fs)' % dur)
+    else:
+        starts = [float(x) for x in args.starts.split(',')]
+        if len(starts) != len(scenes):
+            sys.exit('need %d scene starts, got %d' % (len(scenes), len(starts)))
+        end = float(args.end) if args.end else dur
+        bounds = starts + [end]
+        if any(bounds[i + 1] <= bounds[i] for i in range(len(starts))):
+            sys.exit('scene starts must increase and stay before the end')
+        ranges = list(zip(bounds[:-1], bounds[1:]))
 
     # Output size after the optional crop, scaled down to at most 1920 wide, even numbers.
     if args.crop:
@@ -56,30 +72,24 @@ def build(args):
     W = int(cw * scale) // 2 * 2
     H = int(ch * scale) // 2 * 2
 
-    events, segments, offset = [], [], 0.0
+    segments = []
     for i, sc in enumerate(scenes):
-        a, b = bounds[i], bounds[i + 1]
+        a, b = ranges[i]
         length = b - a
         need = [max(MIN_LINE, len(l) / CPS) for l in sc['lines']]
         total_need = sum(need) + GAP * (len(need) - 1) + 2 * EDGE
         extra = max(0.0, total_need - length)
-        span = length + extra
-        # Spread the captions over the scene in proportion to their reading time.
-        free = span - 2 * EDGE - GAP * (len(need) - 1)
-        t = offset + EDGE
-        for line, n in zip(sc['lines'], need):
-            d = free * n / sum(need)
-            events.append((t, t + d, line))
-            t += d + GAP
         segments.append((a, b, extra))
-        print('scene %-9s %6.1fs -> %6.1fs (held %.1fs)' % (sc['name'], length, span, extra))
-        offset += span
+        print('scene %-9s %6.1fs -> %6.1fs (held %.1fs)' % (sc['name'], length, length + extra, extra))
 
     work = os.path.splitext(args.out)[0] + '_work'
     os.makedirs(work, exist_ok=True)
     pre = []
     if args.crop:
         pre.append('crop=%d:%d:%d:%d' % (cw, ch, cx, cy))
+    if args.delogo:
+        lx, ly, lw, lh = [int(v) for v in args.delogo.split(':')]
+        pre.append('delogo=x=%d:y=%d:w=%d:h=%d' % (lx, ly, lw, lh))
     pre.append('scale=%d:%d:flags=lanczos' % (W, H))
     pre.append('fps=30')
     listing = []
@@ -98,6 +108,22 @@ def build(args):
     joined = os.path.join(work, 'joined.mp4')
     subprocess.check_call(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', joined])
 
+    # Captions go by the real length of each encoded scene (frame rounding adds up), so they never drift.
+    events, offset = [], 0.0
+    for i, sc in enumerate(scenes):
+        span = probe(os.path.join(work, 'seg%02d.mp4' % i))[3]
+        need = [max(MIN_LINE, len(l) / CPS) for l in sc['lines']]
+        # Spread the captions over the scene in proportion to their reading time.
+        free = span - 2 * EDGE - GAP * (len(need) - 1)
+        t = offset + EDGE
+        # "raise": lift this scene's captions (a share of the height above the bottom), clear of buttons there
+        raise_by = float(sc.get('raise', 0))
+        for line, n in zip(sc['lines'], need):
+            d = free * n / sum(need)
+            events.append((t, t + d, line, raise_by))
+            t += d + GAP
+        offset += span
+
     ass_path = os.path.splitext(args.out)[0] + '.ass'
     fs = round(H * 0.034)
     style = ('Style: Cap,Inter,%d,&H00FFFFFF,&H00FFFFFF,&H0033140F,&H2033140F,-1,0,0,0,100,100,0,0,3,%d,0,2,%d,%d,%d,1'
@@ -106,8 +132,9 @@ def build(args):
         f.write('[Script Info]\nScriptType: v4.00+\nPlayResX: %d\nPlayResY: %d\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n' % (W, H))
         f.write('[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n')
         f.write(style + '\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n')
-        for s, e, text in events:
-            f.write('Dialogue: 0,%s,%s,Cap,,0,0,0,,%s\n' % (ts(s), ts(e), ass_escape(text)))
+        for s, e, text, raise_by in events:
+            mv = round(H * raise_by) if raise_by > 0 else 0
+            f.write('Dialogue: 0,%s,%s,Cap,,0,0,%d,,%s\n' % (ts(s), ts(e), mv, ass_escape(text)))
 
     subprocess.check_call(['ffmpeg', '-y', '-v', 'error', '-i', joined, '-vf', "subtitles='%s'" % ass_path.replace("'", r"\'"),
                            '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
@@ -118,9 +145,14 @@ def build(args):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--input', required=True)
-    p.add_argument('--starts', required=True)
+    p.add_argument('--starts')
+    p.add_argument('--ranges')
     p.add_argument('--end')
     p.add_argument('--crop')
+    p.add_argument('--delogo')
     p.add_argument('--captions', default=os.path.join(HERE, 'captions.json'))
     p.add_argument('--out', required=True)
-    build(p.parse_args())
+    a = p.parse_args()
+    if not a.starts and not a.ranges:
+        p.error('give --starts or --ranges')
+    build(a)

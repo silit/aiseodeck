@@ -1,0 +1,11 @@
+How the submitted demo video was cut (recording AISeoDeck.mp4, 2544x1382, 185 s):
+
+python3 make_video.py --input AISeoDeck.mp4 --captions captions-final-cut.json \
+  --crop 2544:1266:0:116 --delogo 2138:1152:322:58 \
+  --ranges 0.0-12.6,13.6-18.8,18.85-24.45,26.05-33.1,33.1-38.0,38.0-48.85,48.9-60.55,60.6-71.1,71.15-79.75,79.8-89.0,104.6-142.0,142.0-155.85,169.45-185.1 \
+  --out AI-SEO-Deck-demo.mp4
+
+- crop: removes the browser tabs, address bar and bookmarks
+- delogo: hides the Windows activation watermark
+- cut out: the address bar suggestions, a game notification and the Webflow dashboard (89-104.6),
+  and a detour through the site settings before the Account page (155.85-169.45)
