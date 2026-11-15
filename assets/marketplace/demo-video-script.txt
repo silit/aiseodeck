@@ -1,0 +1,58 @@
+AI SEO DECK DEMO VİDEOSU (2 ile 5 dakika, İngilizce)
+
+Webflow'un istediği: kurulumdan ana özelliklere tam bir gösterim, OAuth ekranında hem RED hem ONAY, Webflow entegrasyonunun anlatımı ve fiyatlar.
+
+KAYITTAN ÖNCE
+- Önce paneli Webflow'a yüklemiş, "Launch App" ile denemiş ve Install URL'yi hazırlamış ol (0-ADIMLAR.txt, 1. 2. ve 4. adım).
+- Kaydı gmail Chrome'unda yap. Pencere tam ekran, sayfa yakınlaştırması yüzde 100, bildirimler kapalı.
+- Ekranda gizli bilgi olmasın: Webflow uygulama ayarları (Client Secret), Vercel, e-posta kutusu açık durmasın.
+- Bir sekmede Install URL hazır olsun (1-listing.txt içindeki link, Client ID yerleştirilmiş hali).
+- Kayıt aracı: Loom (ücretsiz sürümde 5 dakika sınırı var, bu senaryo yaklaşık 4 dakika) ya da başka bir ekran kaydedici. Linki "linke sahip herkes izleyebilir" olacak.
+- İngilizce konuşmak istemezsen sessiz kaydet, YouTube'a "Liste dışı" yükle ve aşağıdaki SÖYLE satırlarını İngilizce altyazı olarak ekle. İkisi de kabul ediliyor.
+
+----------------------------------------------------------------
+
+SAHNE 1 (0:00) Tanıtım
+EKRAN: aiseodeck.silitlabs.com ana sayfası.
+SÖYLE: "This is AI SEO Deck, a hybrid app for Webflow. It checks whether AI engines like ChatGPT, Google AI Overviews, Gemini, Claude and Grok recommend your brand for the searches you care about, and then it fixes your Webflow site where they don't."
+
+SAHNE 2 (0:20) Kurulum: önce RED
+EKRAN: Install URL'yi aç. Webflow'un izin ekranı gelir. İzin listesini fareyle göster, sonra iptal / reddet düğmesine bas. AI SEO Deck "Authorization cancelled" sayfasını gösterir.
+SÖYLE: "Installing starts on Webflow's own authorization screen. The app asks to read the user, sites, pages and CMS, and to write pages and CMS items, which it only does when you press Apply. First, let's deny it. AI SEO Deck shows that the authorization was cancelled, and nothing is stored."
+
+SAHNE 3 (0:45) Kurulum: ONAY
+EKRAN: Install URL'yi tekrar aç, AI SEO Deck Demo sitesini seç, onayla. AI SEO Deck açılır (All sites). Sessa kartına tıkla.
+SÖYLE: "Now let's approve it for the demo site. Webflow sends us back to AI SEO Deck. The access token is stored encrypted on our server and never reaches the browser. This site is already set up with its brand, rivals and three keywords. Setup takes a minute and suggests keywords for you."
+
+SAHNE 4 (1:10) Overview
+EKRAN: Overview sekmesi. Önce yüzdeyi, sonra motor çubuklarını, sonra sağdaki "Do these next" listesini göster.
+SÖYLE: "The overview shows the AI visibility score: the share of AI answers that name the brand. Below, how many keywords each engine names you for. On the right, the keywords to fix first, ranked by searches and by how rarely AI names you."
+
+SAHNE 5 (1:35) Keywords
+EKRAN: Keywords sekmesi. Tablodaki işaretleri ve "Ideas for you" kutusunu göster.
+SÖYLE: "Each keyword is asked as two real customer questions on ChatGPT, Gemini, Claude and Grok, while Google AI Overviews and AI Mode get the search itself. A yellow mark means the engine names you, a blue ring means it also links to your site."
+
+SAHNE 6 (1:55) What AI said
+EKRAN: En üstteki anahtar kelimeyi aç, "What AI said" sekmesine geç, bir cevabı kaydırarak göster.
+SÖYLE: "Opening a keyword shows exactly what each engine said, which rivals it named instead, the searches it ran and the sites it cited."
+
+SAHNE 7 (2:15) Fix plan ve Apply to Webflow
+EKRAN: "Fix plan" sekmesi. Now / Suggested kutularını ve FAQ cevaplarını göster, "Apply to Webflow" düğmesine bas, çıkan onay mesajını göster.
+SÖYLE: "The fix plan picks the page that should win this keyword. It shows the current title and description, read live from Webflow, next to new ones written from the page, and answers to the questions behind the keyword as FAQ schema. Apply to Webflow writes them through the Webflow Data API: the page title and description on the primary locale, and the FAQ as JSON-LD schema markup. They land as unpublished changes, so nothing goes live until you publish."
+
+SAHNE 8 (2:55) Designer paneli
+EKRAN: AI SEO Deck Demo sitesini Designer'da aç. 7. sahnede düzelttiğinden FARKLI bir sayfaya geç (örneğin About ya da Pricing). Apps paneli > AI SEO Deck > Launch App. Panelde hangisi çıkarsa "Fix", "Write" ya da "Title and description" düğmesi > "Write with AI" > "Apply to this page". İstersen sayfa ayarlarını açıp yeni başlığı göster. Sonra geri ok. Listede "Questions without FAQ schema" satırı varsa "Add" > "Write answers with AI" > "Add FAQ schema"; yoksa bu kısmı atla.
+SÖYLE: "AI SEO Deck also runs inside the Designer. The panel identifies the user with a Webflow ID token, which our server resolves with the Data API, and it only answers for this site. It shows the fixes for the open page. Write with AI drafts a title and description from the page, with a search preview. Apply to this page uses the Designer API, so the change shows in the page settings right away. FAQ schema is written from the page's own text and added with one click."
+
+SAHNE 9 (3:45) Yayınla, fiyatlar, hesap
+EKRAN: Designer'da Publish ile webflow.io adresine yayınla. AI SEO Deck'e dön: anahtar kelime sayfasındaki "Check again" düğmesini göster (basman şart değil). Sonra Account sayfası: planlar, Disconnect ve Delete account.
+SÖYLE: "When you publish in Webflow, the fixes go live, and Check again asks the engines again. The free plan covers one site and three keywords on three engines. Paid plans add every engine, weekly checks and one-click fixes, from 19 dollars a month, and start with a 7-day free trial. You can disconnect Webflow or delete your account at any time."
+
+BİTİŞ (yaklaşık 4:10)
+
+----------------------------------------------------------------
+
+KAYITTAN SONRA
+- Loom: Share > linki kopyala (linke sahip herkes izleyebilir).
+- YouTube: Görünürlük "Liste dışı" (Unlisted).
+- Linki formdaki Demo video alanına yapıştır. Linki gizli pencerede bir kez açıp oynadığını kontrol et.

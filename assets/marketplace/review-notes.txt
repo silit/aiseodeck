@@ -1,0 +1,17 @@
+Hybrid app: a Data Client (OAuth) plus a Designer Extension. It adds no custom code to sites and never publishes.
+
+Review access: any Webflow account with an @webflow.com email gets the Agency plan automatically, free and without expiry (every feature, every engine, 20 sites, 100 keywords, no card). If you review with another email, write to info@silitlabs.com and we turn it on right away.
+
+Pricing: Free (1 site, 3 keywords, ChatGPT, Google AI Overviews and Gemini, checked monthly; fixes can be written and copied but not applied). Solo $19/month (1 site, 10 keywords), Studio $49/month (5 sites, 30 keywords, white label reports), Agency $149/month (20 sites, 100 keywords, white label reports). Paid plans check all six engines weekly and apply fixes to Webflow. Yearly plans include two months free, every paid plan starts with a 7-day free trial, payments through Polar.
+
+Test flow: open the install URL and allow a site. If you press Cancel on the Webflow screen, the app shows an "Authorization cancelled" page and stores nothing. After you allow, set up the site (brand, rivals, keywords; ideas are suggested) and the first check starts. Overview shows the AI visibility score and the keywords to fix next. Keywords lists every keyword with one column per engine. Open a keyword for the engines that name you, What AI said (full answers, searches, cited sites) and the Fix plan. Apply to Webflow writes the title and description, FAQ schema and optional CMS drafts as unpublished changes; publish in Webflow, then Check again. Site health runs the page audit. Account has Disconnect and Delete account.
+
+Designer Extension: open a page of a connected site in the Designer > Apps > AI SEO Deck. The panel shows the page's keyword on every engine and the fixes for that page. Title and description: Write with AI, edit, Apply to this page (page.setTitle and page.setDescription). FAQ schema: Write answers with AI, Add FAQ schema (written by the server through the schema markup API). A site that is not connected yet gets a Connect button.
+
+Panel authentication: the panel calls webflow.getIdToken() and sends the token with the site id to our /ext endpoints. The server resolves it with POST /token/resolve using the stored token of that site and answers only when the token names the same site.
+
+Scopes: authorized_user:read (account and report email), sites:read (site names and domains), pages:read (titles, descriptions and JSON-LD for the audit and to match keywords to pages), pages:write (only on Apply: page title and description, schema markup), cms:read (collections for drafts), cms:write (only on Apply: items created as drafts).
+
+Data: Webflow tokens are encrypted at rest (AES-256-GCM), never reach the browser, and are deleted and revoked on Disconnect and on account deletion, and dropped when Webflow answers 401. Writes go to the primary locale only. The audit fetches only the connected site's own domains.
+
+Published testing site: https://aiseodeck-demo.webflow.io is connected to the app and checked with three keywords.

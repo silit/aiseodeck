@@ -1,0 +1,176 @@
+AI SEO DECK: WEBFLOW MARKETPLACE SUBMISSION FORM
+Form: https://developers.webflow.com/submit (sign in with Webflow first)
+The fields below are in the same order as the form. Text values are autosaved by the form; files are not.
+
+
+=== APP INFO ===
+
+APP REVIEW PREFLIGHT RECEIPT
+The wfpre_ code from the App Review Preflight app (step 3 in 0-ADIMLAR.txt).
+
+SUBMISSION TYPE
+New App
+
+APP NAME
+AI SEO Deck
+
+APP CLIENT ID
+Copy it from Webflow: Silit Labs workspace > Apps & Integrations > Develop > the menu on the AI SEO Deck row > Edit App > Building blocks > Data Client > Client ID > Copy. Close that window with Cancel.
+
+APP CAPABILITIES
+Hybrid
+
+INSTALL URL
+Put the Client ID in place of YOUR_CLIENT_ID:
+https://webflow.com/oauth/authorize?response_type=code&client_id=YOUR_CLIENT_ID&scope=authorized_user%3Aread+sites%3Aread+pages%3Aread+pages%3Awrite+cms%3Aread+cms%3Awrite
+
+SCOPES (add exactly these four, with these access levels)
+Authorized user: read
+Sites: read
+Pages: read and write
+CMS: read and write
+
+APP ICON IMAGE
+logo/ai-seo-deck-logo.png
+
+APP ICON IMAGE ALT TEXT
+AI SEO Deck logo
+
+PAYMENT TYPE
+Paid
+(The app has a free plan and paid plans; the prices are in the description.)
+
+MARKETPLACE VISIBILITY
+Public
+
+
+=== CREATOR INFO ===
+
+CREATOR NAME
+Silit Labs
+
+WEBFLOW ACCOUNT EMAIL
+The email you sign in to Webflow with.
+
+CONTACT EMAIL
+info@silitlabs.com
+
+
+=== APP DETAILS ===
+
+APP CATEGORY (up to 5)
+AI, SEO, Analytics, Marketing, Content Management
+
+APP PREVIEW DESCRIPTION (SHORT)
+See if ChatGPT, Google AI, Gemini, Claude and Grok recommend you, then fix your Webflow site.
+
+APP DETAIL DESCRIPTION
+**AI SEO Deck shows whether AI engines recommend you for the searches that matter, then fixes your Webflow site where they skip you.**
+
+People now ask ChatGPT, Google and other AI engines which product, studio or service to choose. AI SEO Deck asks them the way your customers do, for every keyword you track, and turns the answers into one score you can follow week by week. Then it shows what to change on which page, writes the fix from your own content and applies it to Webflow when you say so.
+
+**What it checks**
+- Six AI engines with live web search: ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude and Grok
+- Each keyword is asked as two real customer questions on the chat engines, while Google AI Overviews and AI Mode get the search itself: 10 answers per keyword in every check
+- Whether each answer names you, links to your site, or recommends a rival instead
+- The sites the engines read and cite, and the searches they run before they answer
+- Search volume for every keyword, keyword ideas for your site, and the keywords where Google's AI already cites you
+- A site audit of your published pages: titles and descriptions, structured data and FAQ schema, Open Graph, alt text and thin content, plus llms.txt, your sitemap and whether robots.txt blocks AI crawlers
+
+**What it fixes**
+- A fix plan for every keyword: the page that should win it, a new title and description, and answers to the questions behind it as FAQ schema
+- Every change shows the current value next to the new one, read live from Webflow
+- One click applies the fixes to Webflow as unpublished changes. Nothing goes live until you publish
+- Optional CMS drafts: FAQ items, or a new page for a keyword that has none yet, created as drafts
+
+**Inside the Designer**
+- Open AI SEO Deck from the Apps panel on any page of a connected site
+- See the keyword that belongs to the page and which AI engines name you for it
+- Write a new title and description and apply them to the page, or add FAQ schema written from the page itself
+
+**Reports**
+- Every keyword is checked again on a schedule, with an email after each check
+- A client report link you can share, white label on the Studio and Agency plans
+
+**Good to know**
+- The app works in English. Keywords can be checked in 11 languages and for 18 countries
+- Webflow stays the source of truth: the app writes only when you press Apply, writes to the primary locale and never publishes your site
+- Webflow access tokens are encrypted at rest and deleted when you disconnect or delete your account
+- The brands in the screenshots are made up
+
+**Pricing**
+- Free: 1 site, 3 keywords, ChatGPT, Google AI Overviews and Gemini, checked every month. Fixes can be written and copied
+- Solo: $19 a month, 1 site, 10 keywords, all six engines checked every week, fixes applied to Webflow
+- Studio: $49 a month, 5 sites, 30 keywords, white label reports
+- Agency: $149 a month, 20 sites, 100 keywords, white label reports
+
+Yearly plans include two months free. Every paid plan starts with a 7-day free trial. Payments through Polar, cancel any time.
+
+Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.
+
+APP PROMO VIDEO URL
+Leave empty (optional).
+
+APP SCREENSHOTS (upload in this order; alt text for each)
+1. screenshots/1-overview.png
+Alt text: AI SEO Deck overview of a site: a 47 percent AI visibility score, how many keywords each of six AI engines names the brand for, and the three keywords to fix next
+
+2. screenshots/2-keywords.png
+Alt text: Keyword table with one column per AI engine showing whether each engine names the brand, with search volume, visibility, a four-week trend and keyword ideas to add
+
+3. screenshots/3-what-ai-said.png
+Alt text: One keyword in detail: one of six AI engines names the brand, two rivals are named instead, and the ChatGPT answers are shown with the searches it ran and the sites it cited
+
+4. screenshots/4-fix-plan.png
+Alt text: Fix plan for a keyword: the current page title and description next to the suggested ones, FAQ answers to add as schema, sites to be listed on, and the Apply to Webflow button
+
+5. screenshots/5-designer-panel.png
+Alt text: The AI SEO Deck panel inside the Webflow Designer in three steps: the page's keyword on every AI engine, a new title and description with a search preview, and FAQ schema answers
+
+SOURCE MAP ARTIFACT
+designer-extension/review-source.zip
+(Not bundle.zip. bundle.zip goes to the app settings with Publish extension version.)
+
+FEATURES OVERVIEW
+1. Six AI engines checked for every keyword, with live web search
+2. One AI visibility score per keyword, with rivals and weekly trends
+3. Fix plans: title, description and FAQ schema written from your page
+4. One click applies fixes to Webflow as unpublished changes
+5. A Designer panel for the page you are editing, plus client reports
+
+WEBSITE URL
+https://aiseodeck.silitlabs.com
+
+ADDITIONAL NOTES
+Paste the whole of 2-review-notes.txt.
+
+APP ACCESS CREDENTIALS
+No credentials are needed. Reviewers sign in with their own Webflow account through the install URL. Any account with an @webflow.com email gets the Agency plan automatically, free and without expiry, so every feature is open with no card. For another email, write to info@silitlabs.com and we turn it on right away.
+
+PUBLISHED TESTING SITE
+https://aiseodeck-demo.webflow.io
+
+
+=== SUPPORT INFO ===
+
+REVIEW TEAM DEMO VIDEO URL
+Your Loom or unlisted YouTube link (3-demo-video-script.txt).
+
+DOCUMENTATION URL
+https://aiseodeck.silitlabs.com/docs
+
+PRIVACY POLICY URL
+https://aiseodeck.silitlabs.com/privacy
+
+HOW CAN USERS REACH SUPPORT?
+By email at info@silitlabs.com. The address is on every page of aiseodeck.silitlabs.com and in the documentation.
+
+SUPPORT EMAIL
+info@silitlabs.com
+
+TERMS AND CONDITIONS URL
+https://aiseodeck.silitlabs.com/terms
+
+
+=== ACKNOWLEDGEMENTS ===
+Tick the box yourself, check "Review your submission", then submit.
