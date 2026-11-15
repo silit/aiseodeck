@@ -191,6 +191,8 @@ const webflow = http.createServer(async (req, res) => {
   const p = u.pathname;
   let m;
   if (p === '/v2/token/authorized_by') return json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' });
+  if (p === '/beta/token/resolve' && req.method === 'POST') { const t = String((body && body.idToken) || ''); return t.startsWith('idt:') ? json(res, 200, { id: t.split(':')[2] || 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L', siteId: t.split(':')[1] }) : json(res, 401, { message: 'Invalid ID token' }); }
+  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'GET') { for (const [sid, list] of Object.entries(wfState.pages)) { const pg = list.find((x) => x.id === m[1]); if (pg) return json(res, 200, Object.assign({ siteId: sid }, pg)); } return json(res, 404, { message: 'mock: no page' }); }
   if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
   if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
@@ -550,8 +552,42 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
   assert(!r.body.includes('data-locale-note'), 'no note on a site with one language');
 
+  console.log('the panel inside the Webflow Designer');
+  const ext = (route, body) => request(port, route === 'OPTIONS' ? 'OPTIONS' : 'POST', '/ext/' + (route === 'OPTIONS' ? 'context' : route), { headers: { 'content-type': 'application/json', origin: 'https://abc123.webflow-ext.com' }, body: route === 'OPTIONS' ? undefined : JSON.stringify(body) });
+  r = await ext('OPTIONS');
+  assert(r.status === 204 && r.headers['access-control-allow-origin'] === '*' && /POST/.test(r.headers['access-control-allow-methods']), 'the panel can call the app from its own address');
+  r = await ext('context', { siteId: 'siteA', idToken: 'bad-token', pageId: 'p2', path: '/about' });
+  assert(r.status === 401 && /session/.test(JSON.parse(r.body).error), 'an ID token Webflow does not know is refused');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:otherSite', pageId: 'p2', path: '/about' });
+  assert(r.status === 403, 'an ID token made on another site is refused');
+  r = await ext('context', { siteId: 'siteNotHere', idToken: 'idt:siteNotHere', pageId: 'x1', path: '/' });
+  assert(r.status === 200 && JSON.parse(r.body).connect === true && /\/auth$/.test(JSON.parse(r.body).connectUrl), 'a site not connected yet gets a link to connect it');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+  let ctx = JSON.parse(r.body);
+  assert(r.status === 200 && ctx.ok && ctx.page.path === '/about' && ctx.page.audited && ctx.plan.canApply === true && /\/app\/site\?id=siteA/.test(ctx.site.url), 'the panel gets the page it is on, matched by its id');
+  assert(ctx.keywords.some((k) => k.text === 'veneers in antalya' && k.answered > 0 && /\/app\/keyword\?id=siteA&k=/.test(k.url)) && ctx.engines.length >= 3, 'and the keywords that belong to the page, with each engine');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pNew', path: 'about/' });
+  assert(JSON.parse(r.body).page.path === '/about', 'a page id the audit has not read is matched by its path');
+  r = await ext('suggest', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', what: 'meta' });
+  const panelSug = JSON.parse(r.body);
+  assert(panelSug.ok && /Lumen Dental/.test(panelSug.meta.title) && panelSug.meta.description.length > 40, 'the panel writes a title and description from the page');
+  const putsBefore = wfState.schemaPuts.length;
+  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', keywordId: kVen.id, faq: [{ q: 'How long do veneers last?', a: 'Usually 10 to 15 years.' }, { q: 'Do UK visitors need a visa?', a: 'Most do not for a short stay.' }] });
+  const lastPut = wfState.schemaPuts[wfState.schemaPuts.length - 1];
+  assert(JSON.parse(r.body).ok && wfState.schemaPuts.length === putsBefore + 1 && lastPut.id === 'p2' && JSON.stringify(lastPut.body).includes('FAQPage'), 'FAQ schema goes to the page through Webflow');
+  assert(getJ('audit:siteA').pages.find((x) => x.path === '/about').schemaTypes.includes('FAQPage') && getJ('site:siteA').keywords.find((x) => x.id === kVen.id).fixedAt > Date.now() - 60000, 'the audit and the keyword know about the fix');
+  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p404', path: '/somewhere', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
+  assert(JSON.parse(r.body).ok === true, 'a page the audit skipped is checked with Webflow before writing');
+  wfState.pages.siteB = [{ id: 'pB', title: 'B', slug: 'b', publishedPath: '/b' }];
+  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pB', path: '/b', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
+  assert(r.status === 403 && /another site/.test(JSON.parse(r.body).error), 'a page of another site is refused');
+  r = await ext('applied', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', title: 'About Lumen Dental, veneers in Antalya', description: 'Who we are and how we plan veneers and implants for patients from the UK.' });
+  assert(JSON.parse(r.body).ok && getJ('audit:siteA').pages.find((x) => x.path === '/about').title === 'About Lumen Dental, veneers in Antalya', 'a title set in the Designer is recorded');
+
   console.log('free plan limits on fixes');
   const u2 = getJ('user:user_1'); u2.plan = 'free'; db.set('user:user_1', JSON.stringify(u2));
+  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
+  assert(r.status === 402 && /paid plans/.test(JSON.parse(r.body).error), 'the panel cannot write on the free plan');
   const updatesBefore = wfState.pageUpdates.length;
   r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
   assert(wfState.pageUpdates.length === updatesBefore && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot write to Webflow');

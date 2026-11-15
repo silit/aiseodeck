@@ -79,6 +79,9 @@ async function revokeToken({ clientId, clientSecret, token }) {
 
 const isRevoked = (e) => !!e && e.status === 401;
 const authorizedBy = (token) => call(token, 'GET', '/token/authorized_by');
+// Who opened the panel inside the Designer: an ID token from webflow.getIdToken(), which only a token of this app
+// can resolve. Answers { id, email, firstName, lastName, siteId }.
+const resolveIdToken = (token, idToken) => beta(token, 'POST', '/token/resolve', { idToken });
 async function tokenStatus(token) {
   try { await authorizedBy(token); return 'ok'; } catch (e) { return isRevoked(e) ? 'revoked' : 'unknown'; }
 }
@@ -137,6 +140,6 @@ const getCollection = (token, collectionId) => call(token, 'GET', `/collections/
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
-  SCOPES, call, beta, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, tokenStatus, listSites, getSite,
+  SCOPES, call, beta, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
   listPages, updatePageSeo, getSchema, putSchema, querySchemas, listCollections, getCollection, createDraftItem
 };

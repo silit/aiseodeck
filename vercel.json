@@ -37,6 +37,10 @@
       "destination": "/api/index?path=cron/:job"
     },
     {
+      "source": "/ext/:rest*",
+      "destination": "/api/index?path=ext/:rest*"
+    },
+    {
       "source": "/:p(auth|callback|login|logout|health)",
       "destination": "/api/index?path=:p"
     }

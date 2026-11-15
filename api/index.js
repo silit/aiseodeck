@@ -779,6 +779,163 @@ async function handleKeywordApply(req, res, user) {
 }
 function andList(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
 
+/* ---------- the panel inside the Webflow Designer (Designer Extension) ---------- */
+// The panel is a static page that Webflow serves from its own address. It proves who opened it with a Webflow ID
+// token, which only a token of this app can resolve, so no cookie or session of ours crosses over.
+const appBase = () => ENV().appUrl || 'https://aiseodeck.silitlabs.com';
+
+function extHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '600');
+}
+async function extAuth(b) {
+  const siteId = String(b.siteId || '');
+  const idToken = String(b.idToken || '');
+  if (!/^[A-Za-z0-9_-]{2,64}$/.test(siteId) || !idToken || idToken.length > 6000) return { status: 400, error: 'Bad request.' };
+  if (!localRateOk('ext:' + siteId, 90, 60000)) return { status: 429, error: 'Too many requests. Wait a minute.' };
+  const site = await store.getSite(siteId);
+  const owner = site && site.userId ? await store.getUser(site.userId) : null;
+  const token = owner ? store.tokenForSite(owner, site) : null;
+  if (!site || !token) return { connect: true };
+  let who;
+  try { who = await wf.resolveIdToken(token, idToken); }
+  catch (e) { return wf.isRevoked(e) || e.status === 403 ? { status: 401, error: 'Webflow did not accept this session. Close and open the app again.' } : { status: 502, error: 'Webflow could not be reached. Try again.' }; }
+  // the token names the site it was made on; without a site, only the account that connected the site may use it
+  if (!who || (who.siteId ? who.siteId !== siteId : who.id !== owner.id)) return { status: 403, error: 'This panel belongs to another site.' };
+  owner._limits = limitsFor(owner);
+  return { site, owner, token, who };
+}
+const extPath = (b) => { let p = String(b.path || '').trim().replace(/[?#].*$/, ''); if (!p.startsWith('/')) p = '/' + p; p = p.replace(/\/+$/, ''); return !p || p === '/index' ? '/' : p; };
+function extRow(audit, b) {
+  const pages = (audit && audit.pages) || [];
+  return (b.pageId && pages.find((p) => p.pageId === String(b.pageId))) || pages.find((p) => p.path === extPath(b)) || null;
+}
+function pageKeywords(site, audit, path) {
+  return (site.keywords || []).filter((k) => { const t = targetFor(k, audit); return t ? t.path === path : k.page === path; });
+}
+async function markFixed(site, keywordId) {
+  if (!keywordId) return;
+  await store.updateSite(site.id, (s) => { const x = (s.keywords || []).find((y) => y.id === String(keywordId)); if (x) x.fixedAt = Date.now(); });
+}
+
+async function extContext(a, b) {
+  const { site, owner } = a;
+  const audit = await store.getAudit(site.id);
+  const row = extRow(audit, b);
+  const path = row ? row.path : extPath(b);
+  const link = (p) => appBase() + p;
+  return {
+    ok: true,
+    site: { name: site.project.brand || site.name, score: site.latest ? site.latest.score : null, keywords: (site.keywords || []).length, ready: !!site.project.ready, url: link(siteUrl(site)), setupUrl: link('/app/setup?id=' + encodeURIComponent(site.id)), healthUrl: link(siteUrl(site, 'tab=audit')), keywordsUrl: link(siteUrl(site, 'tab=keywords')) },
+    plan: { name: owner._limits.name, canApply: !!owner._limits.canApply, upgradeUrl: link('/app/settings#plan') },
+    page: {
+      path, pageId: (row && row.pageId) || String(b.pageId || '') || null, audited: !!row, auditAt: audit ? audit.at : null, score: row ? row.score : null, template: !!(row && row.template),
+      title: row ? row.title || '' : '', description: row ? row.description || '' : '', faqFound: row ? (row.faq || []).length : 0, schemaTypes: row ? row.schemaTypes || [] : [],
+      issues: row ? (row.issues || []).map((code) => ({ code, label: html.issueLabel(code), text: (auditLib.PAGE_RULES[code] || {}).text || '', w: (auditLib.PAGE_RULES[code] || {}).w || 0 })) : []
+    },
+    keywords: pageKeywords(site, audit, path).slice(0, 3).map((k) => {
+      const s = site.kw && site.kw[k.id];
+      const kc = analyze.engineCounts(s);
+      return { id: k.id, text: k.text, volume: k.volume == null ? null : k.volume, named: kc.named, answered: kc.answered, checked: !!s, states: (s && s.eng) || {}, vis: s ? Math.round((s.vis || 0) * 100) : null,
+        lostTo: [...new Set(Object.values((s && s.lost) || {}).flat())].slice(0, 2), fixedAt: k.fixedAt || null, url: link(kwUrl(site, k)) };
+    }),
+    engines: engines.forLimits(owner._limits).map((e) => ({ id: e, label: engines.LABEL[e] || e }))
+  };
+}
+
+async function extSuggest(a, b) {
+  const { site, owner } = a;
+  if (!llm.available()) return { error: 'Writing needs an AI provider, which is not connected yet.' };
+  if (!(await store.rateOk('suggest:' + owner.id, 20, 3600))) return { status: 429, error: 'That is a lot of suggestions for one hour. Try again later.' };
+  const audit = await store.getAudit(site.id);
+  const row = extRow(audit, b);
+  const path = row ? row.path : extPath(b);
+  const origin = audit && audit.origin ? audit.origin : String(site.url || '').replace(/\/+$/, '');
+  const r = await fetcher.getText(origin + path, { allowedHosts: siteHosts(site).concat(hostOfUrl(origin)), timeoutMs: 9000 });
+  if (!r.ok) return { error: 'The published page could not be read. Publish it first, then try again.' };
+  const page = Object.assign(auditLib.readPage(r.text), { path });
+  const k = (site.keywords || []).find((x) => x.id === String(b.keywordId || '')) || pageKeywords(site, audit, path)[0] || null;
+  try {
+    if (b.what === 'faq') {
+      const qs = k ? (k.questions || []).concat(((site.kw && site.kw[k.id]) || {}).queries || []).slice(0, 6) : (site.keywords || []).flatMap((x) => x.questions || []).slice(0, 8);
+      const faq = await fixes.suggestFaq(site.project, page, qs);
+      if (!faq.length) return { error: 'The page does not have enough content to answer questions. Add content first.' };
+      return { ok: true, faq };
+    }
+    return { ok: true, meta: await fixes.suggestMeta(site.project, page, k ? k.text : undefined), keyword: k ? k.text : null };
+  } catch (e) { return { error: 'No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT) }; }
+}
+
+// FAQ schema goes through the Data API (the Designer has no schema call); the title and description are set by the
+// panel itself in the Designer and only reported here.
+async function extFaq(a, b) {
+  const { site, owner, token } = a;
+  if (!owner._limits.canApply) return { status: 402, error: 'Applying to Webflow is part of the paid plans.' };
+  const pairs = (Array.isArray(b.faq) ? b.faq : []).map((x) => ({ q: String((x && x.q) || '').replace(/\s+/g, ' ').trim().slice(0, 200), a: String((x && x.a) || '').replace(/\s+/g, ' ').trim().slice(0, 900) })).filter((x) => x.q && x.a).slice(0, 20);
+  if (pairs.length < 2) return { status: 400, error: 'FAQ schema needs at least two questions and answers.' };
+  const audit = await store.getAudit(site.id);
+  const row = extRow(audit, b);
+  const pageId = String(b.pageId || (row && row.pageId) || '');
+  if (!/^[A-Za-z0-9_-]{2,64}$/.test(pageId)) return { status: 400, error: 'This page cannot take schema from here.' };
+  if (!(row && row.pageId === pageId)) {
+    // a page the audit has not read yet: make sure it belongs to this site
+    try { const p = await wf.call(token, 'GET', '/pages/' + encodeURIComponent(pageId)); if (!p || p.siteId !== site.id) return { status: 403, error: 'This page belongs to another site.' }; }
+    catch (e) { return { status: 403, error: 'This page could not be checked.' }; }
+  }
+  try {
+    let existing = null;
+    try { const s = await wf.getSchema(token, pageId); existing = s && (s.jsonLdSchema || null); } catch (e) { existing = null; }
+    await wf.putSchema(token, pageId, fixes.mergeSchema(existing, [fixes.faqSchema(pairs)]));
+  } catch (e) { return { error: 'Webflow did not accept the change: ' + String(e.message || 'unknown error').slice(0, 160) }; }
+  if (row) {
+    row.schemaTypes = [...new Set((row.schemaTypes || []).concat('FAQPage'))];
+    row.issues = (row.issues || []).filter((x) => x !== 'schema_missing' && x !== 'faq_no_schema');
+    await store.saveAudit(site.id, audit);
+  }
+  await markFixed(site, b.keywordId);
+  return { ok: true };
+}
+
+async function extApplied(a, b) {
+  const { site } = a;
+  const audit = await store.getAudit(site.id);
+  const row = extRow(audit, b);
+  const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (row && title) {
+    row.title = title;
+    if (description) row.description = description;
+    row.issues = (row.issues || []).filter((x) => !/^(title|desc)_/.test(x));
+    await store.saveAudit(site.id, audit);
+  }
+  await markFixed(site, b.keywordId);
+  return { ok: true };
+}
+
+async function handleExt(req, res, path, method) {
+  extHeaders(res);
+  if (method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+  if (method !== 'POST') return json(res, 405, { error: 'Use POST.' });
+  try {
+    const b = await readBody(req);
+    const a = await extAuth(b);
+    if (a.connect) return json(res, 200, { connect: true, connectUrl: appBase() + '/auth' });
+    if (a.error) return json(res, a.status || 400, { error: a.error });
+    let out;
+    if (path === '/ext/context') out = await extContext(a, b);
+    else if (path === '/ext/suggest') out = await extSuggest(a, b);
+    else if (path === '/ext/faq') out = await extFaq(a, b);
+    else if (path === '/ext/applied') out = await extApplied(a, b);
+    else return json(res, 404, { error: 'Unknown request.' });
+    return json(res, out.status || 200, out);
+  } catch (e) {
+    console.error('[aiseodeck] panel', e && e.stack);
+    return json(res, 500, { error: 'Something went wrong on our side. Try again in a minute.' });
+  }
+}
+
 async function handleKeywordRelated(req, res, user) {
   const b = await readBody(req);
   const { site, k } = await keywordContext(user, b.id, b.k);
@@ -1202,6 +1359,7 @@ module.exports = async function handler(req, res) {
     if (path.startsWith('/l/')) return await handleLoginLink(req, res, path.slice(3), method);
     if (path === '/logout') { res.setHeader('Set-Cookie', [cookie(COOKIE, '', 0)]); return redirect(res, '/'); }
     if (path.startsWith('/r/')) return await handleReport(req, res, path.slice(3));
+    if (path.startsWith('/ext/')) return await handleExt(req, res, path, method);
     if (path.startsWith('/cron/')) {
       if (!cronAuthorized(req)) return json(res, 401, { error: 'unauthorized' });
       if (path === '/cron/tick') return json(res, 200, await jobs.tick({ budgetMs: 45000 }));

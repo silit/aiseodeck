@@ -59,6 +59,12 @@ Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (w
 
 Not: Vercel Hobby ticari kullanıma kapalı; ücretli plan satmaya başlamadan önce Pro'ya geçmek gerekir.
 
+## Designer'daki panel (Designer Extension)
+
+`extension/` klasöründe: `webflow.json` ve `public/` (index.html, app.js, app.css; framework yok). Panel açık sayfayı, o sayfanın kelimesini, her AI motorunu ve düzeltilecekleri gösterir; başlık ve açıklamayı Designer API ile sayfaya yazar, FAQ şemasını sunucu yazar (`/ext/*`). Kimlik: `webflow.getIdToken()` ile gelen ID token, sunucuda sitenin kayıtlı tokenı ile `POST /beta/token/resolve` ile çözülür.
+
+Paketlemek: `cd extension && npx @webflow/webflow-cli extension bundle` (bundle.zip, git'e girmez). Yüklemek: Workspace settings > Apps & Integrations > Develop > AI SEO Deck > Publish extension version (workspace admin ve iki adımlı doğrulama açık olmalı; uygulamada Designer Extension yapı taşı açık olmalı). Denemek: Designer > Apps > AI SEO Deck > Launch App.
+
 ## Environment variables
 
 See `.env.example`.
