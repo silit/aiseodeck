@@ -150,7 +150,7 @@ async function handleAuth(req, res) {
   const kw = kwLib.clean(q.kw || '');
   const want = wantedPlan(q.plan, q.interval);
   if ((kw || want) && (await currentUser(req))) return redirect(res, want ? startUrl(want, kw) : '/app?kw=' + encodeURIComponent(kw));
-  if (!env.clientId || !env.appUrl) return send(res, 500, html.errorPage('Not configured', 'WEBFLOW_CLIENT_ID and APP_URL must be set.', '/'));
+  if (!env.clientId || !env.appUrl) { console.error('[aiseodeck] WEBFLOW_CLIENT_ID or APP_URL is missing'); return send(res, 503, html.errorPage('Connecting is paused', 'Connecting to Webflow is not available right now. Try again in a few minutes.', '/')); }
   const state = random(16);
   const cookies = [cookie('ad_state', state, 600)];
   if (kw) cookies.push(cookie('ad_kw', kw, 3600));
@@ -219,7 +219,7 @@ async function ownedSite(user, id) {
   const site = await store.getSite(String(id));
   return site && site.userId === user.id ? site : null;
 }
-const notFound = (res) => send(res, 404, html.errorPage('Site not found', 'That site is not connected to your account.'));
+const notFound = (res) => send(res, 404, html.errorPage('Site not found', 'This site is not connected to your account. It may have been removed or disconnected in Webflow.', '/app'));
 
 function splitList(v, max, each) {
   return String(v || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, max).map((x) => x.slice(0, each || 80));

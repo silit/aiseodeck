@@ -106,6 +106,8 @@ async function generateJSON(opts) {
     if (j != null) return j;
     last = Object.assign(new Error(UNREADABLE), { public: true });
   }
+  // every provider failed: logged, so a run of failures shows in the server logs
+  console.error('[aiseodeck] writing failed', (last && last.message) || 'no provider answered in time');
   throw last || Object.assign(new Error(UNREADABLE), { public: true });
 }
 
