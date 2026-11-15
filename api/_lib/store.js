@@ -278,7 +278,7 @@ async function getRun(id) { return id ? kv.getJSON('run:' + id) : null; }
 async function saveRun(run) { return kv.setJSON('run:' + run.id, run); }
 async function activeRunIds() { return kv.smembers('runs:active'); }
 async function takeTasks(runId, n) { return kv.lpopN('rq:' + runId, n); }
-async function requeue(runId, task) { return kv.rpush('rq:' + runId, task); }
+async function requeue(runId, ...tasks) { return tasks.length ? kv.rpush('rq:' + runId, ...tasks) : 0; }
 async function tasksLeft(runId) { return kv.llen('rq:' + runId); }
 async function saveResult(runId, field, result) { return kv.hsetJSON('res:' + runId, field, result); }
 async function results(runId) { return runId ? kv.hgetallJSON('res:' + runId) : {}; }

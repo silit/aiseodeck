@@ -370,8 +370,21 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(run1 && run1.engines.join() === 'openai,aio,perplexity' && run1.total === 15 && !run1.partial, 'free plan: first run on ChatGPT, Google AI Overviews and Perplexity, 5 answers per keyword');
   assert(run1.units.filter((u) => u.q === 'k').length === 3 && run1.units.find((u) => u.id.endsWith('.0')).text.startsWith('Which clinic'), 'Google gets the keyword, chat engines get the questions');
 
+  console.log('live progress while a check runs');
+  r = await request(port, 'GET', '/app/run/progress?id=siteA', { headers: { cookie } });
+  let prog = JSON.parse(r.body);
+  assert(r.status === 200 && prog.total === 15 && prog.done === 0 && !prog.idle, 'the progress endpoint reports answers read so far');
+  r = await request(port, 'GET', '/app/run/progress?id=siteA');
+  assert(r.status === 401 && JSON.parse(r.body).error === 'signed out', 'signed out progress gets a JSON answer, not the login page');
+  r = await request(port, 'GET', '/app/run/progress?id=nosuchsite', { headers: { cookie } });
+  assert(r.status === 404, 'progress of a site that is not yours is not found');
+  r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie } });
+  assert(r.body.includes("fetch('/app/run/progress?id='") && r.body.includes('setTimeout(peek,5000)'), 'an open page polls the progress while the pump works');
+
   console.log('first run through the page pump');
   await pump(cookie);
+  r = await request(port, 'GET', '/app/run/progress?id=siteA', { headers: { cookie } });
+  assert(JSON.parse(r.body).idle === true, 'progress is idle once the check is done');
   site = getJ('site:siteA');
   const [kVen, kImp, kSmile] = site.keywords;
   const sVen = site.kw[kVen.id], sImp = site.kw[kImp.id], sSmile = site.kw[kSmile.id];
@@ -621,6 +634,47 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     ans = await engines.ask('perplexity', q, { country: 'GB', timeoutMs: 5000 });
     assert(ans.text && engineCalls.filter((c) => c.e === 'perplexity-agent').length === before + 1, 'when Sonar is gone, Perplexity answers come from the Agent API');
     sonarGone = false;
+  }
+
+  console.log('slow engines get a full window');
+  {
+    const jobs = require('../api/_lib/jobs');
+    const enginesLib = require('../api/_lib/engines');
+    assert(jobs.canStartTask('a.0|grok|0', 13000) && !jobs.canStartTask('a.0|grok|0|w', jobs.FULL_WINDOW_MS - 1) && jobs.canStartTask('a.0|grok|0|w', jobs.FULL_WINDOW_MS), 'a task cut short by our window waits for a full one');
+    assert(jobs.windowRetry('a.0', 'grok', 1) === 'a.0|grok|1|w' && jobs.FULL_WINDOW_MS >= 42000, 'the retry keeps its attempt and is marked');
+    const realAsk = enginesLib.ask;
+    const asked = [];
+    let slowMode = 'window'; // 'window': grok needs the full 40 seconds; 'never': grok always times out
+    enginesLib.ask = async (engine, text, o) => {
+      asked.push({ engine, timeoutMs: o.timeoutMs });
+      if (engine === 'grok' && (slowMode === 'never' || o.timeoutMs < 40000)) throw new enginesLib.EngineError('timed out', 0, true);
+      return { text: 'Lumen Dental is a good choice for veneers.', sources: [], consulted: [], queries: [], ms: 5, model: 'stub' };
+    };
+    const fakeSite = { id: 'siteSlow', keywords: [{ id: 'k1', text: 'veneers antalya', questions: ['Best clinic for veneers in Antalya?'] }], project: { brand: 'Lumen Dental', domains: ['lumendental.com'], country: 'GB', language: 'en' } };
+    try {
+      const slow = await store.createRun(fakeSite, { id: 'user_slow' }, ['openai', 'grok'], 'manual', null, true);
+      const queueOf = (id) => (db.get('rq:' + id) || []).slice();
+      let out = await jobs.workRun(slow.id, Date.now() + 20000);
+      let res = await store.results(slow.id);
+      assert(out.ok === 1 && out.failed === 0 && out.retry === 1 && res['k1.0|openai'] && res['k1.0|openai'].ok && !res['k1.0|grok'], 'in a short window the fast engine answers and the slow one is not counted as failed');
+      assert(queueOf(slow.id).join() === 'k1.0|grok|0|w' && asked.filter((a) => a.engine === 'grok').length === 1, 'the slow answer goes back to the queue marked, attempt not used');
+      out = await jobs.workRun(slow.id, Date.now() + 30000);
+      assert(asked.filter((a) => a.engine === 'grok').length === 1 && queueOf(slow.id).join() === 'k1.0|grok|0|w', 'a window too short for it does not start it again');
+      out = await jobs.workRun(slow.id, Date.now() + 50000);
+      res = await store.results(slow.id);
+      const last = asked.filter((a) => a.engine === 'grok').pop();
+      assert(last.timeoutMs === 40000 && res['k1.0|grok'] && res['k1.0|grok'].ok && !queueOf(slow.id).length, 'a full window gives it 40 seconds and the answer is saved');
+      await store.endRun(slow.id);
+
+      slowMode = 'never';
+      const stuck = await store.createRun(fakeSite, { id: 'user_slow' }, ['grok'], 'manual', null, true);
+      for (let i = 0; i < 3; i++) await jobs.workRun(stuck.id, Date.now() + 50000);
+      res = await store.results(stuck.id);
+      assert(res['k1.0|grok'] && res['k1.0|grok'].ok === false && res['k1.0|grok'].err === 'timed out' && !queueOf(stuck.id).length, 'an engine that times out with the full 40 seconds fails after three tries instead of looping');
+      await store.endRun(stuck.id);
+    } finally {
+      enginesLib.ask = realAsk;
+    }
   }
 
   console.log('cost guard');

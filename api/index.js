@@ -491,10 +491,22 @@ async function handlePump(req, res, user) {
   const runId = site.sched && site.sched.runId;
   if (!runId) return json(res, 200, { idle: true });
   if (!localRateOk('pump:' + user.id, 40, 60000) || !(await store.rateOk('pump:' + user.id, 120, 600))) return json(res, 200, { busy: true });
-  const r = await jobs.workRun(runId, Date.now() + 25000);
+  // up to 50 seconds of work per request (the function may run 60): slow engines get their full 40 seconds
+  const r = await jobs.workRun(runId, Date.now() + 50000);
   const finished = await jobs.maybeFinish(runId, Date.now());
   const run = await store.getRun(runId);
   json(res, 200, { finished, busy: !!r.busy, budget: !!r.budget, total: run ? run.total : 0, done: run ? await store.resultCount(runId) : 0 });
+}
+
+// Read by an open page every few seconds while a pump request works, so the progress bar keeps moving.
+async function handleProgress(req, res, user) {
+  const site = await ownedSite(user, queryOf(req).id);
+  if (!site) return json(res, 404, { error: 'not found' });
+  const runId = site.sched && site.sched.runId;
+  if (!runId) return json(res, 200, { idle: true });
+  if (!localRateOk('progress:' + user.id, 60, 60000)) return json(res, 200, { busy: true });
+  const run = await store.getRun(runId);
+  json(res, 200, { total: run ? run.total : 0, done: run ? await store.resultCount(runId) : 0 });
 }
 
 async function handleSiteSettings(req, res, user) {
@@ -1188,7 +1200,7 @@ module.exports = async function handler(req, res) {
     }
     if (path === '/app' || path.startsWith('/app/')) {
       const user = await currentUser(req);
-      if (!user) return method === 'POST' && path === '/app/run/pump' ? json(res, 401, { error: 'signed out' }) : redirect(res, '/login');
+      if (!user) return (method === 'POST' && path === '/app/run/pump') || path === '/app/run/progress' ? json(res, 401, { error: 'signed out' }) : redirect(res, '/login');
       if (method === 'POST' && !sameOrigin(req)) return send(res, 403, html.errorPage('Blocked', 'Cross-site request blocked.'));
       const r = method + ' ' + path;
       if (r === 'GET /app') return await handleApp(req, res, user);
@@ -1198,6 +1210,7 @@ module.exports = async function handler(req, res) {
       if (r === 'GET /app/site') return await handleSitePage(req, res, user);
       if (r === 'POST /app/site/run') return await handleRun(req, res, user);
       if (r === 'POST /app/run/pump') return await handlePump(req, res, user);
+      if (r === 'GET /app/run/progress') return await handleProgress(req, res, user);
       if (r === 'POST /app/site/settings') return await handleSiteSettings(req, res, user);
       if (r === 'POST /app/keywords') return await handleKeywordsAdd(req, res, user);
       if (r === 'GET /app/keyword') return await handleKeywordPage(req, res, user);

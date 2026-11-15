@@ -12,6 +12,11 @@ const { limitsFor, DAY } = require('./plans');
 const insights = require('./insights');
 const STALE_MS = 3 * 60000; // a run with no tasks left and no progress for this long is finished as it is
 const MAX_ATTEMPTS = 3;
+// An answer cut short by our own time window is tried again with "|w" on its task id, and then only starts
+// when the window can give it the full 40 seconds (slow engines such as Google AI Mode or Grok need it).
+const FULL_WINDOW_MS = 43000; // 40 seconds for the answer, 3 to spare
+const windowRetry = (uid, engine, attempt) => uid + '|' + engine + '|' + attempt + '|w';
+const canStartTask = (task, msLeft) => String(task).split('|')[3] !== 'w' || msLeft >= FULL_WINDOW_MS;
 
 const appUrl = () => (process.env.APP_URL || '').replace(/\/+$/, '');
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -105,7 +110,7 @@ async function doTask(run, task, deadline) {
     return 'ok';
   } catch (e) {
     // a timeout caused by our own short time window is not the engine's fault: try again without counting it
-    if (e.message === 'timed out' && timeoutMs < 40000) { await store.requeue(run.id, uid + '|' + engine + '|' + attempt); return 'retry'; }
+    if (e.message === 'timed out' && timeoutMs < 40000) { await store.requeue(run.id, windowRetry(uid, engine, attempt)); return 'retry'; }
     if (e.retry && attempt + 1 < MAX_ATTEMPTS) { await store.requeue(run.id, uid + '|' + engine + '|' + (attempt + 1)); return 'retry'; }
     await store.saveResult(run.id, field, Object.assign(base, { ok: false, at: Date.now(), err: String(e.message || e).slice(0, 200) }));
     return 'failed';
@@ -124,16 +129,21 @@ async function workRun(runId, deadline) {
     const busy = {};
     let queue = [];
     let empty = false;
+    const engineOf = (t) => String(t).split('|')[1];
+    const free = (t) => (busy[engineOf(t)] || 0) < (engines.PARALLEL[engineOf(t)] || 2);
     for (;;) {
       if (out.budget || deadline - Date.now() < 12000) break; // not enough time left to wait for another answer
-      if (!queue.length && !empty) {
-        queue = await store.takeTasks(runId, 12);
-        if (!queue.length) empty = true;
+      const msLeft = deadline - Date.now();
+      // take more when nothing taken can start now (its engine is busy, or it waits for a full window)
+      if (!empty && queue.length < 36 && !queue.some((t) => free(t) && canStartTask(t, msLeft))) {
+        const more = await store.takeTasks(runId, 12);
+        if (!more.length) empty = true; else queue.push(...more);
       }
       // start what each engine's limit of parallel calls allows
       for (let i = 0; i < queue.length; i++) {
-        const engine = String(queue[i]).split('|')[1];
-        if ((busy[engine] || 0) >= (engines.PARALLEL[engine] || 2)) continue;
+        const engine = engineOf(queue[i]);
+        if (!free(queue[i])) continue;
+        if (!canStartTask(queue[i], deadline - Date.now())) continue; // waits for a window long enough to finish
         const task = queue.splice(i, 1)[0];
         i--;
         busy[engine] = (busy[engine] || 0) + 1;
@@ -143,14 +153,14 @@ async function workRun(runId, deadline) {
         running.add(p);
       }
       if (!running.size) {
-        if (empty && !queue.length) break;
-        continue;
+        if (!empty && queue.length < 36) continue; // take more tasks
+        break; // nothing left that can start in this window: the rest goes back to the queue
       }
       await Promise.race(running); // a slot frees up
     }
     await Promise.all(running);
     // tasks taken but not started go back to the queue
-    if (queue.length) for (const t of queue) await store.requeue(runId, t);
+    if (queue.length) await store.requeue(runId, ...queue);
     if (out.ok || out.failed) { run.lastProgressAt = Date.now(); await store.saveRun(run); }
   } finally {
     await store.unlock('run:' + runId);
@@ -272,21 +282,25 @@ async function runAudit(site, user, budgetMs) {
 }
 
 /* ---------- the cron tick ---------- */
+// budgetMs: the usual length of a tick. maxMs: the most it may take (the function may run 60 seconds).
 async function tick(opts) {
   opts = opts || {};
-  const now = opts.now || Date.now();
-  const deadline = now + (opts.budgetMs || 45000);
+  const startedAt = Date.now();
+  const now = opts.now || startedAt;
+  const deadline = startedAt + (opts.budgetMs || 45000);
   if (!(await store.lock('tick', 58))) return { skipped: 'another tick is running' };
   const out = { started: 0, worked: 0, finished: 0, audits: 0 };
   try {
     out.started = await scheduleDue(now, 20);
     let ids = await store.activeRunIds();
-    // oldest runs first, so every run keeps moving
-    const runs = (await Promise.all(ids.map((id) => store.getRun(id)))).filter(Boolean).sort((a, b) => (a.at || 0) - (b.at || 0));
+    // The run that moved least recently goes first and may use the whole window, so in turn every run gets a
+    // window long enough for slow engines (Google AI Mode, Grok), even when scheduling took a few seconds.
+    const runs = (await Promise.all(ids.map((id) => store.getRun(id)))).filter(Boolean)
+      .sort((a, b) => (a.lastProgressAt || a.at || 0) - (b.lastProgressAt || b.at || 0));
+    const workEnd = Math.min(startedAt + (opts.maxMs || 52000), Math.max(deadline, Date.now() + FULL_WINDOW_MS + 1000));
     for (const run of runs) {
-      if (Date.now() > deadline - 15000) break;
-      const share = Math.max(15000, Math.floor((deadline - Date.now()) / Math.max(1, runs.length)));
-      const r = await workRun(run.id, Math.min(deadline, Date.now() + share));
+      if (Date.now() > workEnd - 15000) break;
+      const r = await workRun(run.id, workEnd);
       if (r.budget) { out.budget = true; break; }
       out.worked += (r.ok || 0) + (r.failed || 0);
     }
@@ -306,4 +320,4 @@ async function tick(opts) {
   return out;
 }
 
-module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedKeywords, digestHtml };
+module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };

@@ -607,11 +607,13 @@ function progressHtml(site, progress) {
   return `<div class="notice" id="progress" aria-live="polite"><b>Checking now.</b> <span id="pdone">${done}</span> of <span id="ptotal">${total}</span> AI answers read. Keep this page open to speed it up, or come back later.<div class="progress"><i id="pbar" style="width:${w}%"></i></div></div>`;
 }
 const PUMP = (siteId) => `
-(function(){var id=${JSON.stringify(siteId)};var stop=false;
+(function(){var id=${JSON.stringify(siteId)};var stop=false;var shown=0;
+function show(j){var d=document.getElementById('pdone');if(j&&j.total&&d&&j.done>=shown){shown=j.done;d.textContent=j.done;document.getElementById('ptotal').textContent=j.total;document.getElementById('pbar').style.width=Math.round(j.done/j.total*100)+'%';}}
+function peek(){if(stop)return;fetch('/app/run/progress?id='+encodeURIComponent(id),{headers:{Accept:'application/json'}}).then(function(r){return r.json()}).then(show).catch(function(){}).then(function(){if(!stop)setTimeout(peek,5000);});}
 function step(){if(stop)return;fetch('/app/run/pump',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'id='+encodeURIComponent(id)}).then(function(r){return r.json()}).then(function(j){
-var d=document.getElementById('pdone');if(j.total&&d){d.textContent=j.done;document.getElementById('ptotal').textContent=j.total;document.getElementById('pbar').style.width=Math.round(j.done/j.total*100)+'%';}
+show(j);
 if(j.finished||j.idle){stop=true;location.reload();return;}if(j.budget){stop=true;var p=document.getElementById('progress');if(p)p.insertAdjacentHTML('beforeend','<p class="small" style="margin-top:8px">Checks are paused for a while. They continue on their own; you do not need to keep this page open.</p>');return;}setTimeout(step,j.busy?4000:600);}).catch(function(){setTimeout(step,8000);});}
-step();})();`;
+step();setTimeout(peek,5000);})();`;
 
 function tabsHtml(site, tab) {
   const t = (k, label) => `<a href="${esc(siteHref(site, 'tab=' + k))}"${tab === k ? ' aria-current="page"' : ''}>${label}</a>`;
