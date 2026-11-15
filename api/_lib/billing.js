@@ -40,6 +40,7 @@ async function cancelSubscription(user) { return hasLiveSubscription(user) ? pol
 module.exports = {
   PLANS, ACTIVE, isTester, sign, canCheckout, hasLiveSubscription, trialEligible, trialDays, cancelSubscription,
   mode: () => polar.mode(),
+  offers: () => polar.offers(),
   // opts: { next: 'setup' | 'settings', kw }. The trial is added when the account can still have one.
   checkoutUrl: (user, plan, interval, appUrl, opts) => polar.checkoutUrl(user, plan, interval, appUrl, Object.assign({}, opts, { trialDays: trialEligible(user) ? trialDays() : 0 })),
   syncCheckout: (user, checkoutId, deps) => polar.syncCheckout(user, checkoutId, deps),

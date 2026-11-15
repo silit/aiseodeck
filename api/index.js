@@ -368,14 +368,18 @@ function afterStart(sites, kw) {
 async function handleStart(req, res, user) {
   const q = queryOf(req);
   const plan = PLANS[q.plan] ? q.plan : 'solo';
-  const interval = q.interval === 'yearly' ? 'yearly' : 'monthly';
+  let interval = q.interval === 'yearly' ? 'yearly' : 'monthly';
   const kw = kwLib.clean(q.kw || '');
   const next = afterStart(await store.getSites(user.siteIds || []), kw);
   if (user._limits.plan !== 'free' || billing.hasLiveSubscription(user)) return redirect(res, next);
   if (!(await billing.canCheckout(user))) return redirect(res, withNotice(next, user, 'Paid plans open soon. You are on the free plan for now: 3 keywords, checked on ' + html.freeEnginesText() + '.'));
+  // only what can be bought: the other billing period when this one has no product, or the free plan
+  const offers = await billing.offers();
+  if (!offers.includes(plan + ':' + interval)) interval = interval === 'yearly' ? 'monthly' : 'yearly';
+  if (!offers.includes(plan + ':' + interval)) return redirect(res, withNotice(next, user, `The ${PLANS[plan].name} plan is not open yet. You are on the free plan for now: 3 keywords, checked on ` + html.freeEnginesText() + '.'));
   const notice = user.notice ? html.esc(user.notice) : '';
   if (user.notice) { delete user.notice; await store.saveUser(user); }
-  send(res, 200, html.startPage(user, { plan, interval, kw, next, notice, trialDays: billing.trialEligible(user) ? billing.trialDays() : 0 }));
+  send(res, 200, html.startPage(user, { plan, interval, kw, next, notice, offers, trialDays: billing.trialEligible(user) ? billing.trialDays() : 0 }));
 }
 
 async function handleSetupPage(req, res, user) {
@@ -1214,8 +1218,9 @@ async function handleSettingsPage(req, res, user) {
   const q = queryOf(req);
   const sites = await store.getSites(user.siteIds || []);
   const notice = q.upgraded ? 'Thanks! Your plan updates as soon as the payment is confirmed, usually within a minute.' : (q.saved ? 'Saved.' : html.esc(noticeFrom(q, user)));
+  const canBuy = await billing.canCheckout(user);
   send(res, 200, html.settingsPage(user, sites, user._limits, notice, {
-    billing: await billing.canCheckout(user), providerName: 'Polar', usage: store.usageOf(user),
+    billing: canBuy, offers: canBuy ? await billing.offers() : [], providerName: 'Polar', usage: store.usageOf(user),
     live: billing.hasLiveSubscription(user), trialDays: billing.trialEligible(user) ? billing.trialDays() : 0
   }));
 }
@@ -1237,7 +1242,7 @@ async function handleCheckout(req, res, user) {
   if (billing.hasLiveSubscription(user)) return redirect(res, '/app/billing/portal');
   const opts = b.from === 'start' ? { next: 'setup', kw: kwLib.clean(b.kw || '') } : { next: 'settings' };
   try { redirect(res, await billing.checkoutUrl(user, String(b.plan || ''), String(b.interval || ''), ENV().appUrl, opts)); }
-  catch (e) { console.error('[billing]', e.message); send(res, 502, html.errorPage('Could not open checkout', e.message, '/app/settings')); }
+  catch (e) { console.error('[billing] checkout', e.message); send(res, 502, html.errorPage('Could not open checkout', 'The payment page could not be opened right now. Try again in a minute, or write to info@silitlabs.com.', '/app/settings')); }
 }
 
 // Polar's success page sends the customer here with the checkout id. The plan is switched on from the checkout

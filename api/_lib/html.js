@@ -1351,14 +1351,16 @@ function startPage(user, d) {
   const kwq = d.kw ? '&amp;kw=' + encodeURIComponent(d.kw) : '';
   const href = (plan, interval) => `/app/start?plan=${plan}&amp;interval=${interval}${kwq}`;
   const pick = Object.entries(PLANS).map(([k, x]) => (k === d.plan ? `<span aria-current="true">${esc(x.name)}</span>` : `<a href="${href(k, d.interval)}">${esc(x.name)}</a>`)).join('');
-  const other = yearly ? `<a class="small" href="${href(d.plan, 'monthly')}">Pay monthly instead, $${num(p.monthly)} a month</a>` : `<a class="small" href="${href(d.plan, 'yearly')}">Pay yearly and get 2 months free, $${num(p.yearly)} a year</a>`;
+  // the other billing period, when it can be bought
+  const canOther = !d.offers || d.offers.includes(d.plan + ':' + (yearly ? 'monthly' : 'yearly'));
+  const other = !canOther ? '' : yearly ? `<a class="small" href="${href(d.plan, 'monthly')}">Pay monthly instead, $${num(p.monthly)} a month</a>` : `<a class="small" href="${href(d.plan, 'yearly')}">Pay yearly and get 2 months free, $${num(p.yearly)} a year</a>`;
   return layout((t ? 'Start your free trial' : 'Start ' + p.name) + ' · AI SEO Deck', `${noticeHtml(d.notice)}
 <div class="panel stack startbox">
 <div class="planpick" role="group" aria-label="Plan">${pick}</div>
 <h1>${t ? `Try ${esc(p.name)} free for ${t} days` : `Start ${esc(p.name)}`}</h1>
 <p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all ${allEnginesCount()} AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
 <dl class="bill"><div class="now"><dt>Today</dt><dd>$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>$${num(price)}<small> ${per}</small></dd></div></dl>
-<p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from your Account page and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from Settings.'}</p>
+<p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from your Account page and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from your Account page.'}</p>
 <form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${esc(d.plan)}"><input type="hidden" name="interval" value="${esc(d.interval)}"><input type="hidden" name="from" value="start"><input type="hidden" name="kw" value="${esc(d.kw || '')}"><button class="btn mark" type="submit">${t ? 'Start free trial' : 'Continue to payment'}</button>${other}</form>
 <p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ${freeEnginesText()}.</span></p>
 </div>`, { user, nav: 'settings' });
@@ -1384,8 +1386,17 @@ function settingsPage(user, sites, limits, notice, opts) {
       // with a subscription running, a plan change goes through Polar's portal so there is never a second subscription
       if (opts.live) btn = '<a class="btn sm" href="/app/billing/portal" style="margin-top:auto">Switch in billing</a>';
       else if (opts.billing) {
-        btn = `<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${k}"><button class="btn ${k === 'solo' ? 'mark' : ''} sm" name="interval" value="monthly" type="submit">${t ? `Try free for ${t} days` : 'Monthly'}</button><button class="btn sm" name="interval" value="yearly" type="submit">Yearly, 2 months free</button></form>`
-          + (t ? `<span class="tnote">$0 today, then $${num(p.monthly)} a month or $${num(p.yearly)} a year. Cancel in the first ${t} days and pay nothing.</span>` : '');
+        // a button only for a plan and billing period that has a product at Polar
+        const offers = opts.offers || [];
+        const hasM = offers.includes(k + ':monthly');
+        const hasY = offers.includes(k + ':yearly');
+        if (hasM || hasY) {
+          btn = `<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${k}">`
+            + (hasM ? `<button class="btn ${k === 'solo' ? 'mark' : ''} sm" name="interval" value="monthly" type="submit">${t ? `Try free for ${t} days` : 'Monthly'}</button>` : '')
+            + (hasY ? `<button class="btn ${!hasM && k === 'solo' ? 'mark' : ''} sm" name="interval" value="yearly" type="submit">${!hasM && t ? `Try free for ${t} days, yearly` : 'Yearly, 2 months free'}</button>` : '')
+            + '</form>'
+            + (t ? `<span class="tnote">$0 today, then ${[hasM ? `$${num(p.monthly)} a month` : '', hasY ? `$${num(p.yearly)} a year` : ''].filter(Boolean).join(' or ')}. Cancel in the first ${t} days and pay nothing.</span>` : '');
+        }
       }
     }
     return `<div class="plan${current ? ' current' : ''}"><b>${esc(p.name)}${current ? ' <span class="pill good">Your plan</span>' : ''}</b><span class="price">${price}<span class="small muted" style="font-weight:500">${k === 'free' ? '' : ' a month'}</span></span>

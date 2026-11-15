@@ -97,6 +97,12 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
     }
   }
 
+  // The plan:interval pairs that have a product (solo:monthly, solo:yearly, ...), so no button leads to a missing one.
+  async function offers() {
+    try { return Object.keys(await products()).filter((k) => !k.startsWith('_')); }
+    catch (e) { console.error('[billing] polar products', e.message); return []; }
+  }
+
   // opts: { trialDays (0 for none), next: 'setup' after the start page or 'settings', kw: a keyword to carry to setup }
   async function checkoutUrl(user, plan, interval, appUrl, opts) {
     opts = opts || {};
@@ -277,6 +283,6 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
     return cfg().portal;
   }
 
-  return { name: 'Polar', enabled, mode, planFromProduct, checkoutUrl, syncCheckout, verify, apply, handleWebhook, cancelSubscription, portalUrl, _reset: () => { productCache = null; } };
+  return { name: 'Polar', enabled, mode, offers, planFromProduct, checkoutUrl, syncCheckout, verify, apply, handleWebhook, cancelSubscription, portalUrl, _reset: () => { productCache = null; } };
 };
 module.exports.normStatus = normStatus;

@@ -614,6 +614,18 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('name="plan" value="solo"') && r.body.includes('10 keywords') && r.body.includes('$19'), 'settings show upgrade buttons and keyword plans');
   assert(r.body.includes('Try free for 7 days') && r.body.includes('$0 today, then $19 a month'), 'settings offer the 7 day trial on paid plans');
+  {
+    const card = (name) => r.body.split('<div class="plan').find((c) => c.includes('<b>' + name));
+    const studio = card('Studio'), agency = card('Agency');
+    assert(studio && studio.includes('value="monthly"') && !studio.includes('value="yearly"') && studio.includes('$0 today, then $49 a month. Cancel') && agency && !agency.includes('/app/billing/checkout'),
+      'settings show a button only for a plan and billing period that has a Polar product');
+  }
+  r = await request(port, 'GET', '/app/start?plan=studio&interval=yearly', { headers: { cookie } });
+  assert(r.status === 200 && r.body.includes('name="interval" value="monthly"') && !r.body.includes('Pay yearly'), 'start page falls back to the billing period that can be bought');
+  r = await request(port, 'GET', '/app/start?plan=agency&interval=monthly', { headers: { cookie } });
+  assert(r.status === 302 && decodeURIComponent(r.headers.location).includes('The Agency plan is not open yet'), 'a plan with no product sends the customer on with the free plan');
+  r = await post('/app/billing/checkout', cookie, 'plan=agency&interval=monthly');
+  assert(r.status === 502 && r.body.includes('could not be opened right now') && !r.body.includes('Flowdeck') && !r.body.includes('Polar returned'), 'a failed checkout shows plain words, never the product list');
   r = await post('/app/billing/checkout', cookie, 'plan=solo&interval=yearly');
   assert(r.headers.location === 'https://polar.test/checkout/1' && polarState.checkouts[0].products[0] === 'p_solo_y' && polarState.checkouts[0].metadata.app === 'aiseodeck', 'checkout uses the AI SEO Deck yearly product, never the Flowdeck one');
   assert(polarState.checkouts[0].trial_interval === 'day' && polarState.checkouts[0].trial_interval_count === 7 && polarState.checkouts[0].success_url === 'https://app.test/app/billing/return?next=settings&checkout_id={CHECKOUT_ID}', 'checkout carries a 7 day trial and returns with the checkout id');
