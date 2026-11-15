@@ -87,7 +87,7 @@ async function labs(path, task, timeoutMs) {
   } catch (e) { throw new Error(e.name === 'TimeoutError' ? 'Keyword data timed out' : 'Keyword data could not be reached'); }
   const d = await res.json().catch(() => ({}));
   const t = (d.tasks && d.tasks[0]) || {};
-  if (!res.ok || t.status_code !== 20000) throw new Error('Keyword data: ' + String(t.status_message || d.status_message || res.status).slice(0, 140));
+  if (!res.ok || t.status_code !== 20000) throw Object.assign(new Error('Keyword data: ' + String(t.status_message || d.status_message || res.status).slice(0, 140)), { status: t.status_code || d.status_code || res.status });
   return (t.result && t.result[0]) || {};
 }
 const vol = (info) => (info && typeof info.search_volume === 'number' ? info.search_volume : null);

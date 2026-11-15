@@ -17,6 +17,7 @@ const fetcher = require('./_lib/fetcher');
 const billing = require('./_lib/billing');
 const email = require('./_lib/email');
 const kwLib = require('./_lib/keywords');
+const alerts = require('./_lib/alerts');
 const analyze = require('./_lib/analyze');
 const insights = require('./_lib/insights');
 const { limitsFor, QUESTIONS, PLANS } = require('./_lib/plans');
@@ -265,7 +266,7 @@ async function prepareKeywords(siteId, user, ids) {
   let vols = {};
   const needVol = kws.filter((k) => k.volume == null).map((k) => k.text);
   if (needVol.length && kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400))) {
-    try { vols = await kwLib.volumes(needVol, site.project.country, site.project.language); } catch (e) { console.error('[aiseodeck] volumes', e.message); }
+    try { vols = await kwLib.volumes(needVol, site.project.country, site.project.language); } catch (e) { console.error('[aiseodeck] volumes', e.message); await alerts.report('dataforseo', e, 'monthly searches'); }
   }
   await store.updateSite(siteId, (s) => {
     for (const k of s.keywords || []) {
@@ -392,7 +393,7 @@ async function discoverFor(site, user) {
   if (labs) {
     const dom = (p.domains || [])[0] || hostOfUrl(site.url);
     try { out.cited = (await kwLib.inAiOverviews(dom, p.country, p.language, 40)).map((x) => ({ keyword: x.keyword, volume: x.volume })); }
-    catch (e) { out.error = 'Keyword data is not available right now (' + e.message + ').'; }
+    catch (e) { await alerts.report('dataforseo', e, 'keywords cited in AI Overviews'); out.error = alerts.KEYWORD_DATA_TEXT; }
   }
   if (llm.available() && (await store.rateOk('suggest:' + user.id, 20, 3600))) {
     const r = site.url ? await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 8000 }) : { ok: false };
@@ -400,7 +401,7 @@ async function discoverFor(site, user) {
     try {
       const ideas = await fixes.suggestKeywords(p, home, 12);
       let vols = {};
-      if (labs && ideas.length) { try { vols = await kwLib.volumes(ideas, p.country, p.language); } catch (e) { vols = {}; } }
+      if (labs && ideas.length) { try { vols = await kwLib.volumes(ideas, p.country, p.language); } catch (e) { await alerts.report('dataforseo', e, 'monthly searches'); vols = {}; } }
       out.ideas = ideas.filter((k) => !out.cited.some((c) => c.keyword === k)).map((k) => ({ keyword: k, volume: vols[k] ? vols[k].volume : null }));
     } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
   }
@@ -669,7 +670,7 @@ async function handleKeywordPlan(req, res, user) {
       const [meta, faq] = await Promise.all([fixes.suggestMeta(site.project, page, k.text), fixes.suggestFaq(site.project, page, qs).catch(() => [])]);
       draft.meta = meta; draft.faq = faq; draft.path = target.path;
     }
-  } catch (e) { return back('No suggestion this time: ' + e.message); }
+  } catch (e) { return back('No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT)); }
   await store.saveDraft(site.id, 'kwfix:' + k.id, draft);
   redirect(res, kwUrl(site, k, noticeQuery(user, 'Fixes ready. Review them, change what you like, then apply.')));
 }
@@ -779,7 +780,7 @@ async function handleKeywordRelated(req, res, user) {
   if (!(await store.rateOk('labs:' + user.id, 80, 86400))) return redirect(res, kwUrl(site, k, noticeQuery(user, 'That is a lot of keyword lookups for one day. Try again tomorrow.')));
   let items = [];
   try { items = await kwLib.related(k.text, site.project.country, site.project.language, 15); }
-  catch (e) { return redirect(res, kwUrl(site, k, noticeQuery(user, e.message))); }
+  catch (e) { await alerts.report('dataforseo', e, 'related searches'); return redirect(res, kwUrl(site, k, noticeQuery(user, alerts.KEYWORD_DATA_TEXT))); }
   await store.saveDraft(site.id, 'rel:' + k.id, { list: items, at: Date.now() });
   redirect(res, kwUrl(site, k));
 }
@@ -903,7 +904,7 @@ async function handleFixSuggest(req, res, user) {
       draft.meta = await fixes.suggestMeta(site.project, page);
     }
   } catch (e) {
-    return redirect(res, back + '&' + noticeQuery(user, 'No suggestion this time: ' + e.message));
+    return redirect(res, back + '&' + noticeQuery(user, 'No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT)));
   }
   await store.saveDraft(site.id, key, draft);
   redirect(res, back + '&' + noticeQuery(user, 'Suggestion ready. Review it, change what you like, then apply.'));
@@ -1244,7 +1245,7 @@ module.exports = async function handler(req, res) {
     return send(res, 404, html.errorPage('Not found', 'There is nothing at this address.', '/'));
   } catch (e) {
     console.error('[aiseodeck]', e && e.stack);
-    return send(res, 500, html.errorPage('Something went wrong', (e && e.message) || 'Unexpected error.', '/'));
+    return send(res, 500, html.errorPage('Something went wrong', 'Something went wrong on our side. Please try again in a minute.', '/'));
   }
 };
 module.exports._test = { parseFaq, parseRivals, canRun, canCheckKeyword, targetFor };

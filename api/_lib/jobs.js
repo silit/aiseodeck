@@ -3,6 +3,7 @@
 // start runs that are due, ask the engines, finish runs (summary, history, email), refresh old audits.
 const store = require('./store');
 const engines = require('./engines');
+const alerts = require('./alerts');
 const analyze = require('./analyze');
 const auditLib = require('./audit');
 const wf = require('./webflow');
@@ -111,8 +112,10 @@ async function doTask(run, task, deadline) {
   } catch (e) {
     // a timeout caused by our own short time window is not the engine's fault: try again without counting it
     if (e.message === 'timed out' && timeoutMs < 40000) { await store.requeue(run.id, windowRetry(uid, engine, attempt)); return 'retry'; }
-    if (e.retry && attempt + 1 < MAX_ATTEMPTS) { await store.requeue(run.id, uid + '|' + engine + '|' + (attempt + 1)); return 'retry'; }
-    await store.saveResult(run.id, field, Object.assign(base, { ok: false, at: Date.now(), err: String(e.message || e).slice(0, 200) }));
+    // a refused account (credit ran out, key stopped working) tells the owner and is not tried again in this check
+    const kind = await alerts.report(alerts.ENGINE_SERVICE[engine] || engine, e, 'answers from ' + (engines.LABEL[engine] || engine));
+    if (e.retry && kind !== 'account' && attempt + 1 < MAX_ATTEMPTS) { await store.requeue(run.id, uid + '|' + engine + '|' + (attempt + 1)); return 'retry'; }
+    await store.saveResult(run.id, field, Object.assign(base, { ok: false, at: Date.now(), kind, err: String(e.message || e).slice(0, 200) }));
     return 'failed';
   }
 }

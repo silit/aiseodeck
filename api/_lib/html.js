@@ -6,6 +6,7 @@ const { PLANS, FREE, QUESTIONS } = require('./plans');
 const { LABEL, LONG, ORDER, enabled: enginesOn, freeEngines } = require('./engines');
 const { PAGE_RULES, BOTS } = require('./audit');
 const { engineCounts, verdict } = require('./analyze');
+const alerts = require('./alerts');
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pct = (x) => Math.round((x || 0) * 100) + '%';
@@ -680,7 +681,7 @@ function discoverTab(site, d) {
   return `<div class="cols" style="align-items:start">
 <section class="panel stack"><div class="actions" style="justify-content:space-between"><h2>Cited in Google AI Overviews</h2>${refresh}</div>
 <p class="small muted">Keywords where Google's AI Overviews already use your site as a source${disc.at ? `, found ${ago(disc.at)}` : ''}. Track them to see what the other AI engines say.</p>
-${cited.length ? relatedList(site, cited, tracked, 'discover', 'aio') : `<p class="small muted">${disc.at ? (disc.error ? esc(disc.error) : 'None found yet. Google cites sites that answer a search clearly on one page; the fixes on each keyword help.') : 'Press Find keywords to look it up.'}</p>`}</section>
+${cited.length ? relatedList(site, cited, tracked, 'discover', 'aio') : `<p class="small muted">${disc.at ? (disc.error ? esc(alerts.KEYWORD_DATA_TEXT) : 'None found yet. Google cites sites that answer a search clearly on one page; the fixes on each keyword help.') : 'Press Find keywords to look it up.'}</p>`}</section>
 <section class="panel stack"><h2>Keyword ideas for your site</h2><p class="small muted">Searches people make when they look for what you sell, written from your homepage, with monthly searches when we have them.</p>
 ${ideas.length ? relatedList(site, ideas, tracked, 'discover', 'idea') : `<p class="small muted">${disc.at ? 'No ideas came back this time.' : 'Press Find keywords to write ideas from your homepage.'}</p>`}</section>
 <section class="panel stack"><h2>What the AI searched for</h2><p class="small muted">The web searches the AI engines ran while answering for your keywords. These are the keywords that decide which pages get read.</p>
@@ -832,7 +833,7 @@ function answerBlock(r, unitText, isKeyword, project) {
     const isOwn = own.some((dm) => x.host === dm || String(x.host || '').endsWith('.' + dm));
     return x.url && /^https?:\/\//.test(x.url) && !/vertexaisearch|grounding-api/.test(x.url) ? `<a class="chip${isOwn ? ' own' : ''}" href="${esc(x.url)}" rel="noopener nofollow" target="_blank" title="${esc(x.title || x.url)}">${esc(x.host)}</a>` : `<span class="chip${isOwn ? ' own' : ''}">${esc(x.host)}</span>`;
   }).join('');
-  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(r.snippet || '', project)}</p>` : `<p class="small muted">${esc(r.err || 'The engine did not answer.')}</p>`;
+  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(r.snippet || '', project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
   const searched = r && r.ok && (r.queries || []).length ? `<div class="chips"><span class="tiny faint">Searched</span>${r.queries.map((q) => `<span class="q">${esc(q)}</span>`).join('')}</div>` : '';
   const full = r && r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary>Full answer</summary><p class="quote" style="white-space:pre-line">${highlight(r.text, project)}</p></details>` : '';
   return `<div class="answer"><p class="ask">${isKeyword ? 'Search' : 'Asked'} <b>${esc(unitText)}</b></p><div class="actions" style="gap:6px">${tag}</div>${body}${searched}${chips ? `<div class="chips" aria-label="Sources">${chips}</div>` : ''}${full}</div>`;

@@ -457,6 +457,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   const res2 = Object.fromEntries([...db.get('res:' + run2.id)].map(([k, v]) => [k, JSON.parse(v)]));
   const gem = Object.values(res2).filter((x) => x.e === 'gemini');
   assert(gem.filter((x) => !x.ok && /API key/.test(x.err)).length === 3 && gem.some((x) => x.ok && x.cited), 'Gemini: a 400 is recorded as failed, grounding domains count as citations');
+  assert(gem.filter((x) => !x.ok).every((x) => x.kind === 'account') && emails.filter((e) => /Google Gemini needs attention/.test(e.subject)).length === 1, 'a refused key is an account problem: the owner gets one email, not one per answer');
   assert(Object.values(res2).filter((x) => x.e === 'perplexity').every((x) => x.ok), 'Perplexity answers all read');
   assert(site.latest.failed === 3 && site.latest.none === 1 && site.latest.ok === 32, 'summary counts the failed answers and the missing AI Overview');
   const cl = Object.values(res2).filter((x) => x.e === 'claude' && x.ok && x.cited);
@@ -491,6 +492,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(!audit.pages.some((p) => p.path === '/404'), 'utility pages skipped');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
   assert(r.body.includes('Best page: <a href="http://' + host + '/about"') && r.body.includes('Write the fixes'), 'the keyword is matched to its best page');
+  assert(!r.body.includes('API key not valid') && r.body.includes('This engine could not answer right now. It is asked again at the next check.'), 'customers see plain words for a failed answer, never the provider message');
   r = await post('/app/keyword/plan', cookie, { id: 'siteA', k: kVen.id });
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
   assert(r.body.includes('Veneers and smile design in Antalya | Lumen Dental') && r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('Apply to Webflow') && r.body.includes('value="colFaq"'), 'the fixes are written from the page, with the keyword, ready to apply');
@@ -647,6 +649,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     let slowMode = 'window'; // 'window': grok needs the full 40 seconds; 'never': grok always times out
     enginesLib.ask = async (engine, text, o) => {
       asked.push({ engine, timeoutMs: o.timeoutMs });
+      if (engine === 'grok' && slowMode === 'refused') throw new enginesLib.EngineError('Your team has either used all available credits or reached its monthly spending limit.', 403, false);
       if (engine === 'grok' && (slowMode === 'never' || o.timeoutMs < 40000)) throw new enginesLib.EngineError('timed out', 0, true);
       return { text: 'Lumen Dental is a good choice for veneers.', sources: [], consulted: [], queries: [], ms: 5, model: 'stub' };
     };
@@ -673,6 +676,17 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
       assert(res['k1.0|grok'] && res['k1.0|grok'].ok === false && res['k1.0|grok'].err === 'timed out' && !queueOf(stuck.id).length, 'an engine that times out with the full 40 seconds fails after three tries instead of looping');
       await store.endRun(stuck.id);
 
+      slowMode = 'refused';
+      db.delete('alert:xai');
+      const mailsBefore = emails.length;
+      const refused = await store.createRun(fakeSite, { id: 'user_slow' }, ['grok'], 'manual', null, true);
+      const grokCalls = asked.filter((a) => a.engine === 'grok').length;
+      await jobs.workRun(refused.id, Date.now() + 50000);
+      res = await store.results(refused.id);
+      assert(res['k1.0|grok'] && res['k1.0|grok'].ok === false && res['k1.0|grok'].kind === 'account' && asked.filter((a) => a.engine === 'grok').length === grokCalls + 1, 'an engine that refuses our account is not asked again in the same check');
+      assert(emails.length === mailsBefore + 1 && /xAI \(Grok\) needs attention/.test(emails[emails.length - 1].subject), 'and the owner is told');
+      await store.endRun(refused.id);
+
       // the last answers in flight with an open page are never cut off by the background job finishing the run
       slowMode = 'window';
       const race = await store.createRun(fakeSite, { id: 'user_slow' }, ['grok'], 'manual', null, true);
@@ -692,6 +706,38 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     } finally {
       enginesLib.ask = realAsk;
     }
+  }
+
+  console.log('plain errors for customers, alerts for the owner');
+  {
+    const alerts = require('../api/_lib/alerts');
+    const k = (message, status) => alerts.kindOf({ message, status });
+    assert(k('You exceeded your current quota, please check your plan and billing details.', 429) === 'account' && k('Rate limit reached for gpt-6 in organization org-1 on requests per min. Please try again in 1s.', 429) === 'busy', 'OpenAI: an empty balance needs the owner, a rate limit passes');
+    assert(k('Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.', 400) === 'account' && k('Overloaded', 529) === 'busy', 'Anthropic: low credit balance, overload');
+    assert(k('Your team has either used all available credits or reached its monthly spending limit.', 403) === 'account' && k('Incorrect API key provided: sk-x', 401) === 'account', 'xAI credits, a wrong key');
+    assert(k('Google results: You are not authorized to access this resource.', 40100) === 'account' && k('Keyword data: Payment Required.', 40200) === 'account' && k('Google results: Internal Server Error.', 50000) === 'busy' && k('Google results: Invalid Field.', 40501) === 'other', 'DataForSEO codes');
+    assert(k('timed out', 0) === 'timeout' && k('Resource has been exhausted (e.g. check quota).', 429) === 'busy', 'timeouts and Gemini rate limits');
+    assert(alerts.engineText({ ok: false, err: 'Google results: You are not authorized to access this resource. See your login details here: https://app.dataforseo.com/api-access' }) === alerts.ENGINE_TEXT.account, 'older saved failures also show plain words');
+    assert(alerts.publicText(Object.assign(new Error('The AI reply could not be read. Try again.'), { public: true }), 'x') === 'The AI reply could not be read. Try again.' && alerts.publicText(new Error('AI provider: You exceeded your current quota'), alerts.WRITING_TEXT) === alerts.WRITING_TEXT, 'only our own messages reach customers as they are');
+    db.delete('alert:dataforseo');
+    const before = emails.length;
+    let kind = await alerts.report('dataforseo', { message: 'Keyword data: Payment Required.', status: 40200 }, 'monthly searches');
+    const mail = emails[emails.length - 1];
+    assert(kind === 'account' && emails.length === before + 1 && mail.to[0] === 'info@silitlabs.com' && mail.subject === 'AI SEO Deck: DataForSEO needs attention' && mail.text.includes('https://app.dataforseo.com') && mail.text.includes('monthly searches'), 'the owner gets an email that says what failed and where to fix it');
+    await alerts.report('dataforseo', { message: 'Keyword data: Payment Required.', status: 40200 }, 'monthly searches');
+    kind = await alerts.report('openai', { message: 'Rate limit reached', status: 429 }, 'writing');
+    assert(emails.length === before + 1 && kind === 'busy', 'at most one email per service every 6 hours, none for a rate limit');
+
+    // writing falls back to the next provider when one refuses our account
+    const llmLib = require('../api/_lib/llm');
+    const realFetch = global.fetch;
+    db.delete('alert:openai');
+    global.fetch = (url, o) => (/\/v1\/responses$/.test(String(url)) && !JSON.parse(o.body).tools
+      ? Promise.resolve(new Response(JSON.stringify({ error: { message: 'You exceeded your current quota, please check your plan and billing details.', type: 'insufficient_quota' } }), { status: 429, headers: { 'Content-Type': 'application/json' } }))
+      : realFetch(url, o));
+    let text = '';
+    try { text = await llmLib.generate({ system: 'Write a short line.', prompt: 'Lumen Dental veneers', maxTokens: 50 }); } finally { global.fetch = realFetch; }
+    assert(text && /Lumen Dental|clinic|Prices/i.test(text) && emails.some((e) => e.subject === 'AI SEO Deck: OpenAI needs attention'), 'with no OpenAI credit the fixes are written by the next provider and the owner is told');
   }
 
   console.log('cost guard');

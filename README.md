@@ -62,3 +62,7 @@ Not: Vercel Hobby ticari kullanıma kapalı; ücretli plan satmaya başlamadan �
 ## Environment variables
 
 See `.env.example`.
+
+## When a paid service fails
+
+Customers never see a provider's own error message. A failed answer reads "This engine could not answer right now" (or busy, or too slow), keyword data reads "not available right now", and writing falls back from OpenAI to Gemini to Anthropic. When a service refuses our account (the credit ran out or a key stopped working), `ALERT_EMAIL` (default info@silitlabs.com) gets an email naming the service and where to top it up, at most once every 6 hours per service.
