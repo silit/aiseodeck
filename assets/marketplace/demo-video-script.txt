@@ -22,7 +22,7 @@ SÖYLE: "Installing starts on Webflow's own authorization screen. The app asks t
 
 SAHNE 3 (0:45) Kurulum: ONAY
 EKRAN: Install URL'yi tekrar aç, AI SEO Deck Demo sitesini seç, onayla. AI SEO Deck açılır (All sites). Sessa kartına tıkla.
-SÖYLE: "Now let's approve it for the demo site. Webflow sends us back to AI SEO Deck. The access token is stored encrypted on our server and never reaches the browser. This site is already set up with its brand, rivals and three keywords. Setup takes a minute and suggests keywords for you."
+SÖYLE: "Now let's approve it for the demo site. Webflow sends us back to AI SEO Deck. The access token is stored encrypted on our server and never reaches the browser. This site is already set up with its brand, rivals and keywords. Setup takes a minute and suggests keywords for you."
 
 SAHNE 4 (1:10) Overview
 EKRAN: Overview sekmesi. Önce yüzdeyi, sonra motor çubuklarını, sonra sağdaki "Do these next" listesini göster.

@@ -14,4 +14,4 @@ Scopes: authorized_user:read (account and report email), sites:read (site names 
 
 Data: Webflow tokens are encrypted at rest (AES-256-GCM), never reach the browser, and are deleted and revoked on Disconnect and on account deletion, and dropped when Webflow answers 401. Writes go to the primary locale only. The audit fetches only the connected site's own domains.
 
-Published testing site: https://aiseodeck-demo.webflow.io is connected to the app and checked with three keywords.
+Published testing site: https://aiseodeck-demo.webflow.io is connected to the app and checked with its keywords.
