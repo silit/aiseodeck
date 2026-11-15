@@ -1,0 +1,73 @@
+DEMO VİDEOSU: SESSİZ ÇEKİM, SAHNE SAHNE
+
+Konuşmak yok. İngilizce altyazıları Claude ekleyecek. Toplam 3-4 dakika.
+Her ekranda 3-4 saniye bekle ve tıklamadan önce fareyi bir an düğmenin üzerinde tut, altyazılar bu duraklamalara yerleşecek.
+Bir sahnede takılırsan durma, devam et. Gereksiz kısımlar kesilecek.
+
+
+HAZIRLIK (kayıttan önce)
+
+1. Chrome'da ilk sekmede aç: https://aiseodeck.silitlabs.com
+2. Yeni sekmede https://webflow.com/dashboard adresini aç, AI SEO Deck Demo sitesini Designer'da aç.
+   - Üst ortadaki sayfa seçiciden (Home yazıyor) About sayfasına geç.
+   - Açık bir uygulama paneli varsa kapat.
+3. 1-listing.txt'deki INSTALL URL linkini kopyala (Client ID yerleştirilmiş hali). Kayıt boyunca panoda kalsın.
+4. İlk sekmeye (ana sayfa) dön. Bildirimleri kapat. E-posta, Vercel ve Webflow uygulama ayarları açık olmasın.
+
+
+KAYIT
+
+Başlat: Chrome penceresine bir kez tıkla, Win + Alt + R.
+(Çalışmazsa: Ekran Alıntısı Aracı > kamera simgesi > Chrome'un olduğu alanı seç > Başlat.)
+
+SAHNE 1: Ana sayfa (15 sn)
+- 4 sn bekle. Sayfayı yavaşça biraz aşağı kaydır, 4 sn bekle, yukarı dön.
+
+SAHNE 2: Kurulum, reddet (20 sn)
+- Ctrl+T ile yeni sekme, Ctrl+V ile Install URL, Enter.
+- Webflow'un izin ekranında 4 sn bekle, fareyi soldaki izin listesinin üzerinde gezdir.
+- Sağ alttaki Cancel.
+- "Authorization cancelled" sayfasında 4 sn bekle.
+
+SAHNE 3: Kurulum, onayla (25 sn)
+- Ctrl+L, Ctrl+V, Enter. İzin ekranı yeniden açılır.
+- Sağdaki listede YALNIZCA AI SEO Deck Demo'yu işaretle. Silit Labs, Sessa, Flowdeck Demo ve Curavia işaretsiz kalsın.
+- Sağ alttaki Authorize App.
+- AI SEO Deck açılınca 3 sn bekle. Site listesi gelirse Sessa kartına tıkla.
+
+SAHNE 4: Overview (15 sn)
+- 4 sn bekle. Fareyi soldaki yüzdenin, sonra sağdaki "Do these next" listesinin üzerinde 3'er sn tut.
+
+SAHNE 5: Keywords (15 sn)
+- Soldaki menüden Keywords. 4 sn bekle.
+- Fareyi tablodaki işaretlerin üzerinde gezdir.
+- Sağ üstteki "Check all keywords now" düğmesinin üzerinde 2 sn dur. BASMA.
+
+SAHNE 6: What AI said (20 sn)
+- Tablodaki ilk anahtar kelimenin adına tıkla, 3 sn bekle.
+- What AI said sekmesi, 3 sn bekle.
+- Yavaşça aşağı kaydırıp bir cevabı göster, 3 sn bekle.
+
+SAHNE 7: Fix plan ve Apply to Webflow (30 sn)
+- Fix plan sekmesi, 3 sn bekle.
+- Önerilen başlık ve açıklama görünmüyorsa önce Write the fixes'e bas ve yazılmasını bekle.
+- Yavaşça aşağı kaydır: Now ve Suggested kutularında 3 sn, FAQ cevaplarında 3 sn dur.
+- En alttaki Apply to Webflow. Çıkan mesajda 4 sn bekle.
+
+SAHNE 8: Designer paneli (40 sn)
+- Designer sekmesine geç (About sayfası açık).
+- Sol araç çubuğunda Apps > AI SEO Deck > Launch App. Panel açılınca 4 sn bekle.
+- Başlık ve açıklama satırındaki Fix, Write ya da Edit (hangisi varsa).
+- Write with AI, metin gelene kadar bekle, sonra Apply to this page. 3 sn bekle.
+- Listede "Questions without FAQ schema" varsa: geri ok > Add > Write answers with AI > Add FAQ schema. 3 sn bekle.
+
+SAHNE 9: Yayınla (15 sn)
+- Designer'da sağ üstteki Publish.
+- Yalnızca aiseodeck-demo.webflow.io işaretli olsun, yayınla.
+- Bitene kadar bekle.
+
+SAHNE 10: Hesap (15 sn)
+- AI SEO Deck sekmesine dön, soldaki menünün altındaki Account.
+- 4 sn bekle. Fareyi plan bilgisinin, Disconnect'in ve Delete account'un üzerinde tut. BUNLARA BASMA.
+
+Bitir: Win + Alt + R. Video, Videolar > Yakalamalar klasörüne kaydolur.

@@ -1,0 +1,76 @@
+{
+  "scenes": [
+    {
+      "name": "home",
+      "lines": [
+        "AI SEO Deck shows whether AI engines like ChatGPT, Google AI Overviews, Gemini, Claude and Grok recommend your brand.",
+        "Then it fixes your Webflow site where they don't."
+      ]
+    },
+    {
+      "name": "deny",
+      "lines": [
+        "Installing starts on Webflow's own authorization screen.",
+        "The app asks to read the user, sites, pages and CMS, and to write pages and CMS items. It writes only when you press Apply.",
+        "First, we deny access. AI SEO Deck shows that the authorization was cancelled, and it stores nothing."
+      ]
+    },
+    {
+      "name": "approve",
+      "lines": [
+        "Now we approve it, for the demo site only.",
+        "Webflow sends us back to AI SEO Deck. The access token is stored encrypted on our server and never reaches the browser."
+      ]
+    },
+    {
+      "name": "overview",
+      "lines": [
+        "The overview shows the AI visibility score: the share of AI answers that name the brand.",
+        "Next to it are the keywords to fix first, ranked by searches and by how rarely AI names you."
+      ]
+    },
+    {
+      "name": "keywords",
+      "lines": [
+        "Every keyword is asked as two real customer questions on ChatGPT, Gemini, Claude and Grok. Google AI Overviews and AI Mode get the search itself.",
+        "A yellow mark means the engine names you. A blue ring means it also links to your site."
+      ]
+    },
+    {
+      "name": "answers",
+      "lines": [
+        "For each keyword you see exactly what every engine said, which rivals it named, the searches it ran and the sites it cited."
+      ]
+    },
+    {
+      "name": "fixplan",
+      "lines": [
+        "The fix plan shows the current title and description, read live from Webflow, next to new ones written from the page.",
+        "It also writes answers to the questions behind the keyword, added to the page as FAQ schema.",
+        "Apply to Webflow writes them through the Webflow Data API on the primary locale, as unpublished changes."
+      ]
+    },
+    {
+      "name": "designer",
+      "lines": [
+        "AI SEO Deck also runs inside the Webflow Designer.",
+        "The panel identifies the user with a Webflow ID token. Our server resolves it and answers only for this site.",
+        "Write with AI drafts a title and description from the page. Apply to this page uses the Designer API, so the change shows at once."
+      ]
+    },
+    {
+      "name": "publish",
+      "lines": [
+        "Nothing goes live until you publish. Publishing in Webflow puts the fixes on the site."
+      ]
+    },
+    {
+      "name": "account",
+      "lines": [
+        "Free plan: 1 site, 3 keywords and 3 engines, checked every month.",
+        "Paid plans add every engine, weekly checks and one-click fixes, from $19 a month with a 7-day free trial.",
+        "You can disconnect Webflow or delete your account at any time."
+      ]
+    }
+  ]
+}

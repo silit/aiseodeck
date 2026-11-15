@@ -6,7 +6,7 @@ The fields below are in the same order as the form. Text values are autosaved by
 === APP INFO ===
 
 APP REVIEW PREFLIGHT RECEIPT
-The wfpre_ code from the App Review Preflight app (step 3 in 0-ADIMLAR.txt).
+wfpre_b9a773f444c4754f515af7c9bccbd5a7
 
 SUBMISSION TYPE
 New App
@@ -129,7 +129,7 @@ Alt text: The AI SEO Deck panel inside the Webflow Designer in three steps: the 
 
 SOURCE MAP ARTIFACT
 designer-extension/review-source.zip
-(Not bundle.zip. bundle.zip goes to the app settings with Publish extension version.)
+(The panel itself is already published in the app settings, version 3. Nothing else to upload there.)
 
 FEATURES OVERVIEW
 1. Six AI engines checked for every keyword, with live web search
@@ -154,7 +154,7 @@ https://aiseodeck-demo.webflow.io
 === SUPPORT INFO ===
 
 REVIEW TEAM DEMO VIDEO URL
-Your Loom or unlisted YouTube link (3-demo-video-script.txt).
+The link of the captioned demo video (YouTube unlisted or Google Drive, anyone with the link).
 
 DOCUMENTATION URL
 https://aiseodeck.silitlabs.com/docs
