@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font:400 12.5px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-#app{display:flex;flex-direction:column;min-height:100%}
+#app{display:flex;flex-direction:column;height:100%}
 a{color:var(--cite)}
 :focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:6px}
 h1,h2,h3,p{margin:0}
@@ -15,7 +15,7 @@ h1,h2,h3,p{margin:0}
 .top .back svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .top .path{margin-left:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pill{padding:3px 8px;border-radius:999px;background:var(--panel2);color:#D6D9E6;font-size:11.5px;font-weight:600;white-space:nowrap}
-.body{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+.body{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;padding:14px;display:flex;flex-direction:column;gap:14px}
 .here{display:grid;gap:2px}
 .here .k{font-size:11.5px;color:var(--muted)}
 .here .nm{font-size:15px;font-weight:700;overflow-wrap:anywhere}
