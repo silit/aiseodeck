@@ -144,7 +144,7 @@
       if (['title_missing', 'title_length', 'desc_missing', 'desc_length', 'faq_no_schema', 'schema_missing'].indexOf(x.code) > -1) return;
       items.push({ title: x.label, note: x.text });
     });
-    if (p.audited && !p.template && !has('title_missing') && !has('title_length') && !has('desc_missing') && !has('desc_length')) items.push({ ok: true, title: 'Title and description are fine' });
+    if (p.audited && !p.template && !has('title_missing') && !has('title_length') && !has('desc_missing') && !has('desc_length')) items.push({ ok: true, title: 'Title and description are fine', cta: 'Edit', run: function () { S.view = 'meta'; draw(); } });
     if (p.schemaTypes.indexOf('FAQPage') > -1) items.push({ ok: true, title: 'FAQ schema is on the page' });
     return items;
   }
@@ -167,7 +167,7 @@
         ic.firstChild.style.stroke = it.ok ? 'var(--good)' : 'var(--warn)';
         var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', '8'); circle.setAttribute('cy', '8'); circle.setAttribute('r', '6.5');
         ic.firstChild.insertBefore(circle, ic.firstChild.firstChild);
-        return h('li', null, ic, h('span', { class: 'tx' }, h('b', { text: it.title }), it.note ? h('span', { class: 'nt', text: it.note }) : null), it.cta ? h('button', { class: 'btn mark', type: 'button', onclick: it.run }, it.cta) : null);
+        return h('li', null, ic, h('span', { class: 'tx' }, h('b', { text: it.title }), it.note ? h('span', { class: 'nt', text: it.note }) : null), it.cta ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', onclick: it.run }, it.cta) : null);
       }));
       add(body, h('section', { class: 'sec', 'aria-labelledby': 'fixh' }, h('div', { class: 'hd' }, h('h2', { id: 'fixh', text: 'Fix this page' }), h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })), list));
     }
