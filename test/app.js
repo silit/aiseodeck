@@ -200,7 +200,13 @@ const webflow = http.createServer(async (req, res) => {
   if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
   if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') { wfState.pageUpdates.push({ id: m[1], body, localeId: u.searchParams.get('localeId') }); return json(res, 200, Object.assign({ id: m[1] }, body)); }
+  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') {
+    // like Webflow: a primary locale id is refused, only a secondary one may be named
+    const lid = u.searchParams.get('localeId');
+    const site0 = wfState.sites[0] || {};
+    if (lid && site0.locales && site0.locales.primary && site0.locales.primary.id === lid) return json(res, 400, { code: 'bad_request', message: 'Bad Request: Request is malformed: The provided locale must be a secondary locale.' });
+    wfState.pageUpdates.push({ id: m[1], body, localeId: lid }); return json(res, 200, Object.assign({ id: m[1] }, body));
+  }
   if ((m = p.match(/^\/beta\/pages\/(\w+)\/schema-markup$/))) {
     if (req.method === 'PUT') { wfState.schemaPuts.push({ id: m[1], body, localeId: u.searchParams.get('localeId') }); wfState.schemas[m[1]] = body.jsonLdSchema; return json(res, 200, { id: m[1], jsonLdSchema: body.jsonLdSchema }); }
     return json(res, 200, { id: m[1], jsonLdSchema: wfState.schemas[m[1]] || null });
@@ -536,14 +542,15 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2Fabout', { headers: { cookie } });
   assert(r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('FAQPage'), 'AI FAQ answers feed the FAQPage proposal');
 
-  console.log('localized sites: writes name the primary locale');
+  console.log("localized sites: writes go to the primary locale");
   assert(wfState.pageUpdates.every((x) => !x.localeId) && wfState.items.every((x) => !x.cmsLocaleId), 'a site without locales is written exactly as before');
   wfState.sites[0].locales = { primary: { id: 'loc_en', cmsLocaleId: 'cms_en', displayName: 'English', tag: 'en', enabled: true }, secondary: [{ id: 'loc_tr', cmsLocaleId: 'cms_tr', displayName: 'Turkish', tag: 'tr', enabled: true }, { id: 'loc_de', cmsLocaleId: 'cms_de', displayName: 'German', tag: 'de', enabled: false }] };
   r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'Lumen Dental | Veneers and implants in Antalya', description: 'Emax veneers, implants and digital smile design in Antalya for patients from the UK and Ireland.' });
-  assert(wfState.pageUpdates[wfState.pageUpdates.length - 1].localeId === 'loc_en', 'the title and description are written to the primary locale by id');
+  assert(r.status === 302 && !decodeURIComponent(r.headers.location).includes('not accept'), 'the title and description of a localized site are accepted by Webflow');
+  assert(wfState.pageUpdates[wfState.pageUpdates.length - 1].localeId === null && wfState.pageUpdates[wfState.pageUpdates.length - 1].body.seo.title.startsWith('Lumen Dental | Veneers'), 'the title and description go to the primary locale without naming it (Webflow refuses a primary locale id)');
   r = await post('/app/fix/faq', cookie, { id: 'siteA', path: '/about', action: 'cms', collection: 'colFaq', faq: 'Q: Do you speak English?\nA: Yes, every coordinator does.' });
   const lastItem = wfState.items[wfState.items.length - 1];
-  assert(lastItem.cmsLocaleId === 'cms_en' && lastItem.isDraft === true, 'CMS drafts are created in the primary locale by id');
+  assert(!lastItem.cmsLocaleId && lastItem.isDraft === true && lastItem.fieldData.name === 'Do you speak English?', 'CMS drafts are created in the primary locale without naming it');
   r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/about', schema: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[]}' });
   assert(wfState.schemaPuts[wfState.schemaPuts.length - 1].localeId === null, 'schema markup goes to the primary locale (Webflow documents localeId there for secondary locales only)');
   assert(getJ('site:siteA').locale && getJ('site:siteA').locale.id === 'loc_en' && getJ('site:siteA').locale.others.join() === 'Turkish', 'the site keeps its languages; a disabled one is left out');

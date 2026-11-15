@@ -103,7 +103,7 @@ async function listPages(token, siteId, max) {
 }
 
 // SEO title and description of a static page (Webflow ignores slug changes for home and templates; we never send a slug).
-// localeId names the locale written (the site's primary locale); it is left out only when Webflow sent no locales.
+// localeId is only for a secondary locale: without it Webflow writes the primary one, and it refuses a primary locale id.
 async function updatePageSeo(token, pageId, { title, description, ogTitle, ogDescription }, localeId) {
   const body = { seo: {} };
   if (title != null) body.seo.title = title;
@@ -136,7 +136,7 @@ async function listCollections(token, siteId) {
 }
 const getCollection = (token, collectionId) => call(token, 'GET', `/collections/${collectionId}`);
 // New CMS items are always created as drafts: the user reviews and publishes them in Webflow.
-// cmsLocaleId names the locale of the item (the site's primary locale); it is left out only when Webflow sent no locales.
+// cmsLocaleId is only for a secondary locale: without it the item is created in the primary one.
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
