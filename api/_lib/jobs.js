@@ -176,12 +176,19 @@ async function maybeFinish(runId, now) {
   if (left > 0) return false;
   const done = await store.resultCount(runId);
   if (done < run.total && now - (run.lastProgressAt || run.at) < STALE_MS) return false; // answers still coming in
-  if (!(await store.lock('finish:' + runId, 90))) return false; // another worker is finishing it
+  // A worker on this run (an open page or the background job) may have its last answers in flight, taken off
+  // the queue: never finish under it, or those answers are lost and the run ends without them.
+  if (!(await store.lock('run:' + runId, 60))) return false;
   try {
+    if ((await store.tasksLeft(runId)) > 0) return false; // its work went back to the queue
     const fresh = await store.getRun(runId);
     if (!fresh || fresh.status !== 'running') return false;
-    await finishRun(fresh, now);
-  } finally { await store.unlock('finish:' + runId); }
+    if ((await store.resultCount(runId)) < fresh.total && now - (fresh.lastProgressAt || fresh.at) < STALE_MS) return false;
+    if (!(await store.lock('finish:' + runId, 90))) return false; // another worker is finishing it
+    try {
+      await finishRun(fresh, now);
+    } finally { await store.unlock('finish:' + runId); }
+  } finally { await store.unlock('run:' + runId); }
   return true;
 }
 

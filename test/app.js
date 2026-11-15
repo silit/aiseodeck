@@ -672,6 +672,23 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
       res = await store.results(stuck.id);
       assert(res['k1.0|grok'] && res['k1.0|grok'].ok === false && res['k1.0|grok'].err === 'timed out' && !queueOf(stuck.id).length, 'an engine that times out with the full 40 seconds fails after three tries instead of looping');
       await store.endRun(stuck.id);
+
+      // the last answers in flight with an open page are never cut off by the background job finishing the run
+      slowMode = 'window';
+      const race = await store.createRun(fakeSite, { id: 'user_slow' }, ['grok'], 'manual', null, true);
+      race.lastProgressAt = Date.now() - 10 * 60000;
+      await store.saveRun(race);
+      await store.lock('run:' + race.id, 60); // a page pump is working on it
+      const inFlight = await store.takeTasks(race.id, 12);
+      let fin = await jobs.maybeFinish(race.id, Date.now());
+      assert(inFlight.length === 1 && fin === false && (await store.getRun(race.id)).status === 'running', 'a run is not finished while a worker has its last answer in flight');
+      await store.requeue(race.id, ...inFlight);
+      await store.unlock('run:' + race.id);
+      fin = await jobs.maybeFinish(race.id, Date.now());
+      assert(fin === false && (await store.tasksLeft(race.id)) === 1, 'an answer back in the queue keeps the run going');
+      await store.takeTasks(race.id, 12); // lost for good: nobody works on it any more
+      fin = await jobs.maybeFinish(race.id, Date.now());
+      assert(fin === true && (await store.getRun(race.id)).status === 'done', 'with nothing left and nobody working, a stale run is finished as it is');
     } finally {
       enginesLib.ask = realAsk;
     }
