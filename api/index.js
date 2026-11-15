@@ -328,7 +328,7 @@ function targetFor(k, audit) {
 }
 function backUrl(site, back, extra) {
   const b = String(back || '');
-  if (b.startsWith('k:') && (site.keywords || []).some((k) => k.id === b.slice(2))) return '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(b.slice(2)) + (extra ? '&' + extra : '');
+  if (b.startsWith('k:') && (site.keywords || []).some((k) => k.id === b.slice(2))) return '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(b.slice(2)) + (extra ? '&' + extra : '') + '#related';
   return siteUrl(site, 'tab=' + (['discover', 'keywords', 'insights', 'settings', 'audit'].includes(b) ? b : 'keywords') + (extra ? '&' + extra : ''));
 }
 
@@ -453,21 +453,29 @@ async function handleSetupSave(req, res, user) {
   redirect(res, siteUrl(updated, 'tab=keywords' + (notes.length ? '&' + noticeQuery(user, notes.join(' ')) : '')));
 }
 
+// What the sidebar of a site's pages shows: the plan, keywords in use, checks left, and the audit for Site health.
+async function sideData(user, audit) {
+  const limits = user._limits;
+  const usage = store.usageOf(user);
+  return { limits, used: await store.keywordCount(user), checksLeft: limits.rechecks ? Math.max(0, limits.rechecks - ((usage && usage.rechecks) || 0)) : null, audit: audit || null };
+}
+
 async function handleSitePage(req, res, user) {
   const q = queryOf(req);
   const site = await ownedSite(user, q.id);
   if (!site) return notFound(res);
   if (!site.project.ready) return redirect(res, '/app/setup?id=' + encodeURIComponent(site.id) + (q.kw ? '&kw=' + encodeURIComponent(kwLib.clean(q.kw)) : ''));
-  const tab = ['keywords', 'discover', 'insights', 'audit', 'settings'].includes(q.tab) ? q.tab : (q.tab === 'setup' ? 'settings' : q.tab === 'rivals' || q.tab === 'sources' ? 'insights' : 'keywords');
+  const tab = ['overview', 'keywords', 'discover', 'insights', 'audit', 'settings'].includes(q.tab) ? q.tab : (q.tab === 'setup' ? 'settings' : q.tab === 'rivals' || q.tab === 'sources' ? 'insights' : q.kw ? 'keywords' : 'overview');
   const limits = user._limits;
   const { progress, running } = await runProgress(site);
   const hist = await store.history(site.id, 12);
-  const audit = tab === 'audit' ? await store.getAudit(site.id) : null;
+  const audit = await store.getAudit(site.id);
   let notice = html.esc(noticeFrom(q, user));
   if (q.saved) notice = 'Saved.';
-  const room = Math.max(0, limits.keywords - (await store.keywordCount(user)));
+  const side = await sideData(user, audit);
+  const room = Math.max(0, limits.keywords - side.used);
   send(res, 200, html.sitePage(user, site, {
-    tab, limits, progress, running, history: hist, audit, notice, room, prefill: kwLib.clean(q.kw || ''),
+    tab, limits, progress, running, history: hist, audit, side, notice, room, prefill: kwLib.clean(q.kw || ''),
     engines: engines.forLimits(limits), locked: engines.lockedFor(limits), canRun: canRun(site, limits, store.usageOf(user)),
     trialDays: limits.plan === 'free' && billing.trialEligible(user) ? billing.trialDays() : 0
   }));
@@ -582,7 +590,7 @@ async function handleKeywordPage(req, res, user) {
   send(res, 200, html.keywordPage(user, site, k, {
     notice: html.esc(noticeFrom(q, user)), limits, progress, running, run, results, target, draft, related: related ? related.list : null, collections,
     pages: audit ? audit.pages : null, origin: audit ? audit.origin : (site.url || ''), engines: engines.forLimits(limits), locked: run ? [] : engines.lockedFor(limits),
-    labs: kwLib.available(), canCheck: canCheckKeyword(site, limits, store.usageOf(user))
+    labs: kwLib.available(), canCheck: canCheckKeyword(site, limits, store.usageOf(user)), side: await sideData(user, audit)
   }));
 }
 
@@ -782,7 +790,7 @@ async function handleKeywordRelated(req, res, user) {
   try { items = await kwLib.related(k.text, site.project.country, site.project.language, 15); }
   catch (e) { await alerts.report('dataforseo', e, 'related searches'); return redirect(res, kwUrl(site, k, noticeQuery(user, alerts.KEYWORD_DATA_TEXT))); }
   await store.saveDraft(site.id, 'rel:' + k.id, { list: items, at: Date.now() });
-  redirect(res, kwUrl(site, k));
+  redirect(res, kwUrl(site, k) + '#related');
 }
 
 async function handleDiscover(req, res, user) {
@@ -878,7 +886,7 @@ async function handleFixPage(req, res, user) {
   }
   if (existing) existingTypes = auditLib.readPage('<script type="application/ld+json">' + JSON.stringify(existing) + '</script>').schemaTypes;
   const faqPairs = draft.faq && draft.faq.length ? draft.faq : (row.faq || []);
-  send(res, 200, html.fixPage(user, site, row, { draft, limits: user._limits, notice: html.esc(noticeFrom(q, user)), existingTypes, collections, proposedSchema: proposedSchema(site, row, audit, faqPairs, existing) }));
+  send(res, 200, html.fixPage(user, site, row, { draft, limits: user._limits, notice: html.esc(noticeFrom(q, user)), existingTypes, collections, proposedSchema: proposedSchema(site, row, audit, faqPairs, existing), side: await sideData(user, audit) }));
 }
 
 async function handleFixSuggest(req, res, user) {

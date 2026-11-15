@@ -53,6 +53,7 @@ const CSS = `
 --mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#8F6E00;--cite:#2F5BFF;--cite-soft:#E6ECFF;--rival:#C2335A;--good:#138A5A;--good-soft:#E2F5EB;--bad:#C93C34;--bad-soft:#FBE8E6;--warn:#9A6400;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:450 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:56px}
+body.inshell{padding-bottom:0}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 a{color:var(--cite);text-underline-offset:3px}
@@ -144,16 +145,18 @@ table.kt{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
 .kt td.k a:hover{text-decoration:underline;text-decoration-color:var(--faint)}
 .kt td.k .sub{display:block;font-weight:500;font-size:12.5px;color:var(--faint);margin-top:2px}
 .kt td.vol{color:var(--muted);text-align:right}
-.c{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:middle}
-.c.st-n{background:var(--mark);box-shadow:0 0 0 1px var(--mark-ring)}
-.c.st-b{background:var(--mark);box-shadow:0 0 0 3px var(--panel),0 0 0 5px var(--cite)}
-.c.st-i{box-shadow:inset 0 0 0 2.5px var(--cite)}
-.c.st-o{width:6px;height:6px;background:var(--faint);opacity:.75}
-.c.st-x{width:12px;height:2px;border-radius:2px;background:var(--line)}
-.c.st-f{width:12px;height:12px;border:1.5px dashed var(--faint)}
-.c.st-w{width:8px;height:8px;background:var(--line)}
-.c.st-run{width:8px;height:8px;background:var(--cite);animation:pulse 1.4s ease-in-out infinite}
+.c{width:28px;height:28px;border-radius:8px;display:inline-grid;place-items:center;vertical-align:middle;flex:none}
+.c svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.c.st-n{background:var(--mark);color:var(--mark-ink);box-shadow:inset 0 0 0 1px var(--mark-ring)}
+.c.st-b{background:var(--mark);color:var(--mark-ink);box-shadow:inset 0 0 0 2px var(--cite)}
+.c.st-i{background:var(--cite-soft);color:var(--cite)}.c.st-i svg{stroke-width:2.1}
+.c.st-o{border:1.5px solid var(--line);color:var(--muted)}.c.st-o svg{width:11px;height:11px;stroke-width:2.4}
+.c.st-x{border:1.5px dashed var(--line);color:var(--faint)}.c.st-x svg{width:12px;height:12px;stroke-width:2.4}
+.c.st-f{background:var(--bad-soft);color:var(--bad)}
+.c.st-w{border:1.5px dotted var(--line)}
+.c.st-run{border:1.5px solid var(--cite);animation:pulse 1.4s ease-in-out infinite}
 .c.st-lock{width:auto;height:auto;border-radius:0;color:var(--faint)}
+.c.sm{width:20px;height:20px;border-radius:6px}.c.sm svg{width:11px;height:11px}.c.sm.st-o svg,.c.sm.st-x svg{width:9px;height:9px}
 @keyframes pulse{50%{opacity:.3}}
 .vis{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;font-weight:700}
 .vis i{display:block;width:46px;height:6px;border-radius:999px;background:var(--line2);overflow:hidden;position:relative}
@@ -179,6 +182,12 @@ table.kt{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
   .kt td.visc{order:4;flex:1 1 50%;text-align:left}
   .kt td.visc .vis{justify-content:flex-start}
   .kt td.tr{order:4;flex:1 1 50%}
+  .kt tr::after{content:"";flex-basis:100%;height:0;order:3}
+  .kt td[data-e] .c{width:26px;height:26px}
+  .kt td.nb{order:4;flex:1 1 33%;padding:0}
+  .kt td.visc{flex:1 1 33%}.kt td.tr{flex:1 1 33%}
+  .kt td.act{order:5;flex-basis:100%;text-align:left;padding-top:12px}
+  .tablehead{padding:16px 16px 12px}
 }
 
 /* keyword page */
@@ -301,8 +310,7 @@ svg.chart .fut{stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 5;fill:no
 .site .num{text-align:right}
 .site .num b{display:block;font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-stretch:115%}
 .engs{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px}
-.engs span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:600}
-.engs .c{width:10px;height:10px}.engs .c.st-b{box-shadow:0 0 0 2px var(--panel),0 0 0 3.5px var(--cite)}
+.engs>span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:600}
 @media(max-width:640px){.site{grid-template-columns:1fr auto}.site .go{grid-column:1/-1}}
 
 /* setup */
@@ -351,6 +359,142 @@ ol.nf .nk a:hover{text-decoration:underline}
 @media (max-width:620px){ol.nf li{grid-template-columns:28px minmax(0,1fr)}ol.nf li .btn{grid-column:2;justify-self:start}.bill{grid-template-columns:1fr}}
 @media (max-width:560px){.top nav{gap:14px}.trialchip .tw{display:none}.top .wrap:has(.trialchip) .brand span{display:none}}
 @media (max-width:420px){.top nav{gap:12px;font-size:14px}.top .brand span{display:none}.top nav a.navsites{display:none}}
+/* site shell: a sidebar with the site's sections */
+.shell{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;overflow:auto;background:var(--panel);border-right:1px solid var(--line2);padding:18px 14px 18px;display:flex;flex-direction:column;gap:18px}
+.side .brand{padding:4px 8px}
+.sitepick{display:flex;align-items:center;gap:10px;min-height:54px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--ink);text-decoration:none}
+.sitepick:hover{border-color:var(--faint)}
+.sitepick .ini{width:30px;height:30px;flex:none;border-radius:8px;background:var(--cite-soft);color:var(--cite);display:grid;place-items:center;font-weight:800;font-size:13px}
+.sitepick .nm{display:grid;min-width:0;flex:1;line-height:1.3}
+.sitepick .nm b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitepick .nm span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidenav{display:grid;gap:4px}
+.sidenav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:650;font-size:14.5px}
+.sidenav a:hover{color:var(--ink);background:var(--panel2)}
+.sidenav a[aria-current=page]{background:var(--ink);color:var(--bg)}
+.sidenav svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sidenav .n{margin-left:auto;font-size:12px;font-weight:600;opacity:.8}
+.sidenav .badge{margin-left:auto;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--warn-soft);color:var(--warn)}
+.sidenav a[aria-current=page] .badge{background:var(--mark);color:var(--mark-ink)}
+.planbox{margin-top:auto;display:grid;gap:9px;padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line2)}
+.planbox .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.planbox .ph a{font-weight:650;font-size:12.5px}
+.meter{display:block;height:6px;border-radius:999px;background:var(--line2);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--ink);border-radius:inherit}
+.planbox .trialchip{justify-self:start;font-size:12px;font-weight:700;color:var(--mark-ink);background:var(--mark);border-radius:999px;padding:3px 10px;text-decoration:none}
+.sidefoot{display:flex;flex-wrap:wrap;gap:4px 14px;padding:0 8px;font-size:13px}
+.sidefoot a{color:var(--muted);text-decoration:none;font-weight:600}.sidefoot a:hover{color:var(--ink)}
+.content{min-width:0;padding:30px max(16px,3vw,env(safe-area-inset-right,0px)) 0 max(16px,3vw,env(safe-area-inset-left,0px))}
+.content>footer{margin-bottom:24px}
+@media(max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line2);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
+  .side .brand{padding:0}
+  .sitepick{grid-column:1/-1;min-height:48px}
+  .sidenav{grid-column:1/-1;display:flex;overflow-x:auto;gap:6px;padding-bottom:2px}
+  .sidenav a{flex:none;min-height:40px;border:1px solid var(--line2)}
+  .planbox{display:none}
+  .sidefoot{grid-column:2;grid-row:1;align-self:center;padding:0}
+  .sidefoot a.allsites{display:none}
+  .content{padding-top:22px}
+}
+/* page head inside the shell */
+.pagehead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px 20px;margin-bottom:22px}
+.pagehead h1{font-size:clamp(26px,2.6vw,32px)}
+.pagehead .sub{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:70ch}
+.pagehead .meta{color:var(--muted);font-size:13.5px;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 16px}
+.runbox{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:flex-end}
+.runbox .tiny{max-width:300px}
+/* overview */
+.ov{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-bottom:20px}
+.ov2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media(max-width:1100px){.ov{grid-template-columns:minmax(0,1fr)}.ov .vis-card{grid-column:auto}}
+@media(max-width:800px){.ov2{grid-template-columns:minmax(0,1fr)}}
+.vis-card{grid-column:span 2;display:grid;gap:22px;align-content:start}
+.vis-top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end;justify-content:space-between}
+.vis-num{display:grid;gap:10px}
+.vis-num .big{font-size:64px}
+.vis-num .row1{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.vis-num .row1 .lbl{color:var(--muted);font-size:14px;max-width:220px;line-height:1.4}
+.vis-chart{flex:1 1 260px;max-width:380px;min-width:0}
+.delta{justify-self:start;font-size:13px;font-weight:700;border-radius:999px;padding:4px 10px;background:var(--lift);color:var(--muted)}
+.delta.up{background:var(--good-soft);color:var(--good)}.delta.down{background:var(--bad-soft);color:var(--bad)}
+.engrows{display:grid;gap:12px}
+.engrows h3{font-size:13px;color:var(--muted);font-weight:700}
+.engrow{display:grid;grid-template-columns:130px minmax(0,1fr) 92px;gap:14px;align-items:center;font-size:14px}
+.engrow b{font-weight:650}
+.engrow .meter{height:10px}
+.engrow .v{font-family:var(--mono);font-stretch:87.5%;font-size:12.5px;text-align:right;color:var(--ink)}
+.engrow.locked{color:var(--faint)}.engrow.locked .v{color:var(--faint);font-family:var(--sans);font-size:12.5px}
+@media(max-width:560px){.engrow{grid-template-columns:100px minmax(0,1fr) 70px;gap:10px}}
+.next-card{background:var(--ink);color:var(--bg);border-color:var(--ink);display:grid;gap:16px;align-content:start}
+.next-card h2{color:var(--bg)}
+.next-card .lead{font-size:13px;color:color-mix(in srgb,var(--bg) 72%,var(--ink))}
+ol.todo{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+ol.todo li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 86%,var(--bg))}
+ol.todo .num{width:28px;height:28px;border-radius:8px;background:var(--mark);color:var(--mark-ink);display:grid;place-items:center;font-weight:800;font-size:13px}
+ol.todo .tx{display:grid;gap:6px;min-width:0}
+ol.todo b{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+ol.todo .why{font-size:12.5px;line-height:1.45;color:color-mix(in srgb,var(--bg) 78%,var(--ink))}
+ol.todo .go{justify-self:start;display:inline-flex;align-items:center;min-height:36px;padding:0 12px;margin-top:2px;border-radius:10px;background:var(--bg);color:var(--ink);text-decoration:none;font-weight:700;font-size:13px}
+ol.todo .go:hover{filter:brightness(1.05)}
+.card-head{display:grid;gap:6px;margin-bottom:14px}
+.card-head p{font-size:13px;color:var(--muted)}
+.card-foot{margin-top:14px;font-size:13.5px;font-weight:650}
+.rivalrows{display:grid;gap:14px}
+.rivalrow{display:grid;grid-template-columns:minmax(0,1fr) 124px;gap:14px;align-items:center}
+.rivalrow .nm{display:grid;gap:6px;min-width:0;font-size:14px;font-weight:650}
+.rivalrow .meter i{background:var(--rival)}.rivalrow.own .meter i{background:var(--ink)}
+.rivalrow .v{font-size:13px;color:var(--muted);text-align:right}
+.srcrows{display:grid}
+.srcrow{display:flex;align-items:center;gap:10px;min-height:42px;border-top:1px solid var(--line2)}
+.srcrow:first-child{border-top:0}
+.srcrow .h{font-family:var(--mono);font-stretch:87.5%;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srcrow .v{font-size:13px;color:var(--muted);white-space:nowrap}
+.youtag{font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--cite-soft);color:var(--cite)}
+/* keywords: add box with ideas, marks in words, the table */
+.addbox{display:grid;gap:12px;margin-bottom:20px}
+.addbox .addkw{margin:0;background:var(--panel2)}
+.ideas{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ideas>span{font-size:13px;font-weight:650;color:var(--muted);margin-right:2px}
+.ideas form{display:contents}
+.idea{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:650;cursor:pointer;max-width:100%}
+.idea:hover{border-color:var(--faint)}
+.idea svg{width:13px;height:13px;flex:none;fill:none;stroke:var(--cite);stroke-width:2.2;stroke-linecap:round}
+.idea .v{font-weight:500;color:var(--muted)}
+.idea .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tablehead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px 20px;padding:18px 20px 12px}
+.marks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--muted)}
+.marks li{display:inline-flex;align-items:center;gap:8px}
+.kt td.nb{white-space:nowrap;text-align:left;padding-left:12px}
+.kt td.nb b{font-size:14px}.kt td.nb span{display:block;font-size:12px;color:var(--muted)}
+.kt td.act{text-align:right;white-space:nowrap}
+.kt td.k .vol{display:block;font-weight:500;font-size:12.5px;color:var(--muted);margin-top:2px}
+/* keyword page */
+.estrip{list-style:none;margin:18px 0 0;padding:16px 0 0;border-top:1px solid var(--line2);display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:12px}
+.estrip li{display:grid;justify-items:center;gap:6px;text-align:center}
+.estrip b{font-size:12.5px;line-height:1.25}
+.estrip span.st{font-size:12px;color:var(--muted);line-height:1.25}
+.verdict2{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(220px,340px);gap:18px 28px;align-items:center}
+.verdict2.yes .big{color:var(--mark-text)}
+@media(max-width:900px){.verdict2{grid-template-columns:auto minmax(0,1fr)}.verdict2 .chart{grid-column:1/-1}}
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line2);margin:22px 0 20px}
+.vtabs button{font:inherit;font-size:14.5px;font-weight:650;color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 14px;min-height:44px;cursor:pointer;border-radius:8px 8px 0 0}
+.vtabs button:hover{color:var(--ink)}
+.vtabs button[aria-selected=true]{color:var(--ink);font-weight:800;border-bottom-color:var(--ink)}
+.vtabs .n{font-size:12px;font-weight:700;margin-left:6px;opacity:.75}
+.tabbed .vpanel+.vpanel{margin-top:22px}
+.tabbed.js .vpanel+.vpanel{margin-top:0}
+.tick{font-size:13px;font-weight:800;font-stretch:100%}
+.fx>li:not(.done) .tick{background:var(--ink);border-color:var(--ink);color:var(--bg);width:26px;height:26px;border-radius:8px}
+.diff2{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:12px}
+.diff2>div{border-radius:12px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
+.diff2 .was{background:var(--panel2);border:1px solid var(--line2)}
+.diff2 .now{background:color-mix(in srgb,var(--mark) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--mark) 55%,var(--line))}
+.diff2 .l{font-size:12px;font-weight:700;color:var(--muted)}
+.diff2 .was b{font-size:14px;overflow-wrap:anywhere}.diff2 .was span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.who{display:grid;gap:12px}
 @media (prefers-reduced-motion:reduce){.c.st-run{animation:none}.progress i{transition:none}.btn,.kt tbody tr{transition:none}.spin{animation:none}}
 `;
 
@@ -367,13 +511,18 @@ function layout(title, body, opts) {
   const nav = opts.user
     ? `<nav aria-label="Main">${left ? `<a class="trialchip" href="/app/settings#plan"><span class="tw">Trial, </span>${plural(left, 'day')} left</a>` : ''}<a class="navsites" href="/app"${cur('sites')}>Sites</a><a href="/app/settings"${cur('settings')}>Settings</a><a href="/logout">Sign out</a></nav>`
     : `<nav aria-label="Main"><a href="/">Home</a><a href="/docs">Docs</a><a href="/login">Sign in</a></nav>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(title)}</title>
+  const foot = `<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.</span>'}</footer>`;
+  const head = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(title)}</title>
 <meta name="theme-color" content="#1E2336"><link rel="icon" href="/favicon.png">${FONTS}
-<style>${CSS}</style></head><body>
+<style>${CSS}</style></head><body${opts.side ? ' class="inshell"' : ''}>`;
+  const script = opts.script ? `<script>${opts.script}</script>` : '';
+  // the pages of one site: a sidebar with its sections instead of the top bar
+  if (opts.side) return `${head}<div class="shell"><aside class="side" aria-label="Site">${opts.side}</aside><main class="content">${body}${foot}</main></div>${script}</body></html>`;
+  return `${head}
 <header class="top"><div class="wrap"><a class="brand" href="${opts.user ? '/app' : (opts.brandName ? '#' : '/')}">${opts.brandName ? '' : LOGO}<span>${opts.brandName ? esc(opts.brandName) : 'AI SEO Deck'}</span></a>${opts.plain ? '' : nav}</div></header>
 <main class="wrap">${body}
-<footer>${opts.footer || '<span>AI SEO Deck by Silit Labs</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/docs">Docs</a><span>Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.</span>'}</footer>
-</main>${opts.script ? `<script>${opts.script}</script>` : ''}</body></html>`;
+${foot}
+</main>${script}</body></html>`;
 }
 const noticeHtml = (n, cls) => (n ? `<div class="notice${cls ? ' ' + cls : ''}" role="status">${n}</div>` : '');
 // Webflow Localization: fixes are written to the primary language only, and the user is told so where they apply them.
@@ -404,10 +553,23 @@ function loginConfirm(token) {
 
 /* ---------- small pieces ---------- */
 
-const STATE_TEXT = { b: 'Named and your site cited', n: 'Named', i: 'Your site cited, not named', o: 'Not named', x: 'No AI answer on Google', f: 'Could not be read', w: 'Not checked yet', run: 'Checking now' };
-function dot(state, engine) {
+const STATE_TEXT = { b: 'Names you and links your site', n: 'Names you', i: 'Links your site, does not name you', o: 'Does not name you', x: 'No AI answer on Google', f: 'Could not be read', w: 'Not checked yet', run: 'Checking now' };
+const SVG = (d) => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}"/></svg>`;
+const MARK_ICON = {
+  n: SVG('M3.5 8.5l3 3 6-7'), b: SVG('M3.5 8.5l3 3 6-7'),
+  i: SVG('M6.5 9.5l3-3M5.5 7.5l-1 1a2.1 2.1 0 003 3l1-1M10.5 8.5l1-1a2.1 2.1 0 00-3-3l-1 1'),
+  o: SVG('M4.5 4.5l7 7M11.5 4.5l-7 7'), x: SVG('M4 8h8'), f: SVG('M8 4.5v4.2M8 11.3h.01')
+};
+// small: true for the compact marks on the sites list
+function dot(state, engine, small) {
   const label = (LONG[engine] || engine || '') + ': ' + (STATE_TEXT[state] || state);
-  return `<i class="c st-${esc(state)}" role="img" aria-label="${esc(label)}" title="${esc(label)}"></i>`;
+  return `<span class="c st-${esc(state)}${small ? ' sm' : ''}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${MARK_ICON[state] || ''}</span>`;
+}
+// The marks explained in words, with the same icons.
+function marksLegend(engines) {
+  const g = (engines || []).some((e) => e === 'aio' || e === 'aimode');
+  const item = (st, text) => `<li><span class="c sm st-${st}" aria-hidden="true">${MARK_ICON[st]}</span>${text}</li>`;
+  return `<ul class="marks" aria-label="What the marks mean">${item('n', 'Names you')}${item('b', 'Names you and links your site')}${item('i', 'Links your site only')}${item('o', 'Does not name you')}${g ? item('x', 'Google shows no AI answer') : ''}</ul>`;
 }
 function sparkline(trend, w, h) {
   const pts = (trend || []).map((p) => p[1]).filter((v) => typeof v === 'number');
@@ -415,8 +577,8 @@ function sparkline(trend, w, h) {
   w = w || 60; h = h || 20;
   const min = Math.min(...pts) - 4, max = Math.max(...pts) + 4;
   const d = pts.map((p, i) => (i ? 'L' : 'M') + ((i * w) / (pts.length - 1)).toFixed(1) + ' ' + (h - ((p - min) / (max - min || 1)) * h).toFixed(1)).join(' ');
-  const up = pts[pts.length - 1] >= pts[0];
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--${up ? 'good' : 'bad'})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dd = pts[pts.length - 1] - pts[0];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--${dd > 0 ? 'good' : dd < 0 ? 'bad' : 'faint'})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function delta(trend) {
   const t = trend || [];
@@ -473,13 +635,36 @@ function highlight(text, project) {
 
 /* ---------- the deck ---------- */
 
+// The keywords where AI names you least, ranked by what fixing them is worth: searches a month (at least 10, so
+// keywords without data still count) times the share of engines that skip you, a little more when a rival takes the
+// place, much less when fixes were applied in the last two weeks.
+function rankGaps(site) {
+  const now = Date.now();
+  const items = [];
+  for (const k of site.keywords || []) {
+    const s = site.kw && site.kw[k.id];
+    const v = verdict(s);
+    if (!s || v === 'yes' || v === 'none') continue;
+    const kc = engineCounts(s);
+    const lostTo = [...new Set(Object.values(s.lost || {}).flat())].slice(0, 2);
+    const recent = !!(k.fixedAt && now - k.fixedAt < 14 * 86400000);
+    const miss = kc.answered ? 1 - kc.named / kc.answered : 1;
+    const worth = Math.max(10, k.volume || 0) * miss * (lostTo.length ? 1.3 : 1) * (recent ? 0.2 : 1);
+    items.push({ k, kc, lostTo, recent, worth });
+  }
+  return items.sort((a, b) => b.worth - a.worth);
+}
+
 // opts: { engines (the plan's engines), locked, link (true on the app, false on public reports), running: [keyword ids being checked] }
 function deckTable(site, opts) {
   opts = opts || {};
-  const kws = site.keywords || [];
   const engines = (opts.engines || []).slice().sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   const locked = opts.locked || [];
   const running = opts.running || [];
+  const app = opts.link !== false;
+  // most searched first; keywords without data keep their order at the end
+  const kws = (site.keywords || []).map((k, i) => [k, i]).sort((a, b) => ((b[0].volume || -1) - (a[0].volume || -1)) || a[1] - b[1]).map((x) => x[0]);
+  const first = new Set(rankGaps(site).filter((g) => !g.recent).slice(0, 3).map((g) => g.k.id));
   const head = engines.map((e) => `<th scope="col" title="${esc(LONG[e] || e)}">${esc(LABEL[e] || e)}</th>`).join('')
     + locked.map((e) => `<th scope="col" class="lock" title="${esc(LONG[e] || e)}: paid plans">${LOCK} ${esc(LABEL[e] || e)}</th>`).join('');
   const rows = kws.map((k) => {
@@ -490,15 +675,17 @@ function deckTable(site, opts) {
       return `<td data-e="${esc(SHORT[e] || e)}">${dot(st, e)}</td>`;
     }).join('') + locked.map((e) => `<td data-e="${esc(SHORT[e] || e)}"><span class="c st-lock" title="${esc(LONG[e] || e)} is part of the paid plans" aria-label="${esc(LABEL[e])}: paid plans">${LOCK}</span></td>`).join('');
     const vis = s ? Math.round((s.vis || 0) * 100) : null;
-    const name = opts.link === false ? esc(k.text) : `<a href="${esc(kwHref(site, k))}">${esc(k.text)}</a>`;
-    const sub = k.page ? `<span class="sub">${esc(k.page)}</span>` : '';
-    return `<tr><td class="k">${name}${sub}</td><td class="vol r">${k.volume == null ? '' : num(k.volume)}</td>${cells}
+    const kc = s ? engineCounts(s) : null;
+    const name = app ? `<a href="${esc(kwHref(site, k))}">${esc(k.text)}</a>` : esc(k.text);
+    const sub = (k.volume != null ? `<span class="vol">${num(k.volume)} searches a month</span>` : '') + (k.page ? `<span class="sub">${esc(k.page)}</span>` : '');
+    const cta = !app ? '' : `<td class="act">${first.has(k.id) ? `<a class="btn sm mark" href="${esc(kwHref(site, k))}">Fix this first</a>` : `<a class="btn sm" href="${esc(kwHref(site, k))}">Fix plan</a>`}</td>`;
+    return `<tr><td class="k">${name}${sub}</td>${cells}
+<td class="nb">${kc && kc.answered ? `<b>${kc.named} of ${kc.answered}</b><span>engines</span>` : `<span>${checking ? 'Checking' : '-'}</span>`}</td>
 <td class="visc r">${vis == null ? `<span class="tiny faint">${checking ? 'Checking' : 'Waiting'}</span>` : `<span class="vis"><i style="--w:${vis}%"></i>${vis}%</span>`}</td>
-<td class="tr r"><span class="trend">${s ? sparkline(s.trend) + delta(s.trend) : ''}</span></td></tr>`;
+<td class="tr r"><span class="trend">${s ? sparkline(s.trend) + delta(s.trend) : ''}</span></td>${cta}</tr>`;
   }).join('');
-  const legend = `<div class="legend" aria-hidden="true"><span><i class="c st-n"></i>Named</span><span><i class="c st-b"></i>Named and your site cited</span><span><i class="c st-i"></i>Your site cited, not named</span><span><i class="c st-o"></i>Not named</span>${engines.some((e) => e === 'aio' || e === 'aimode') ? '<span><i class="c st-x"></i>No AI answer on Google</span>' : ''}</div>`;
-  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${opts.link === false ? '' : opts.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly">Try all ${allEnginesCount()} free for ${opts.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
-  return `<div class="deck"><table class="kt"><thead><tr><th scope="col" class="l">Keyword</th><th scope="col" class="r">Searches a month</th>${head}<th scope="col" class="r">Visible</th><th scope="col" class="r">Trend</th></tr></thead><tbody>${rows}</tbody></table></div>${legend}${upsell}`;
+  const upsell = locked.length ? `<div class="upsell"><p><b>${plural(locked.length, 'more AI engine')}</b> answer for these keywords too: ${locked.map((e) => esc(LONG[e] || e)).join(', ')}.</p>${!app ? '' : opts.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly">Try all ${allEnginesCount()} free for ${opts.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan">See every AI</a>'}</div>` : '';
+  return `<section class="deck" aria-labelledby="kt-title"><div class="tablehead"><h2 id="kt-title" style="font-size:16px">${app ? 'Your keywords, most searched first' : 'Keywords'}</h2>${marksLegend(engines)}</div><table class="kt"><thead><tr><th scope="col" class="l">Keyword</th>${head}<th scope="col" class="l" style="padding-left:12px">Named by</th><th scope="col" class="r">Visible</th><th scope="col" class="r">4 weeks</th>${app ? '<th scope="col"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Fix</span></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></section>${upsell}`;
 }
 
 function statStrip(site, history, limits) {
@@ -539,7 +726,7 @@ function dashboard(user, sites, limits, notice, opts) {
   const list = sites.length ? sites.map((s) => {
     const l = s.latest;
     const ready = s.project && s.project.ready;
-    const bars = l ? ORDER.filter((e) => l.byEngine && l.byEngine[e] && (l.byEngine[e].k || l.byEngine[e].kx)).map((e) => { const b = l.byEngine[e]; const st = b.km ? (b.kc ? 'b' : 'n') : b.kc ? 'i' : b.k ? 'o' : 'x'; return `<span title="${esc(LONG[e])}: names you for ${b.km} of ${plural(b.k, 'keyword')}">${dot(st, e)}${esc(LABEL[e])} ${b.k ? b.km + '/' + b.k : ''}</span>`; }).join('') : '';
+    const bars = l ? ORDER.filter((e) => l.byEngine && l.byEngine[e] && (l.byEngine[e].k || l.byEngine[e].kx)).map((e) => { const b = l.byEngine[e]; const st = b.km ? (b.kc ? 'b' : 'n') : b.kc ? 'i' : b.k ? 'o' : 'x'; return `<span title="${esc(LONG[e])}: names you for ${b.km} of ${plural(b.k, 'keyword')}">${dot(st, e, true)}${esc(LABEL[e])} ${b.k ? b.km + '/' + b.k : ''}</span>`; }).join('') : '';
     const line = l ? `Named for ${l.kwNamed || 0} of ${plural(l.keywords || 0, 'keyword')}. Checked ${ago(l.finishedAt || l.at, now)}.` : ready ? (s.sched && s.sched.runId ? 'The first check is running.' : 'No check yet.') : 'Add your brand, rivals and keywords to start.';
     return `<div class="panel site"><div class="nm"><div class="actions" style="gap:10px"><h2>${esc(s.name)}</h2>${siteStatus(s)}</div>
 <p class="small muted">${esc(hostOf(s.url))}${s.audit ? `, site audit ${s.audit.score}/100` : ''}</p><p class="small">${line}</p>${bars ? `<div class="engs">${bars}</div>` : ''}</div>
@@ -616,51 +803,173 @@ show(j);
 if(j.finished||j.idle){stop=true;location.reload();return;}if(j.budget){stop=true;var p=document.getElementById('progress');if(p)p.insertAdjacentHTML('beforeend','<p class="small" style="margin-top:8px">Checks are paused for a while. They continue on their own; you do not need to keep this page open.</p>');return;}setTimeout(step,j.busy?4000:600);}).catch(function(){setTimeout(step,8000);});}
 step();setTimeout(peek,5000);})();`;
 
-function tabsHtml(site, tab) {
-  const t = (k, label) => `<a href="${esc(siteHref(site, 'tab=' + k))}"${tab === k ? ' aria-current="page"' : ''}>${label}</a>`;
-  return `<nav class="tabs" aria-label="Site sections">${t('keywords', 'Keywords')}${t('discover', 'Discover')}${t('insights', 'Rivals<span class="tlong"> and sources</span>')}${t('audit', 'Site audit')}${t('settings', 'Settings')}</nav>`;
+/* ---------- the site shell: sidebar, page head ---------- */
+
+const NAV_ICON = {
+  overview: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg>',
+  keywords: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4h8M6 8h8M6 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg>',
+  audit: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8.5h3l1.5-4 3 8 1.5-4h4"/></svg>',
+  settings: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>'
+};
+const CHEVRON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;color:var(--muted)"><path d="M4 6l4 4 4-4"/></svg>';
+const BACK_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>';
+const PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>';
+
+// The site-level checks of the audit that fail, in the order they matter.
+function failingChecks(audit) {
+  if (!audit) return [];
+  const s = audit.site || {};
+  const out = [];
+  if ((s.blockedBots || []).some((b) => (BOTS.find((x) => x.ua === b) || {}).kind === 'search')) out.push('robots_blocks_ai');
+  if (!s.llms) out.push('llms_missing');
+  if (!s.sitemap) out.push('sitemap_missing');
+  if (!s.orgSchema) out.push('org_schema_missing');
+  return out;
+}
+// What the Site health screen asks to fix: the failing site checks and the pages that score under 80.
+function healthCount(audit) {
+  if (!audit) return 0;
+  return failingChecks(audit).length + (audit.pages || []).filter((p) => !p.error && p.score != null && p.score < 80).length;
+}
+
+// d.side: { limits, used (keywords tracked on the account), checksLeft, audit }
+function siteSide(user, site, active, d) {
+  const sd = (d && d.side) || {};
+  const lim = sd.limits || {};
+  const nav = [['overview', 'Overview'], ['keywords', 'Keywords'], ['audit', 'Site health'], ['settings', 'Settings']].map(([k, label]) => {
+    let extra = '';
+    if (k === 'keywords') extra = `<span class="n">${(site.keywords || []).length}</span>`;
+    if (k === 'audit') { const n = healthCount(sd.audit); extra = sd.audit ? (n ? `<span class="badge">${n} to fix</span>` : '') : '<span class="badge">Not run</span>'; }
+    return `<a href="${esc(siteHref(site, 'tab=' + k))}"${active === k ? ' aria-current="page"' : ''}>${NAV_ICON[k]}${label}${extra}</a>`;
+  }).join('');
+  const name = site.project && site.project.brand ? site.project.brand : site.name;
+  const left = trialLeft(user);
+  const usedPct = lim.keywords ? Math.min(100, Math.round(((sd.used || 0) / lim.keywords) * 100)) : 0;
+  const top = lim.plan === 'agency' || lim.complimentary;
+  const plan = lim.name ? `<div class="planbox"><div class="ph"><b>${esc(lim.name)} plan</b>${top ? '' : '<a href="/app/settings#plan">Upgrade</a>'}</div>${left ? `<a class="trialchip" href="/app/settings#plan">Trial, ${plural(left, 'day')} left</a>` : ''}<span class="meter" aria-hidden="true"><i style="width:${usedPct}%"></i></span><span class="tiny muted">${sd.used || 0} of ${plural(lim.keywords || 0, 'keyword')} tracked.${sd.checksLeft != null ? ' ' + plural(sd.checksLeft, 'keyword check') + ' left this month.' : ''}</span></div>` : '';
+  return `<a class="brand" href="/app">${LOGO}<span>AI SEO Deck</span></a>
+<a class="sitepick" href="/app" title="All your sites"><span class="ini" aria-hidden="true">${esc(String(name || '?').trim().charAt(0).toUpperCase() || '?')}</span><span class="nm"><b>${esc(name)}</b><span>${esc(hostOf(site.url))}</span></span>${CHEVRON}<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">, all sites</span></a>
+<nav class="sidenav" aria-label="Site sections">${nav}</nav>
+${plan}
+<nav class="sidefoot" aria-label="Account"><a class="allsites" href="/app">All sites</a><a href="/app/settings">Account</a><a href="/logout">Sign out</a></nav>`;
+}
+
+function pageHead(title, sub, meta, right) {
+  return `<div class="pagehead"><div style="min-width:0"><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}${meta && meta.length ? `<p class="meta">${meta.join('')}</p>` : ''}</div>${right ? `<div class="runbox">${right}</div>` : ''}</div>`;
+}
+function runControls(site, can) {
+  can = can || {};
+  const btn = site.sched && site.sched.runId ? '' : `<form method="post" action="/app/site/run"><input type="hidden" name="id" value="${esc(site.id)}"><button class="btn" type="submit"${can.ok ? '' : ' disabled'}>Check all keywords now</button></form>`;
+  const note = !can.ok && can.why ? `<span class="tiny muted">${esc(can.why)}</span>` : (can.ok && can.cost ? `<span class="tiny muted">Uses ${plural(can.cost, 'keyword check')} of ${can.left} left this month</span>` : '');
+  return note + btn;
 }
 
 function addKeywordForm(site, opts) {
   opts = opts || {};
   return `<form class="addkw" method="post" action="/app/keywords"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="back" value="keywords">${SEARCH_ICON}
-<label for="newkw" class="tiny" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Add keywords</label><input type="text" id="newkw" name="text" maxlength="400" placeholder="Add a keyword, for example crm for small business" value="${esc(opts.prefill || '')}" autocomplete="off" required>
+<label for="newkw" class="tiny" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Add keywords</label><input type="text" id="newkw" name="text" maxlength="400" placeholder="Type a search, for example crm for small business" value="${esc(opts.prefill || '')}" autocomplete="off" required>
 <button class="btn mark" type="submit">Add and check</button>
-<span class="hint">${opts.room > 0 ? `${plural(opts.room, 'keyword')} left on your plan. Separate several with commas. ` : 'Your plan\'s keywords are all in use. Remove one or upgrade to add more. '}<a href="${esc(siteHref(site, 'tab=discover'))}">Find keyword ideas</a></span></form>`;
+<span class="hint">${opts.room > 0 ? `${plural(opts.room, 'keyword')} left on your plan. Separate several with commas.` : 'Your plan\'s keywords are all in use. Remove one or upgrade to add more.'}</span></form>`;
+}
+
+// Adding keywords, with ideas from the homepage and from Google AI Overviews one click away.
+function addBox(site, d) {
+  const disc = site.discover || {};
+  const tracked = new Set((site.keywords || []).map((k) => k.text));
+  const ideas = (disc.cited || []).map((x) => Object.assign({ src: 'aio' }, x)).concat((disc.ideas || []).map((x) => Object.assign({ src: 'idea' }, x)))
+    .filter((x) => x.keyword && !tracked.has(x.keyword)).slice(0, 5);
+  const chips = ideas.map((it) => `<form method="post" action="/app/keywords"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="text" value="${esc(it.keyword)}"><input type="hidden" name="back" value="keywords"><input type="hidden" name="source" value="${esc(it.src)}"><button class="idea" type="submit" title="Track ${esc(it.keyword)}">${PLUS}<span class="t">${esc(it.keyword)}</span>${it.volume != null ? `<span class="v">${num(it.volume)}</span>` : ''}</button></form>`).join('');
+  return `<section class="panel addbox" aria-labelledby="add-h"><h2 id="add-h" style="font-size:16px">Add keywords</h2>${addKeywordForm(site, { room: d.room, prefill: d.prefill })}
+<div class="ideas">${ideas.length ? `<span>Ideas for you</span>${chips}` : ''}<a class="small" href="${esc(siteHref(site, 'tab=discover'))}" style="font-weight:650">${ideas.length ? 'More ideas' : 'Find keyword ideas'}</a></div></section>`;
 }
 
 function keywordsTab(site, d) {
-  if (!(site.keywords || []).length) return `${addKeywordForm(site, { room: d.room, prefill: d.prefill })}<div class="panel empty"><h2>Add your first keyword</h2><p>Type what your customers search for, like a service and a city. We ask every AI engine in your plan and show whether they name you.</p><a class="btn" href="${esc(siteHref(site, 'tab=discover'))}">Find keyword ideas</a></div>`;
-  return `${addKeywordForm(site, { room: d.room, prefill: d.prefill })}${fixNext(site)}${deckTable(site, { engines: d.engines, locked: d.locked, running: d.running, trialDays: d.trialDays })}`;
+  if (!(site.keywords || []).length) return `${addBox(site, d)}<div class="panel empty"><h2>Add your first keyword</h2><p>Type what your customers search for, like a service and a city. We ask every AI engine in your plan and show whether they name you.</p></div>`;
+  return `${addBox(site, d)}${deckTable(site, { engines: d.engines, locked: d.locked, running: d.running, trialDays: d.trialDays })}`;
 }
 
-// "Fix next": the keywords where AI names you least, ranked by what fixing them is worth.
+/* ---------- overview ---------- */
+
+function gapAction(site) {
+  return (g) => {
+    const why = [];
+    if (g.k.volume) why.push(`${num(g.k.volume)} searches a month`);
+    why.push(g.kc.named ? `${g.kc.named} of ${plural(g.kc.answered, 'AI engine')} name you` : `None of the ${plural(g.kc.answered, 'AI engine')} name you`);
+    if (g.lostTo.length) why.push(`${andList(g.lostTo)} named instead`);
+    return {
+      title: g.k.text,
+      why: g.recent ? `Fixes applied ${ago(g.k.fixedAt)}. Publish in Webflow, then check it again.` : why.join('. ') + '.',
+      cta: g.recent ? 'Check again' : 'Open the fix plan',
+      href: kwHref(site, g.k)
+    };
+  };
+}
+function todoList(items) {
+  return `<ol class="todo">${items.map((a, i) => `<li><span class="num" aria-hidden="true">${i + 1}</span><div class="tx"><b>${esc(a.title)}</b><span class="why">${esc(a.why)}</span><a class="go" href="${esc(a.href)}">${esc(a.cta)}</a></div></li>`).join('')}</ol>`;
+}
+// The keywords where AI names you least, as a short to-do list (the overview shows it with the site checks).
 function fixNext(site) {
-  const now = Date.now();
-  const items = [];
-  for (const k of site.keywords || []) {
-    const s = site.kw && site.kw[k.id];
-    const v = verdict(s);
-    if (!s || v === 'yes' || v === 'none') continue;
-    const kc = engineCounts(s);
-    const lostTo = [...new Set(Object.values(s.lost || {}).flat())].slice(0, 2);
-    const recent = !!(k.fixedAt && now - k.fixedAt < 14 * 86400000);
-    const miss = kc.answered ? 1 - kc.named / kc.answered : 1;
-    // searches a month (at least 10, so keywords without data still count) times the share of engines that skip
-    // you, a little more when a rival takes the place, much less when fixes were applied in the last two weeks
-    const worth = Math.max(10, k.volume || 0) * miss * (lostTo.length ? 1.3 : 1) * (recent ? 0.2 : 1);
-    items.push({ k, kc, lostTo, recent, worth });
+  const items = rankGaps(site).slice(0, 3).map(gapAction(site));
+  return items.length ? todoList(items) : '';
+}
+// Do these next: a crawler block first, then the keywords worth most, then site health and setup gaps.
+function nextActions(site, d) {
+  const audit = d.side && d.side.audit;
+  const fails = failingChecks(audit);
+  const health = (code) => ({ title: SITE_CHECKS[code].title, why: SITE_CHECKS[code].fix, cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
+  const out = [];
+  if (fails[0] === 'robots_blocks_ai') out.push(health('robots_blocks_ai'));
+  out.push(...rankGaps(site).slice(0, 3).map(gapAction(site)));
+  if (!audit) out.push({ title: 'Run the site audit', why: 'It reads your pages, robots.txt, llms.txt and sitemap, then matches each keyword to its best page.', cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
+  else if (fails.length && fails[0] !== 'robots_blocks_ai') out.push(health(fails[0]));
+  if (!(site.project.competitors || []).length) out.push({ title: 'Add your rivals', why: 'See who AI names instead of you, and on which keywords.', cta: 'Add rivals', href: siteHref(site, 'tab=settings') });
+  return out.slice(0, 3);
+}
+
+function overviewTab(site, d) {
+  const l = site.latest;
+  const brand = site.project.brand || site.name;
+  const engines = (d.engines || []).slice().sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  const locked = d.locked || [];
+  const running = !!(site.sched && site.sched.runId);
+  const todo = nextActions(site, d);
+  const todoCard = `<section class="panel next-card" aria-labelledby="todo-h"><div class="card-head" style="margin:0"><h2 id="todo-h">Do these next</h2><p class="lead">${todo.length ? 'Ranked by searches and by how rarely AI names you.' : 'Nothing needs you right now.'}</p></div>${todo.length ? todoList(todo) : `<p class="lead">Most engines name you for every keyword. Add keywords to find new ground.</p><a class="btn sm" href="${esc(siteHref(site, 'tab=keywords'))}" style="justify-self:start">Add keywords</a>`}</section>`;
+  const gEngines = engines.some((e) => e === 'aio' || e === 'aimode');
+  const lockRows = locked.map((e) => `<div class="engrow locked"><b>${LOCK} ${esc(LABEL[e] || e)}</b><span class="meter"></span><span class="v">Paid plans</span></div>`).join('');
+  const lockLink = locked.length ? (d.trialDays ? `<a class="btn mark sm" href="/app/start?plan=solo&amp;interval=monthly" style="justify-self:start">Try all ${allEnginesCount()} engines free for ${d.trialDays} days</a>` : '<a class="btn mark sm" href="/app/settings#plan" style="justify-self:start">See every AI</a>') : '';
+  if (!l) {
+    const rows = engines.map((e) => `<div class="engrow"><b>${esc(LABEL[e] || e)}</b><span class="meter"></span><span class="v">${running ? 'checking' : 'not yet'}</span></div>`).join('');
+    return `<div class="ov"><section class="panel vis-card" aria-labelledby="vis-h"><div class="vis-num"><h2 id="vis-h">AI visibility</h2><div class="row1"><span class="big">-</span><span class="lbl">${running ? 'The first check is running. Answers appear here in a few minutes.' : 'No check yet. It runs with the next scheduled check.'}</span></div></div>
+<div class="engrows"><h3>Keywords each engine names you for</h3>${rows}${lockRows}${lockLink}</div></section>${todoCard}</div>`;
   }
-  if (!items.length) return '';
-  items.sort((a, b) => b.worth - a.worth);
-  const rows = items.slice(0, 3).map(({ k, kc, lostTo, recent }, i) => {
-    const why = [kc.named ? `${kc.named} of ${plural(kc.answered, 'AI engine')} name you` : `None of the ${plural(kc.answered, 'AI engine')} name you`];
-    if (lostTo.length) why.push(`<span class="rival-name">${esc(andList(lostTo))}</span> named instead`);
-    if (k.volume) why.push(`${num(k.volume)} searches a month`);
-    const line = recent ? `Fixes applied ${esc(ago(k.fixedAt, now))}. Publish in Webflow, then check it again.` : why.join('. ') + '.';
-    return `<li><div class="nk"><a href="${esc(kwHref(site, k))}">${esc(k.text)}</a><span class="small muted">${line}</span></div><a class="btn sm${recent || i ? '' : ' mark'}" href="${esc(kwHref(site, k))}">${recent ? 'Check again' : 'Open the fix plan'}</a></li>`;
+  const hist = (d.history || []).filter((h) => typeof h.score === 'number');
+  const prev = hist[1];
+  const dd = prev ? l.score - prev.score : null;
+  const trend = hist.slice(0, 8).reverse().map((h) => [h.at, h.score]);
+  const deltaChip = dd == null ? '' : `<span class="delta${dd > 0 ? ' up' : dd < 0 ? ' down' : ''}">${dd > 0 ? `Up ${plural(dd, 'point')}` : dd < 0 ? `Down ${plural(-dd, 'point')}` : 'No change'} since the check before</span>`;
+  const rows = engines.map((e) => {
+    const b = (l.byEngine && l.byEngine[e]) || { k: 0, km: 0, kx: 0 };
+    const w = b.k ? Math.round((b.km / b.k) * 100) : 0;
+    return `<div class="engrow"><b>${esc(LABEL[e] || e)}</b><span class="meter" aria-hidden="true"><i style="width:${w}%"></i></span><span class="v" title="${esc(LONG[e] || e)} names you for ${b.km} of ${plural(b.k, 'keyword')}">${b.k ? `${b.km} of ${b.k}` : 'no answer'}</span></div>`;
   }).join('');
-  return `<section class="panel nextfix" aria-labelledby="nf-title"><div class="nf-head"><h2 id="nf-title">Fix next</h2><p class="small muted">Where AI names you least, most searched first. Each keyword has a fix plan ready.</p></div><ol class="nf">${rows}</ol></section>`;
+  const visCard = `<section class="panel vis-card" aria-labelledby="vis-h"><div class="vis-top"><div class="vis-num"><h2 id="vis-h">AI visibility</h2><div class="row1"><span class="big">${l.score}<small>%</small></span><span class="lbl">of AI answers about your keywords name ${esc(brand)}</span></div>${deltaChip}</div>
+<div class="vis-chart">${lineChart(trend, { w: 360, h: 130 })}</div></div>
+<div class="engrows"><h3>Keywords each engine names you for</h3>${rows}${lockRows}${gEngines ? '<p class="tiny muted">AI Overviews and AI Mode count only the searches where Google shows an AI answer.</p>' : ''}${lockLink}</div></section>`;
+  // rivals: on how many keywords each one is named, next to you
+  const measured = (site.keywords || []).filter((k) => site.kw && site.kw[k.id]).length || 1;
+  const rk = {};
+  for (const k of site.keywords || []) { const s = site.kw && site.kw[k.id]; if (s) for (const [name] of s.rivals || []) rk[name] = (rk[name] || 0) + 1; }
+  const rivals = Object.entries(rk).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const rrow = (name, n, own) => `<div class="rivalrow${own ? ' own' : ''}"><div class="nm"><span>${esc(name)}${own ? ' <span class="youtag">You</span>' : ''}</span><span class="meter" aria-hidden="true"><i style="width:${Math.round((n / measured) * 100)}%"></i></span></div><span class="v">in ${n} of ${plural(measured, 'keyword')}</span></div>`;
+  const rivalCard = `<section class="panel" aria-labelledby="riv-h"><div class="card-head"><h2 id="riv-h">Who AI names</h2><p>Your rivals next to you: on how many of your keywords the engines name each one.</p></div>
+${!(site.project.competitors || []).length ? `<p class="small muted">Add your rivals to see who AI names instead of you.</p><p class="card-foot"><a href="${esc(siteHref(site, 'tab=settings'))}">Add rivals</a></p>`
+    : `<div class="rivalrows">${rrow(brand, l.kwNamed || 0, true)}${rivals.map(([n, c]) => rrow(n, c, false)).join('') || '<p class="small muted">No rival was named in the latest answers.</p>'}</div><p class="card-foot"><a href="${esc(siteHref(site, 'tab=insights'))}">See where rivals win</a></p>`}</section>`;
+  const hosts = (l.topHosts || []).slice(0, 5);
+  const ownN = (l.ownCited || []).reduce((a, u) => a + (u.n || 0), 0);
+  const srcCard = `<section class="panel" aria-labelledby="src-h"><div class="card-head"><h2 id="src-h">Sites the AI reads</h2><p>A listing or a review on these sites moves you into the answers.</p></div>
+${hosts.length || ownN ? `<div class="srcrows">${hosts.map((h) => `<div class="srcrow"><span class="h" title="${esc(h.host)}">${esc(h.host)}</span><span class="v">${plural(h.n, 'answer')}</span></div>`).join('')}${ownN ? `<div class="srcrow"><span class="h">${esc(hostOf(site.url))}</span><span class="youtag">Your site</span><span class="v">${plural(ownN, 'answer')}</span></div>` : ''}</div>` : '<p class="small muted">No sources were reported yet.</p>'}
+<p class="card-foot"><a href="${esc(siteHref(site, 'tab=insights'))}">See all sources and how AI describes you</a></p></section>`;
+  return `<div class="ov">${visCard}${todoCard}</div><div class="ov2">${rivalCard}${srcCard}</div>`;
 }
 
 function trackButton(site, keyword, tracked, back, source) {
@@ -802,23 +1111,37 @@ ${site.settings.reportToken ? `<pre class="copy">${esc((process.env.APP_URL || '
 }
 
 function sitePage(user, site, d) {
-  const tab = d.tab || 'keywords';
-  let body = '';
-  if (tab === 'keywords') body = keywordsTab(site, d);
-  else if (tab === 'discover') body = discoverTab(site, d);
-  else if (tab === 'insights') body = insightsTab(site);
-  else if (tab === 'audit') body = auditHtml(site, d.audit);
-  else body = settingsTab(site, d.limits);
+  const tab = d.tab || 'overview';
   const can = d.canRun || {};
-  const runBtn = site.sched && site.sched.runId ? '' : `<form method="post" action="/app/site/run"><input type="hidden" name="id" value="${esc(site.id)}"><button class="btn" type="submit"${can.ok ? '' : ' disabled'}>Check all keywords now</button></form>`;
-  const meta = [`<span>${esc(hostOf(site.url))}</span>`, `<span>${plural((site.keywords || []).length, 'keyword')}</span>`];
-  if (site.latest) meta.push(`<span>checked ${esc(ago(site.latest.finishedAt || site.latest.at))}</span>`);
-  if (site.tracked && site.sched.nextRunAt && !site.sched.runId) meta.push(`<span>next check ${esc(until(site.sched.nextRunAt))}</span>`);
-  return layout(site.name + ' · AI SEO Deck', `${noticeHtml(d.notice)}${progressHtml(site, d.progress)}
-<div class="head"><div><h1>${esc(site.project.brand || site.name)}</h1><p class="meta">${meta.join('')}</p></div><div class="actions">${runBtn}${!can.ok && can.why ? `<span class="tiny muted" style="max-width:280px">${esc(can.why)}</span>` : (can.ok && can.cost ? `<span class="tiny muted">Uses ${plural(can.cost, 'keyword check')} of ${can.left} left this month</span>` : '')}</div></div>
-${statStrip(site, d.history, d.limits)}
-${tabsHtml(site, tab)}
-${body}`, { user, nav: 'sites', script: site.sched && site.sched.runId ? PUMP(site.id) : '' });
+  const brand = site.project.brand || site.name;
+  const active = tab === 'discover' ? 'keywords' : tab === 'insights' ? 'overview' : tab;
+  const n = (site.keywords || []).length;
+  const back = (t, label) => `<a class="back" href="${esc(siteHref(site, 'tab=' + t))}">${BACK_ICON} ${label}</a>`;
+  let head = '', body = '';
+  if (tab === 'overview') {
+    const meta = [`<span>${esc(hostOf(site.url))}</span>`];
+    if (site.latest) meta.push(`<span>checked ${esc(ago(site.latest.finishedAt || site.latest.at))}</span>`);
+    if (site.tracked && site.sched.nextRunAt && !site.sched.runId) meta.push(`<span>next check ${esc(until(site.sched.nextRunAt))}</span>`);
+    head = pageHead(esc(brand), `How often AI engines name ${esc(brand)} when people ask about your ${plural(n, 'keyword')}.`, meta, runControls(site, can));
+    body = overviewTab(site, d);
+  } else if (tab === 'keywords') {
+    head = pageHead('Keywords', `Each keyword is checked on every AI engine in your plan. Open one for its fix plan.`, [], runControls(site, can));
+    body = keywordsTab(site, d);
+  } else if (tab === 'discover') {
+    head = back('keywords', 'Keywords') + pageHead('Keyword ideas', 'Searches worth tracking: the ones Google AI Overviews already cite you for, ideas from your homepage and what the AI searched for.');
+    body = discoverTab(site, d);
+  } else if (tab === 'insights') {
+    head = back('overview', 'Overview') + pageHead('Rivals and sources', 'Where rivals win, how the AI describes you and the websites it relies on.');
+    body = insightsTab(site);
+  } else if (tab === 'audit') {
+    head = pageHead('Site health', 'What keeps AI engines from reading and citing your site, with a fix for each page.');
+    body = auditHtml(site, d.audit);
+  } else {
+    head = pageHead('Settings', `Brand, rivals, tracking and the client report link for ${esc(brand)}.`);
+    body = settingsTab(site, d.limits);
+  }
+  return layout(site.name + ' · AI SEO Deck', `${noticeHtml(d.notice)}${progressHtml(site, d.progress)}${head}${body}`,
+    { user, side: siteSide(user, site, active, d), script: site.sched && site.sched.runId ? PUMP(site.id) : '' });
 }
 
 /* ---------- keyword page ---------- */
@@ -851,7 +1174,7 @@ function lanesHtml(site, k, d) {
     const mine = units.filter((u) => (u.q === 'k') === (e === 'aio' || e === 'aimode'));
     const answers = mine.map((u) => answerBlock(res[u.id + '|' + e], u.text, u.q === 'k', site.project)).join('');
     const label = { b: 'Names you and cites your site', n: 'Names you', i: 'Cites your site, does not name you', o: 'Does not name you', x: 'No AI answer on Google', f: 'Could not be read', w: d.checking ? 'Checking now' : 'Not checked yet' }[st] || '';
-    return `<li class="lane" id="e-${esc(e)}"><div class="lh"><span class="sig st-${esc(st)}" aria-hidden="true"></span><b>${esc(LONG[e] || e)}</b><span class="small muted">${esc(label)}</span></div>${answers || (run ? '' : '<p class="small muted" style="margin-left:24px">Answers appear after the first check.</p>')}</li>`;
+    return `<li class="lane" id="e-${esc(e)}"><div class="lh"><span class="c sm st-${esc(st)}" aria-hidden="true">${MARK_ICON[st] || ''}</span><b>${esc(LONG[e] || e)}</b><span class="small muted">${esc(label)}</span></div>${answers || (run ? '' : '<p class="small muted" style="margin-left:24px">Answers appear after the first check.</p>')}</li>`;
   }).join('')}${(d.locked || []).map((e) => `<li class="lane"><div class="lh"><span class="c st-lock" aria-hidden="true">${LOCK}</span><b>${esc(LONG[e] || e)}</b><span class="small muted">Part of the paid plans</span></div></li>`).join('')}</ul>`;
 }
 
@@ -859,6 +1182,10 @@ function faqLines(pairs) { return (pairs || []).map((x) => 'Q: ' + x.q + '\nA: '
 
 // The plan of fixes for one keyword: the page, title and description, answers with FAQ schema, where the AI looks.
 function fixPlan(site, k, d) {
+  let i = 0;
+  return fixPlanBody(site, k, d).replace(/<span class="tick" aria-hidden="true"><\/span>/g, () => `<span class="tick" aria-hidden="true">${++i}</span>`);
+}
+function fixPlanBody(site, k, d) {
   const sum = site.kw && site.kw[k.id];
   const id = esc(site.id);
   const target = d.target; // { path, pageId, static, score, row } or null
@@ -868,7 +1195,7 @@ function fixPlan(site, k, d) {
   const whereItem = `<li class="manual"><span class="tick" aria-hidden="true"></span><div><h3>Be where the AI looks</h3><p class="d">${hosts.length ? 'The engines cited these sites for this keyword. Reviews, listings and articles there move you into the answers.' : 'After the first check, this lists the sites the engines cite for this keyword.'}</p>${hosts.length ? `<div class="chips" style="margin-top:10px">${hosts.map(([h, n]) => `<span class="q">${esc(h)} <span class="faint">${n}</span></span>`).join('')}</div>` : ''}</div></li>`;
   const pageOptions = (d.pages || []).filter((p) => p.ok !== false && !p.error).slice(0, 80).map((p) => `<option value="${esc(p.path)}"${target && target.path === p.path ? ' selected' : ''}>${esc(p.path)}${p.pageId ? '' : ' (CMS)'}</option>`).join('');
   const pagePicker = d.pages && d.pages.length ? `<form method="post" action="/app/keyword/page" class="actions" style="gap:8px"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><select name="path" aria-label="Page for this keyword" style="width:auto;max-width:260px">${target ? '' : '<option value="">Choose a page</option>'}${pageOptions}<option value="new"${k.page === 'new' ? ' selected' : ''}>A new page in the CMS</option></select><button class="btn sm" type="submit">Use</button></form>` : '';
-  const head = `<div class="plan-head"><div><h2>What to do</h2><p class="small muted" style="margin-top:4px">${target ? `Best page: <a href="${esc(d.origin + target.path)}" target="_blank" rel="noopener">${esc(target.path)}</a>${k.page === target.path ? '' : ' (matched by its title and address)'}` : k.page === 'new' ? 'A new page, drafted in your CMS' : d.pages ? 'No page on your site matches this keyword yet.' : 'Run the site audit to match a page.'}</p></div>${pagePicker}</div>`;
+  const head = `<div class="plan-head"><div><h2>Your fix plan</h2><p class="small muted" style="margin-top:4px">${target ? `Best page: <a href="${esc(d.origin + target.path)}" target="_blank" rel="noopener">${esc(target.path)}</a>${k.page === target.path ? '' : ' (matched by its title and address)'}` : k.page === 'new' ? 'A new page, drafted in your CMS' : d.pages ? 'No page on your site matches this keyword yet.' : 'Run the site audit to match a page.'}</p></div>${pagePicker}</div>`;
   if (!d.pages) {
     return `<section class="panel plan-card">${head}<ul class="fx"><li><span class="tick" aria-hidden="true"></span><div><h3>Find the best page for this keyword</h3><p class="d">The site audit reads your pages and matches each keyword to the one that should rank. It takes up to a minute.</p>
 <form method="post" action="/app/site/audit" style="margin-top:12px"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${esc(k.id)}"><button class="btn sm primary" type="submit">Run the site audit</button></form></div></li>${whereItem}</ul></section>`;
@@ -888,7 +1215,7 @@ function fixPlan(site, k, d) {
   const faq = draft.faq || [];
   const isStatic = !!target.pageId;
   const titleItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Title and description</h3><p class="d">The first thing search engines and AI read about the page.</p>
-${meta ? `<div class="diff"><div><span class="l">Now</span><s>${esc(row.title || '(no title)')}</s></div><div><span class="l">New</span><div class="fields" style="gap:8px"><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:70px" aria-label="New description">${esc(meta.description)}</textarea></div></div></div>
+${meta ? `<div class="diff2"><div class="was"><span class="l">Now</span><b>${esc(row.title || '(no title)')}</b><span>${esc(row.description || 'No description')}</span></div><div class="now"><span class="l">Suggested</span><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:84px" aria-label="New description">${esc(meta.description)}</textarea></div></div>
 <label class="include"><input type="checkbox" name="do_meta" value="1" form="applyform" checked> Apply the new title and description</label>` : `<p class="small" style="margin-top:8px">Now: <b>${esc(row.title || '(no title)')}</b></p>`}</div></li>`;
   const faqItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Answers to what people ask</h3><p class="d">Answers written from your own page for the questions behind this keyword, added to the page as FAQ schema${collections ? ' and to your CMS as drafts' : ''}.</p>
 ${faq.length ? `<textarea name="faq" form="applyform" style="min-height:160px;margin-top:10px" aria-label="Questions and answers">${esc(faqLines(faq))}</textarea><span class="hint">Lines start with Q: and A:. Every answer should also be visible on the page.</span>
@@ -901,6 +1228,16 @@ ${faq.length ? `<textarea name="faq" form="applyform" style="min-height:160px;ma
   return `<section class="panel plan-card">${head}<ul class="fx">${titleItem}${faqItem}${whereItem}</ul>${cmsNote}${foot}${can ? '' : '<p class="tiny muted" style="padding:0 22px 16px">Applying to Webflow is part of the paid plans. You can copy everything on the free plan.</p>'}</section>`;
 }
 
+// Tabs on the keyword page: every panel is in the page, so it reads in full without JavaScript; with it, one panel
+// shows at a time and the address keeps the open one (#plan, #answers, #related).
+const TABS_JS = `(function(){var root=document.querySelector('.tabbed');if(!root)return;var list=root.querySelector('.vtabs');if(!list)return;
+var tabs=[].slice.call(list.querySelectorAll('[role=tab]'));
+function show(v,focus){tabs.forEach(function(t){var on=t.getAttribute('data-v')===v;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;var p=document.getElementById('p-'+t.getAttribute('data-v'));if(p)p.hidden=!on;if(on&&focus)t.focus();});}
+list.hidden=false;root.classList.add('js');
+var start=(location.hash||'').slice(1);if(!tabs.some(function(t){return t.getAttribute('data-v')===start;}))start='plan';show(start);
+tabs.forEach(function(t,i){t.addEventListener('click',function(){show(t.getAttribute('data-v'));try{history.replaceState(null,'','#'+t.getAttribute('data-v'));}catch(e){}});
+t.addEventListener('keydown',function(e){if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;show(tabs[j].getAttribute('data-v'),true);});});})();`;
+
 function keywordPage(user, site, k, d) {
   const sum = site.kw && site.kw[k.id];
   const v = verdict(sum);
@@ -909,30 +1246,44 @@ function keywordPage(user, site, k, d) {
   const checking = !!(site.sched && site.sched.runId && (d.running || []).includes(k.id));
   const can = d.canCheck || {};
   const checkBtn = checking ? '' : `<form method="post" action="/app/keyword/check"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><button class="btn" type="submit"${can.ok ? '' : ' disabled'}>Check again</button></form>`;
+  const checkNote = !checking && !can.ok && can.why ? `<span class="tiny muted">${esc(can.why)}</span>` : (can.ok && can.left != null ? `<span class="tiny muted">${plural(can.left, 'keyword check')} left this month</span>` : '');
   const meta = [];
   if (k.volume != null) meta.push(`<span>${num(k.volume)} searches a month</span>`);
   if (sum) meta.push(`<span>checked ${esc(ago(sum.at))}</span>`);
   meta.push(`<span>${plural((k.questions || []).length || 1, 'question')} on each chat engine</span>`);
-  const verdictBox = sum ? `<section class="panel verdict${v === 'yes' ? ' yes' : ''}"><div class="big">${kc.named}<small>/${kc.answered}</small></div>
+  // which engine names you, in words under each mark
+  const engs = ((d.run && d.run.engines) || d.engines || []).slice().sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  const strip = engs.length ? `<ul class="estrip" aria-label="Each AI engine">${engs.map((e) => {
+    const st = sum && sum.eng && sum.eng[e] ? sum.eng[e] : checking ? 'run' : 'w';
+    return `<li>${dot(st, e)}<b>${esc(LABEL[e] || e)}</b><span class="st">${esc(STATE_TEXT[st] || '')}</span></li>`;
+  }).join('')}${(d.locked || []).map((e) => `<li><span class="c st-lock" aria-hidden="true">${LOCK}</span><b>${esc(LABEL[e] || e)}</b><span class="st">Paid plans</span></li>`).join('')}</ul>` : '';
+  const verdictBox = sum ? `<section class="panel"><div class="verdict2${v === 'yes' ? ' yes' : ''}"><div class="big">${kc.named}<small>/${kc.answered}</small></div>
 <div class="vt"><strong>${esc(verdictText(sum, site.project.brand))}</strong><div class="facts"><span>Visible in <b>${Math.round((sum.vis || 0) * 100)}%</b> of ${plural(sum.n, 'answer')}</span><span>Your site cited in <b>${sum.c}</b></span>${sum.rank ? `<span>Average place <b>#${sum.rank}</b></span>` : ''}${(sum.rivals || []).length ? `<span>Rivals named: ${sum.rivals.slice(0, 3).map(([n, c]) => `<span class="rival-name">${esc(n)}</span> ${c}`).join(', ')}</span>` : ''}</div></div>
-<div class="chart">${lineChart(sum.trend || [], { w: 340, h: 120, next: site.sched && site.sched.nextRunAt ? new Date(site.sched.nextRunAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '' })}</div></section>`
-    : `<section class="panel verdict"><div class="big">-</div><div class="vt"><strong>${checking ? 'Asking the AI engines now.' : 'Not checked yet.'}</strong><p class="small muted">${checking ? 'Answers appear here in a minute or two. Keep the page open to speed it up.' : 'It is checked with the next scheduled check, or press Check again.'}</p></div></section>`;
+<div class="chart">${lineChart(sum.trend || [], { w: 340, h: 120, next: site.sched && site.sched.nextRunAt ? new Date(site.sched.nextRunAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '' })}</div></div>${strip}</section>`
+    : `<section class="panel"><div class="verdict2"><div class="big">-</div><div class="vt"><strong>${checking ? 'Asking the AI engines now.' : 'Not checked yet.'}</strong><p class="small muted">${checking ? 'Answers appear here in a minute or two. Keep the page open to speed it up.' : 'It is checked with the next scheduled check, or press Check again.'}</p></div></div>${strip}</section>`;
   const searched = (sum && sum.queries || []).slice(0, 10).map((q) => ({ keyword: q, volume: null })).filter((x) => x.keyword.length <= 80);
   const related = d.related || null;
-  const relBox = `<section class="panel stack"><h2>Related keywords</h2>
-<div><h3 style="margin-bottom:6px">What the AI searched for</h3><p class="small muted" style="margin-bottom:8px">The web searches the engines ran before answering.</p>${searched.length ? relatedList(site, searched, tracked, 'k:' + k.id, 'search') : '<p class="small muted">Appears after the first check.</p>'}</div>
-<div><h3 style="margin-bottom:6px">Searches related to this keyword</h3>${related ? (related.length ? relatedList(site, related, tracked, 'k:' + k.id, 'idea') : '<p class="small muted">No related searches found for this market.</p>') : `<form method="post" action="/app/keyword/related" class="actions"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><button class="btn sm" type="submit"${d.labs ? '' : ' disabled'}>Show related searches</button>${d.labs ? '' : '<span class="tiny muted">Needs keyword data on the server.</span>'}</form>`}</div></section>`;
+  const relBox = `<div class="cols" style="align-items:start"><section class="panel stack"><div><h2>What the AI searched for</h2><p class="small muted" style="margin-top:6px">The web searches the engines ran before answering.</p></div>${searched.length ? relatedList(site, searched, tracked, 'k:' + k.id, 'search') : '<p class="small muted">Appears after the first check.</p>'}</section>
+<section class="panel stack"><div><h2>Searches related to this keyword</h2><p class="small muted" style="margin-top:6px">What people search next on Google, most searched first.</p></div>${related ? (related.length ? relatedList(site, related, tracked, 'k:' + k.id, 'idea') : '<p class="small muted">No related searches found for this market.</p>') : `<form method="post" action="/app/keyword/related" class="actions"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><button class="btn sm" type="submit"${d.labs ? '' : ' disabled'}>Show related searches</button>${d.labs ? '' : '<span class="tiny muted">Needs keyword data on the server.</span>'}</form>`}</section></div>`;
+  // who the engines name for this keyword, you included
+  const who = sum && sum.n ? [[site.project.brand || site.name, sum.m || 0, true]].concat((sum.rivals || []).slice(0, 4).map(([n, c]) => [n, c, false])) : [];
+  const whoBox = who.length ? `<section class="panel stack"><h2>Who AI names here</h2><div class="rivalrows">${who.map(([n, c, own]) => `<div class="rivalrow${own ? ' own' : ''}"><div class="nm"><span>${esc(n)}${own ? ' <span class="youtag">You</span>' : ''}</span><span class="meter" aria-hidden="true"><i style="width:${Math.round((c / sum.n) * 100)}%"></i></span></div><span class="v">${c} of ${plural(sum.n, 'answer')}</span></div>`).join('')}</div></section>` : '';
   const qBox = `<section class="panel stack"><h2>Questions we ask</h2><p class="small muted">The chat engines get these questions; Google AI Overviews and AI Mode get the keyword itself. Edit them to match how your customers ask.</p>
 <form method="post" action="/app/keyword/questions" class="fields"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><div class="field"><label for="qs">One question per line, up to ${QUESTIONS}</label><textarea id="qs" name="questions" style="min-height:90px">${esc((k.questions || []).join('\n'))}</textarea></div>
 <div class="actions"><button class="btn sm" type="submit">Save questions</button></div></form>
 <form method="post" action="/app/keyword/remove" onsubmit="return this.querySelector('[name=sure]').checked" style="border-top:1px solid var(--line2);padding-top:14px"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><label class="check small"><input type="checkbox" name="sure" value="1"> Stop tracking this keyword</label><button class="btn sm danger" type="submit" style="margin-top:8px">Remove keyword</button></form></section>`;
-  const script = (checking ? PUMP(site.id) : '') + `document.querySelectorAll('#writeplan').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button');var w=f.querySelector('#writing');if(b){b.disabled=true;}if(w){w.hidden=false;}});});`;
+  const answers = sum ? (sum.n || 0) + (sum.na || 0) + (sum.f || 0) : 0;
+  const tab = (id, label, n) => `<button type="button" role="tab" id="t-${id}" data-v="${id}" aria-controls="p-${id}" aria-selected="${id === 'plan' ? 'true' : 'false'}"${id === 'plan' ? '' : ' tabindex="-1"'}>${label}${n ? `<span class="n">${n}</span>` : ''}</button>`;
+  const views = `<div class="tabbed"><div class="vtabs" role="tablist" aria-label="Keyword views" hidden>${tab('plan', 'Fix plan')}${tab('answers', 'What AI said', answers)}${tab('related', 'Related keywords', searched.length + (related ? related.length : 0))}</div>
+<section class="vpanel" id="p-plan" role="tabpanel" aria-labelledby="t-plan"><div class="grid2"><div class="stack">${fixPlan(site, k, d)}</div><div class="stack">${whoBox}${qBox}</div></div></section>
+<section class="vpanel" id="p-answers" role="tabpanel" aria-labelledby="t-answers"><div class="panel stack"><h2>What each AI engine said</h2>${lanesHtml(site, k, Object.assign({ checking }, d))}</div></section>
+<section class="vpanel" id="p-related" role="tabpanel" aria-labelledby="t-related">${relBox}</section></div>`;
+  const script = (checking ? PUMP(site.id) : '') + TABS_JS + `document.querySelectorAll('#writeplan').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button');var w=f.querySelector('#writing');if(b){b.disabled=true;}if(w){w.hidden=false;}});});`;
   return layout(k.text + ' · AI SEO Deck', `${noticeHtml(d.notice)}${checking ? progressHtml(site, d.progress) : ''}
-<a class="back" href="${esc(siteHref(site, 'tab=keywords'))}">${esc(site.project.brand || site.name)}, all keywords</a>
-<div class="head"><div><h1>${esc(k.text)}</h1><p class="meta">${meta.join('')}</p></div><div class="actions">${checkBtn}${!checking && !can.ok && can.why ? `<span class="tiny muted" style="max-width:280px">${esc(can.why)}</span>` : (can.ok && can.left != null ? `<span class="tiny muted">${plural(can.left, 'keyword check')} left this month</span>` : '')}</div></div>
+<a class="back" href="${esc(siteHref(site, 'tab=keywords'))}">${BACK_ICON} All keywords</a>
+${pageHead(esc(k.text), '', meta, checkNote + checkBtn)}
 ${verdictBox}
-<div class="grid2"><div class="stack">${fixPlan(site, k, d)}<section class="panel stack"><h2>What each AI engine said</h2>${lanesHtml(site, k, Object.assign({ checking }, d))}</section></div>
-<div class="stack">${relBox}${qBox}</div></div>`, { user, nav: 'sites', script });
+${views}`, { user, side: siteSide(user, site, 'keywords', d), script });
 }
 
 /* ---------- page fix (from the audit) ---------- */
@@ -951,7 +1302,7 @@ function fixPage(user, site, row, d) {
   const faqPairs = draft.faq && draft.faq.length ? draft.faq : (row.faq || []);
   const existingTypes = d.existingTypes || [];
   return layout('Fix ' + row.path + ' · AI SEO Deck', `${noticeHtml(d.notice)}
-<a class="back" href="${esc(siteHref(site, 'tab=audit'))}">Back to the site audit</a>
+<a class="back" href="${esc(siteHref(site, 'tab=audit'))}">${BACK_ICON} Site health</a>
 <div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div></div>${localeNote(site)}
 <div class="stack">
 <section class="panel stack"><h2>Title and description</h2><p class="small muted">What search engines and AI assistants read first about this page.</p>
@@ -970,7 +1321,7 @@ function fixPage(user, site, row, d) {
 <form method="post" action="/app/fix/schema" class="fields"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}">
 <div class="field"><label for="schema">What will be written to Webflow</label><textarea id="schema" name="schema" class="code" spellcheck="false">${esc(JSON.stringify(d.proposedSchema || {}, null, 2))}</textarea>${row.path === '/' ? '<span class="hint">Business details come from the Settings tab. Change them there and come back.</span>' : ''}</div>
 <div class="actions">${applyBtn('Apply to Webflow')}<button class="btn ghost" type="button" data-copy="schema">Copy</button></div>${lockNote}</form></section>
-</div>`, { user, nav: 'sites', script: COUNT_JS });
+</div>`, d.side ? { user, side: siteSide(user, site, 'audit', d), script: COUNT_JS } : { user, nav: 'sites', script: COUNT_JS });
 }
 
 /* ---------- account settings ---------- */

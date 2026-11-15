@@ -404,7 +404,13 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(site.sched.nextRunAt - Date.now() > 29 * 86400000 && sVen.trend.length === 1, 'free plan: next check in about a month, trend started');
 
   r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie } });
+  assert(r.status === 200 && r.body.includes('class="shell"') && r.body.includes('aria-current="page">' ) && r.body.includes('>Overview<') && r.body.includes('AI visibility') && r.body.includes('Do these next') && r.body.includes('Keywords each engine names you for'), 'a site opens on its overview, inside the sidebar');
+  assert(r.body.includes('Open the fix plan') && r.body.includes('Run the site audit') && /<ol class="todo">/.test(r.body), 'the overview says what to do next: keywords worth fixing, then the site audit');
+  assert(r.body.includes('Who AI names') && r.body.includes('Sites the AI reads') && r.body.includes('Not run'), 'rivals, sources and the site health badge');
+  r = await request(port, 'GET', '/app/site?id=siteA&tab=keywords', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('class="kt"') && r.body.includes('veneers in antalya') && r.body.includes('c st-b') && r.body.includes('c st-x'), 'the keyword deck renders with engine states');
+  assert(r.body.includes('What the marks mean') && r.body.includes('Names you and links your site') && r.body.includes('Named by') && (r.body.includes('Fix this first') || r.body.includes('Fix plan')), 'the marks are explained in words, each keyword says how many engines name it and what to do');
+  assert(r.body.indexOf('1,800 searches a month') > -1 && r.body.indexOf('veneers in antalya') < r.body.indexOf('smile makeover antalya'), 'the most searched keywords come first');
   assert(r.body.includes('c st-lock') && r.body.includes('4 more AI engines') && r.body.includes('1,800'), 'free plan sees the paid engines as locked columns, volumes shown');
   assert(r.body.includes('Check all keywords now') && r.body.includes('disabled') && r.body.includes('Checks on demand are part of the paid plans'), 'free plan cannot check on demand');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
