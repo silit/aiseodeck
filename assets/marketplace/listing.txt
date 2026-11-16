@@ -37,8 +37,8 @@ APP ICON IMAGE ALT TEXT
 AI SEO Deck logo
 
 PAYMENT TYPE
-Paid
-(The app has a free plan and paid plans; the prices are in the description.)
+Free
+(Webflow marks an app Free when it has an ongoing free tier; AI SEO Deck has the Free plan, and the paid plans are in the description.)
 
 MARKETPLACE VISIBILITY
 Public
@@ -58,8 +58,8 @@ info@silitlabs.com
 
 === APP DETAILS ===
 
-APP CATEGORY (up to 5)
-AI, SEO, Analytics, Marketing, Content Management
+APP CATEGORY (up to 2)
+AI, SEO
 
 APP PREVIEW DESCRIPTION (SHORT)
 See if ChatGPT, Google AI, Gemini, Claude and Grok recommend you, then fix your Webflow site.
@@ -106,7 +106,7 @@ People now ask ChatGPT, Google and other AI engines which product, studio or ser
 
 Yearly plans include two months free. Every paid plan starts with a 7-day free trial. Payments through Polar, cancel any time.
 
-Not affiliated with Webflow, OpenAI, Google, Anthropic or xAI.
+AI SEO Deck is not affiliated with or endorsed by OpenAI, Google, Anthropic, xAI or Webflow.
 
 APP PROMO VIDEO URL
 Leave empty (optional).
