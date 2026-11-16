@@ -1,4 +1,11 @@
 AI SEO DECK: WEBFLOW MARKETPLACE SUBMISSION FORM
+
+SUBMITTED
+16 November 2026, 03:33 (Istanbul). Webflow reference ID: 74f6e5a5-5312-44c8-acbc-671267369fa5
+Review usually takes 10 to 15 business days. Feedback and the decision arrive by email on the submission thread; reply there.
+If changes are needed: fix, then Publish > Upload Bundle for Review in the app settings. The review continues on the same thread.
+
+
 Form: https://developers.webflow.com/submit (sign in with Webflow first)
 The fields below are in the same order as the form. Text values are autosaved by the form; files are not.
 
