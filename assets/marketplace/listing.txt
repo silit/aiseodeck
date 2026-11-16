@@ -112,20 +112,20 @@ APP PROMO VIDEO URL
 Leave empty (optional).
 
 APP SCREENSHOTS (upload in this order; alt text for each)
-1. screenshots/1-overview.png
-Alt text: AI SEO Deck overview of a site: a 47 percent AI visibility score, how many keywords each of six AI engines names the brand for, and the three keywords to fix next
+1. screenshots/1-ai-visibility.png
+Alt text: AI SEO Deck overview of a site: a 47 percent AI visibility score, how many keywords each of six AI engines names the brand for, and the keywords to fix next
 
-2. screenshots/2-keywords.png
-Alt text: Keyword table with one column per AI engine showing whether each engine names the brand, with search volume, visibility, a four-week trend and keyword ideas to add
+2. screenshots/2-every-engine.png
+Alt text: Keyword table with one column per AI engine: a yellow mark when the engine names the brand and a blue ring when it also links to the site, with search volume, visibility and a four-week trend
 
 3. screenshots/3-what-ai-said.png
-Alt text: One keyword in detail: one of six AI engines names the brand, two rivals are named instead, and the ChatGPT answers are shown with the searches it ran and the sites it cited
+Alt text: One keyword in detail: one of six AI engines names the brand, with the full Gemini answer, the rival it named, the search it ran and the site it cited
 
 4. screenshots/4-fix-plan.png
-Alt text: Fix plan for a keyword: the current page title and description next to the suggested ones, FAQ answers to add as schema, sites to be listed on, and the Apply to Webflow button
+Alt text: Fix plan for a keyword: the current page title and description next to the suggested ones, and the Apply to Webflow button that writes them as unpublished changes
 
 5. screenshots/5-designer-panel.png
-Alt text: The AI SEO Deck panel inside the Webflow Designer in three steps: the page's keyword on every AI engine, a new title and description with a search preview, and FAQ schema answers
+Alt text: The AI SEO Deck panel inside the Webflow Designer: a title and description written from the page, a search preview and the Apply to this page button
 
 SOURCE MAP ARTIFACT
 designer-extension/review-source.zip
@@ -154,7 +154,7 @@ https://aiseodeck-demo.webflow.io
 === SUPPORT INFO ===
 
 REVIEW TEAM DEMO VIDEO URL
-The link of the captioned demo video (YouTube unlisted or Google Drive, anyone with the link).
+https://youtu.be/wr8nkhgncMc
 
 DOCUMENTATION URL
 https://aiseodeck.silitlabs.com/docs
