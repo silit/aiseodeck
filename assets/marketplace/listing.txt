@@ -37,8 +37,8 @@ APP ICON IMAGE ALT TEXT
 AI SEO Deck logo
 
 PAYMENT TYPE
-Free
-(Webflow marks an app Free when it has an ongoing free tier; AI SEO Deck has the Free plan, and the paid plans are in the description.)
+Free and Paid (tick both)
+(The Free plan is ongoing and the paid plans are in the description. The form blocks Free alone when the listing mentions paid plans.)
 
 MARKETPLACE VISIBILITY
 Public
