@@ -10,6 +10,12 @@ Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, 
 - [Privacy policy](https://aiseodeck.silitlabs.com/privacy)
 - [Terms of use](https://aiseodeck.silitlabs.com/terms)
 
+## Guides
+
+- [How to check if ChatGPT recommends your business](https://silitlabs.com/guides/check-if-chatgpt-recommends-your-business/): a repeatable manual check across AI engines
+- [AI visibility tracker: what to measure and how to read it](https://silitlabs.com/guides/ai-visibility-tracker/): share of answers, links, rivals, sources and search demand
+- [Webflow AEO checklist](https://silitlabs.com/guides/webflow-aeo-checklist/): crawler access, titles, FAQ schema, llms.txt and measurement on Webflow
+
 ## Plans (US dollars)
 
 - Free: 3 keywords on 1 site, ChatGPT, Google AI Overviews and Gemini, checked monthly
