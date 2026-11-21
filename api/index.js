@@ -20,6 +20,7 @@ const kwLib = require('./_lib/keywords');
 const alerts = require('./_lib/alerts');
 const analyze = require('./_lib/analyze');
 const insights = require('./_lib/insights');
+const vr = require('./_lib/vr/http');
 const { limitsFor, QUESTIONS, PLANS } = require('./_lib/plans');
 const { seal, open, random, timingEqual } = require('./_lib/crypto');
 const crypto = require('crypto');
@@ -1377,10 +1378,14 @@ module.exports = async function handler(req, res) {
     if (path.startsWith('/l/')) return await handleLoginLink(req, res, path.slice(3), method);
     if (path === '/logout') { res.setHeader('Set-Cookie', [cookie(COOKIE, '', 0)]); return redirect(res, '/'); }
     if (path.startsWith('/r/')) return await handleReport(req, res, path.slice(3));
+    // the AI Visibility Report: any website, no account (see _lib/vr)
+    if (vr.isOurs(path)) return await vr.handle(req, res, path, method, { send, json, redirect, readBody, queryOf, clientIp, localRateOk, sameOrigin });
     if (path.startsWith('/ext/')) return await handleExt(req, res, path, method);
     if (path.startsWith('/cron/')) {
       if (!cronAuthorized(req)) return json(res, 401, { error: 'unauthorized' });
       if (path === '/cron/tick') return json(res, 200, await jobs.tick({ budgetMs: 45000 }));
+      if (path === '/cron/vr') return json(res, 200, await vr.tick({ budgetMs: 45000 }));
+      if (path === '/cron/vrstats') return json(res, 200, { days: await vr.stats(parseInt(queryOf(req).days, 10) || 30) });
       return json(res, 404, { error: 'unknown job' });
     }
     if (path === '/app' || path.startsWith('/app/')) {
