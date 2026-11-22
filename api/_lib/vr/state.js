@@ -112,7 +112,7 @@ function publicAnswer(check, row, unit) {
   return Object.assign(base, {
     ms: row.ms || 0,
     blocks: blocks.map((b) => ({ t: b.t, segs: segments(b.s, terms) })), more,
-    you: !!row.mentioned, rank: row.rank || 0, of: row.of || 0, cited: !!row.cited, read: !!row.read, ready: !!row.nx || row.k === 'b',
+    you: !!row.mentioned, rank: row.rank || 0, of: row.of || 0, cited: !!row.cited, read: !!row.read, card: !!row.card, ready: !!row.nx || row.k === 'b',
     named: (row.named || []).slice(0, 12),
     sources: (row.sources || []).slice(0, 8).map((s) => ({ host: s.host, url: /^https?:\/\//i.test(s.url || '') && !/vertexaisearch\.cloud\.google/.test(s.url) ? s.url : '', title: s.title || '', own: !!s.own })),
     pages: all.length, cites: (row.sources || []).length,

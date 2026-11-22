@@ -259,6 +259,20 @@ const polar = http.createServer((req, res) => {
   delete process.env.VR_LOOKUPS_PER_DAY;
   assert(capped.known === false && callsL.volumes.length === 1, 'past the day\'s cap no lookup is paid for, and the check goes on without numbers');
 
+  console.log('\nNames, spellings and Google\'s own cards');
+  const same = (a, b) => core.sameBusiness(core.nameWords(a), core.nameWords(b));
+  assert(same('Drakes', 'Drakes of Brighton') && same('Drakes Hotel', 'Drakes') && same('Hotel du Vin', 'The Hotel du Vin Brighton') && !same('Grand', 'Grand Central') && !same('Hotel Una', 'Hotel Pelirocco') && !same('Hilton', 'Hilton Garden Inn Brighton City'), 'a shorter name that starts a longer one is the same business; one short word is not enough');
+  assert(core.bareName('Drakes Hotel | A Curious Group of Hotels') === 'Drakes Hotel' && core.bareName('Hotel du Vin - Brighton') === 'Hotel du Vin' && core.bareName('A1 | Taxis') === 'A1 | Taxis' && core.bareName('Travessa Nove Suites') === 'Travessa Nove Suites', 'a tagline after a bar or a dash is cut from a name');
+  const spelt = (e, names) => ({ ok: true, k: 't0', q: '0', e, named: names.map((name) => ({ name, kind: 'business' })) });
+  const reg = core.registry([spelt('openai', ['Hotel Pelirocco', 'Drakes']), spelt('aio', ['Drakes Hotel', 'Hotel du Vin Brighton']), spelt('gemini', ['Hotel Pelirocco', 'Drakes of Brighton'])], 'business');
+  assert(reg.length === 3 && reg[0].n === 3 && /^Drakes/.test(reg[0].name) && reg[1].name === 'Hotel Pelirocco' && reg[1].n === 2, 'three spellings of one hotel in three answers count as one rival named three times');
+  c = await core.get(id2);
+  const cardRow = core.readAnswer(c, { id: 't1.k', k: 't1', q: 'k', text: 'boutique hotel alfama' }, 'aio', { text: 'Casa Aldora and The Lumiar House are small hotels in Alfama.', ms: 900, model: 'mock', sources: [{ url: 'https://lisbonweekender.example/alfama', title: 'Alfama hotels', host: 'lisbonweekender.example' }, { url: 'https://www.google.com/searchviewer/10?x=1', title: 'Casa Aldora', host: 'google.com' }, { url: 'https://www.google.com/searchviewer/10?x=2', title: 'The Lumiar House', host: 'google.com' }], consulted: [] });
+  assert(cardRow.card === true && cardRow.sources.length === 1 && cardRow.sources[0].host === 'lisbonweekender.example', 'a business card Google shows with its answer is not counted as a page, and the business\'s own card is noticed');
+  assert(V.notesFor({ state: 'named', topic: 't1', you: true, rank: 1, of: 2, card: true, pages: 1, named: [{ name: 'Casa Aldora', kind: 'business', you: true }, { name: 'The Lumiar House', kind: 'business' }] }, {}).some((n) => /your own business card/.test(n.text)), 'and the margin says so');
+  const shell2 = await core.start('appshell.example', { ip: 'visitor3b' });
+  assert(shell2.id && shell2.id !== other.id && !shell2.cached, 'a draft whose searches could not be worked out is not handed to the next visitor');
+
   console.log('\nWhen things go wrong');
   const shell = await core.get(other.id);
   assert(shell.site.words < 120 && shell.site.appShell && core.findingsOf(shell.site)[0].code === 'empty_html' && shell.topics.length === 0, 'a page drawn by JavaScript reads as empty, which is the first finding');
