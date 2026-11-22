@@ -418,14 +418,27 @@
   function readingHtml(st, rd) {
     if (!rd || !rd.pages || !rd.pages.length) return '<p class="empty-note">The engines cited no pages for these searches, or this step could not be completed.</p>';
     var rows = rd.pages.map(function (p) {
+      // another business's own website is not a page to be on, so being absent from it is not marked as a gap
       var who = p.status !== 'read' ? '<span class="na">' + PAGE_STATUS[p.status] + '</span>'
+        : p.theirs && !p.you ? '<span class="na">their own website</span>'
         : (p.you ? '<mark class="you">you are on it</mark>' : '<span class="miss">you are not on it</span>') + (p.rivals && p.rivals.length ? '<span class="on-it">names ' + p.rivals.slice(0, 3).map(function (n) { return '<span class="rival">' + esc(n) + '</span>'; }).join(', ') + (p.rivals.length > 3 ? ' and ' + (p.rivals.length - 3) + ' more' : '') + '</span>' : '');
       var title = esc(p.title || p.host);
-      return '<li class="page' + (p.status === 'read' && !p.you ? ' gap' : '') + '"><div class="page-main">' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener noreferrer nofollow">' + title + '</a>' : '<span>' + title + '</span>') +
+      return '<li class="page' + (p.status === 'read' && !p.you && !p.theirs ? ' gap' : '') + '"><div class="page-main">' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener noreferrer nofollow">' + title + '</a>' : '<span>' + title + '</span>') +
         '<span class="page-host">' + esc(p.host) + ', ' + esc(p.kind.charAt(0).toLowerCase() + p.kind.slice(1)) + '</span></div><div class="page-use">used in ' + plural(p.n, 'answer') + (p.cited ? ', cited in ' + p.cited : '') + '</div><div class="page-who">' + who + '</div></li>';
     }).join('');
-    var sum = rd.opened ? 'We could open ' + rd.opened + ' of these ' + rd.pages.length + ' pages. You are on ' + rd.you + '.' + (rd.top ? ' ' + esc(rd.top.name) + ' is on ' + rd.top.n + '.' : '') : 'None of these pages would open for our reader, so we could not check who is on them.';
+    var theirs = rd.theirs || 0;
+    var onOthers = rd.pages.filter(function (p) { return p.status === 'read' && !p.theirs && p.you; }).length;
+    var sum = rd.opened ? 'We could open ' + rd.opened + ' of these ' + rd.pages.length + ' pages.' +
+      (theirs ? ' ' + (theirs === 1 ? 'One is' : theirs + ' are') + ' the own website of another business, where nobody else is listed. On the other ' + (rd.opened - theirs) + ' you are named on ' + (onOthers || 'none') + '.' : ' You are on ' + rd.you + '.') +
+      (rd.top ? ' ' + esc(rd.top.name) + ' is on ' + rd.top.n + '.' : '') : 'None of these pages would open for our reader, so we could not check who is on them.';
     return '<p class="sum">' + sum + '</p><ul class="pages">' + rows + '</ul>';
+  }
+
+  // The tone of the answers that name the business. Left out when it could not be read: three zeros say nothing.
+  function tone(s) {
+    var n = s.sentiment || {};
+    if (!((n.positive || 0) + (n.neutral || 0) + (n.negative || 0))) return '';
+    return '<p class="tiny">From the ' + plural(s.basedOn, 'answer') + ' that name you: ' + (n.positive || 0) + ' positive, ' + (n.neutral || 0) + ' neutral, ' + (n.negative || 0) + ' negative.</p>';
   }
 
   var KNOWS = { yes: ['Knows you', 'ok'], partly: ['Vague', 'mid'], no: ['Does not know you', 'bad'], other: ['Mixes you up', 'bad'], failed: ['Did not answer', 'na'] };
@@ -446,7 +459,7 @@
     var s = r.says;
     if (s && (s.descriptors || []).length) {
       out += '<div class="says"><h3>The words AI uses for you</h3><ul class="chips big">' + s.descriptors.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ul>' +
-        '<p class="tiny">From the ' + plural(s.basedOn, 'answer') + ' that name you: ' + s.sentiment.positive + ' positive, ' + s.sentiment.neutral + ' neutral, ' + s.sentiment.negative + ' negative.</p></div>';
+        tone(s) + '</div>';
     }
     return out;
   }

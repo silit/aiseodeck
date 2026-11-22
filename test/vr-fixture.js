@@ -280,17 +280,25 @@ const ANSWERS = {
   }
 };
 
-const KNOWN_NAMES = [[L, 'business'], [M, 'business'], [T, 'business'], [S, 'business'], [A, 'business'], [C, 'business'], ['TripAdvisor', 'directory'], ['Booking.com', 'directory']];
+// What the writing model says each name in an answer is. "other" is a name providers use or belong to, not a choice
+// between them: a bed maker in an answer about hotels, a tourist board.
+const KNOWN_NAMES = [[L, 'rival'], [M, 'rival'], [T, 'rival'], [S, 'rival'], [A, 'rival'], [C, 'rival'], ['TripAdvisor', 'directory'], ['Booking.com', 'directory'], ['Hästens', 'other'], ['Turismo de Lisboa', 'other']];
+// What it says a page is, from address and title. Pages it is not asked about, or does not know, are articles.
+const PAGE_KINDS = { 'hotelfinderlisbon.example': 'listing', 'grandhotelbelem.example': 'rival', 'hastens.example': 'supplier', 'turismolisboa.example': 'official', 'lisbonforum.example': 'forum' };
 
 // What the writing model replies, by what it was asked.
 function llmJSON(opts) {
   const sys = String(opts.system || ''), prompt = String(opts.prompt || '');
   if (/study the home page/.test(sys)) return /appshell|blocked/.test(prompt) ? {} : PROFILE;
-  if (/list the specific businesses/.test(sys)) {
+  if (/sort web pages by what they are/.test(sys)) {
+    const rows = [...prompt.matchAll(/^(\d+)\. (\S+)/gm)].map((m) => ({ n: parseInt(m[1], 10), kind: PAGE_KINDS[m[2]] || 'article' }));
+    return { pages: rows.concat([{ n: 99, kind: 'rival' }, { n: 1, kind: 'nonsense' }]) }; // a row that is not there and a word that is not a kind change nothing
+  }
+  if (/list the names it gives the customer/.test(sys)) {
     const answer = prompt.split('Answer:\n')[1] || '';
     const body = answer.split('\n\nReturn {')[0];
     const named = KNOWN_NAMES.filter(([n]) => body.includes(n)).sort((x, y) => body.indexOf(x[0]) - body.indexOf(y[0])).map(([name, kind]) => ({ name, kind }));
-    return { named: named.concat([{ name: 'Hotel That Is Not There', kind: 'business' }]) }; // a name the answer never wrote must be dropped
+    return { named: named.concat([{ name: 'Hotel That Is Not There', kind: 'rival' }]) }; // a name the answer never wrote must be dropped
   }
   if (/compare what AI assistants say/.test(sys)) {
     return {
@@ -334,7 +342,7 @@ const llmText = () => 'Hello,\n\nI run Casa Aldora, a family-run hotel with four
 // Patches the modules the report uses so that nothing leaves this process. Returns what was called.
 function install(opts) {
   opts = opts || {};
-  const calls = { ask: [], llm: [], emails: [], fetched: [], volumes: [] };
+  const calls = { ask: [], llm: [], emails: [], fetched: [], volumes: [], ads: [] };
   const engines = require('../api/_lib/engines');
   const keywords = require('../api/_lib/keywords');
   const llm = require('../api/_lib/llm');
@@ -366,6 +374,14 @@ function install(opts) {
     const known = VOLUMES[country] || {};
     const out = {};
     for (const k of list) if (typeof known[k] === 'number') out[k] = { volume: known[k], intent: 'commercial' };
+    return out;
+  };
+  // the second lookup, Google Ads: opts.ads is { keyword: number } (what Google has a number for) or 'down'
+  keywords.adsVolumes = async (list, country, language, timeoutMs) => {
+    calls.ads.push({ list: list.slice(), country, language, timeoutMs });
+    if (opts.ads === 'down') throw new Error('Keyword data: rate limit');
+    const out = {};
+    for (const k of list) if (opts.ads && typeof opts.ads[k] === 'number') out[k] = { volume: opts.ads[k] };
     return out;
   };
   return calls;

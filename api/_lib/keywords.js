@@ -2,6 +2,7 @@
 // Keywords: cleaning, matching a keyword to the best page of a site, and keyword data from DataForSEO Labs
 // (monthly search volumes, related keywords, and the keywords where Google's AI Overviews already cite a domain).
 // Labs calls cost about 1.2 cents each plus 0.012 cents per returned keyword, from the same DataForSEO balance.
+// adsVolumes asks Google Ads instead (9 cents a request), for keywords Labs does not hold; only the report uses it.
 const { LOCATION } = require('./engines');
 
 const env = (k, d) => String(process.env[k] || d || '').trim();
@@ -105,6 +106,32 @@ async function volumes(list, country, language, timeoutMs) {
   return out;
 }
 
+// Monthly searches from Google Ads itself, for keywords the Labs database does not hold: { keyword: { volume } }, with
+// only the keywords Google has a number for. One request costs 9 cents whatever the number of keywords, takes up to
+// about seven seconds, and the account may send 12 a minute, so callers keep it for the few cases that need it.
+const ADS_OK = /^[\p{L}\p{N} .&+-]+$/u; // Google Ads turns a whole request down for one keyword with other symbols
+async function adsVolumes(list, country, language, timeoutMs) {
+  const kws = cleanList(list, 700).filter((k) => ADS_OK.test(k) && k.split(' ').length <= 10);
+  if (!kws.length) return {};
+  let res;
+  try {
+    res = await fetch(base() + '/v3/keywords_data/google_ads/search_volume/live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from(env('DATAFORSEO_LOGIN') + ':' + env('DATAFORSEO_PASSWORD')).toString('base64') },
+      body: JSON.stringify([Object.assign({ keywords: kws }, where(country, language))]),
+      signal: AbortSignal.timeout(timeoutMs || 12000)
+    });
+  } catch (e) { throw new Error(e.name === 'TimeoutError' ? 'Keyword data timed out' : 'Keyword data could not be reached'); }
+  const d = await res.json().catch(() => ({}));
+  const t = (d.tasks && d.tasks[0]) || {};
+  if (!res.ok || t.status_code !== 20000) throw Object.assign(new Error('Keyword data: ' + String(t.status_message || d.status_message || res.status).slice(0, 140)), { status: t.status_code || d.status_code || res.status });
+  const out = {};
+  for (const it of Array.isArray(t.result) ? t.result : []) {
+    if (it && it.keyword && typeof it.search_volume === 'number') out[clean(it.keyword)] = { volume: it.search_volume };
+  }
+  return out;
+}
+
 // Keywords where Google's AI Overviews cite the domain, most searched first.
 async function inAiOverviews(domain, country, language, limit) {
   const target = String(domain || '').replace(/^[a-z]+:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '');
@@ -135,4 +162,4 @@ async function related(seed, country, language, limit) {
   return out.sort((a, b) => (b.volume || 0) - (a.volume || 0));
 }
 
-module.exports = { available, clean, cleanList, tokens, matchPage, volumes, inAiOverviews, related, where };
+module.exports = { available, clean, cleanList, tokens, matchPage, volumes, adsVolumes, inAiOverviews, related, where };

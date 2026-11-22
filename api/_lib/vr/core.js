@@ -252,21 +252,45 @@ function keywordFrom(question) {
 
 /* ---------- which searches a report is built on ---------- */
 
-// Monthly Google searches for a list of keywords in one country: { known, map: { keyword: number } }. known is false
-// when the keyword data service is not set up, does not answer, or the day's lookups are used up (each one costs
-// about 1.3 cents, and a check is started far more often than it is bought); the report then works without numbers.
-async function searchVolumes(keywords, country, language, timeoutMs) {
+// Monthly Google searches for a list of keywords in one country: { known, map: { keyword: number }, asked, filled }.
+// known is false when the keyword data service is not set up, does not answer, or the day's lookups are used up (each
+// one costs about 1.3 cents, and a check is started far more often than it is bought); the report then works without
+// numbers. The first lookup reads DataForSEO's own list of keywords, which has nothing for many real searches. With
+// fill (how many milliseconds may still be spent, or a function that says so), the ones it missed are asked of Google
+// Ads in one more request: asked is how many, filled how many came back with a number.
+async function searchVolumes(keywords, country, language, timeoutMs, fill) {
   const list = [...new Set((keywords || []).map((k) => kwLib.clean(k)).filter(Boolean))];
-  if (!list.length || !kwLib.available()) return { known: false, map: {} };
+  const none = { known: false, map: {}, asked: 0, filled: 0 };
+  if (!list.length || !kwLib.available()) return none;
   try {
     const used = await kv.incr('vrkw:' + day());
     if (used === 1) await kv.expire('vrkw:' + day(), 3 * 86400);
-    if (used > (parseInt(process.env.VR_LOOKUPS_PER_DAY || '', 10) || 600)) return { known: false, map: {} };
+    if (used > (parseInt(process.env.VR_LOOKUPS_PER_DAY || '', 10) || 600)) return none;
     const got = await kwLib.volumes(list, country, language, timeoutMs || 7000);
     const map = {};
     for (const k of list) if (got[k] && typeof got[k].volume === 'number') map[k] = got[k].volume;
-    return { known: true, map };
-  } catch (e) { console.error('[vr] volumes', e.message); return { known: false, map: {} }; }
+    const missing = list.filter((k) => !(k in map));
+    const more = fill && missing.length ? await fillFromAds(missing, country, language, typeof fill === 'function' ? fill() : fill, map) : { asked: 0, filled: 0 };
+    return { known: true, map, asked: more.asked, filled: more.filled };
+  } catch (e) { console.error('[vr] volumes', e.message); return none; }
+}
+
+// Google Ads answers for any keyword, but a request costs 9 cents however many keywords it carries, takes up to about
+// seven seconds, and the whole account may send 12 a minute. So it has a daily cap of its own (VR_ADS_LOOKUPS_PER_DAY,
+// 0 turns it off) and never stops a check: whatever goes wrong, the numbers already found stand.
+const adsCap = () => { const n = parseInt(process.env.VR_ADS_LOOKUPS_PER_DAY || '', 10); return Number.isFinite(n) && n >= 0 ? n : 40; };
+async function fillFromAds(missing, country, language, ms, map) {
+  const out = { asked: 0, filled: 0 };
+  if (!adsCap() || !(ms >= 3000)) return out;
+  try {
+    const used = await kv.incr('vrads:' + day());
+    if (used === 1) await kv.expire('vrads:' + day(), 3 * 86400);
+    if (used > adsCap()) return out;
+    out.asked = missing.length;
+    const got = await kwLib.adsVolumes(missing, country, language, Math.min(ms, 9000));
+    for (const k of missing) if (got[k] && typeof got[k].volume === 'number') { map[k] = got[k].volume; out.filled++; }
+  } catch (e) { console.error('[vr] ads volumes', e.message); }
+  return out;
 }
 
 const stemK = (w) => w.replace(/(ies|es|s)$/, (m) => (m === 'ies' ? 'y' : '')).slice(0, 12);
@@ -391,9 +415,9 @@ async function start(input, ctx) {
   const who = await understand(site, n.host, Math.max(8000, Math.min(24000, left() - 9000)));
   const tWho = Date.now() - t0 - tRead;
   const askCountry = who.customersCountry || 'US';
-  const vols = await searchVolumes(who.candidates.map((c) => c.keyword), askCountry, who.language || 'en', Math.max(2500, Math.min(7000, left() - 1500)));
+  const vols = await searchVolumes(who.candidates.map((c) => c.keyword), askCountry, who.language || 'en', Math.max(2500, Math.min(7000, left() - 1500)), () => left() - 2500);
   // one line per started check: how long each step took, to tune the limits from real numbers
-  console.log(`[vr] start ${n.host}: read ${tRead} ms, understand ${tWho} ms (${who.byAi ? who.candidates.length + ' searches' : 'no answer'}), volumes ${Date.now() - t0 - tRead - tWho} ms (${vols.known ? 'known' : 'not known'})`);
+  console.log(`[vr] start ${n.host}: read ${tRead} ms, understand ${tWho} ms (${who.byAi ? who.candidates.length + ' searches' : 'no answer'}), volumes ${Date.now() - t0 - tRead - tWho} ms (${vols.known ? 'known' + (vols.asked ? ', Google Ads gave ' + vols.filled + ' of ' + vols.asked + ' more' : '') : 'not known'})`);
   const picked = pickTopics(who.candidates, vols.map, topicCount());
   const looked = vols.known ? askCountry : '';
   const check = {
@@ -595,21 +619,32 @@ function namedByShape(text) {
   return out.slice(0, 12).map((name) => ({ name: bareName(name), kind: 'business' }));
 }
 
+// The names an answer gives the customer. A 'business' is someone the customer could choose in place of the business
+// being checked, a 'directory' a listing or review site the answer points to. A name such providers only use, stock or
+// belong to (an implant maker in an answer about dental clinics, a regulator) is neither, and is left out: counted as
+// a rival it would top the list of every clinic that works with it.
+const aOrAn = (w) => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
+const kindOf = (k) => { const v = String(k || '').toLowerCase(); return v === 'directory' ? 'directory' : v === 'other' ? 'other' : 'business'; };
 async function extractNamed(check, unit, text, budgetMs) {
   let list = null;
   if (llm.available() && budgetMs > 4000) {
     try {
+      const brand = check.project.brand;
+      const category = check.profile.category;
       const j = await llm.generateJSON({
         budgetMs: Math.min(budgetMs, 16000), timeoutMs: Math.min(budgetMs, 14000),
-        system: 'You read an AI assistant\'s answer to a customer question and list the specific businesses, brands or products it puts forward as options for what the customer is looking for. Copy each name exactly as written in the answer. Never add a name that is not in the answer.',
-        prompt: `Customer question: ${clean(unit.text, 200)}\n\nAnswer:\n${String(text).slice(0, 4500)}\n\n` +
-          `Return {"named": [{"name": "...", "kind": "business"}]} in the order they first appear, at most 12. kind is "business" for a specific provider, brand or product the customer could choose${check.profile.category ? ' (the same kind of thing as a ' + check.profile.category + ')' : ''}, ` +
-          'and "directory" for a listing, review, booking, marketplace or comparison site the answer points the customer to. Leave out anything that is only a part of another option (its bar, restaurant, spa or room types), and leave out places, landmarks, generic terms and publications that are only cited as sources. ' +
+        system: 'You read an AI assistant\'s answer to a customer question and list the names it gives the customer, each with what it is. Copy each name exactly as written in the answer. Never add a name that is not in the answer.',
+        prompt: `The customer is choosing ${aOrAn(category || 'business like ' + brand)}. ${brand} is one.\nCustomer question: ${clean(unit.text, 200)}\n\nAnswer:\n${String(text).slice(0, 4500)}\n\n` +
+          'Return {"named": [{"name": "...", "kind": "rival"}]} in the order they first appear, at most 14. kind is one of three words.\n' +
+          `"rival": a provider the customer could choose instead of ${brand}. That is another ${category || 'business of the same kind'}, or a brand or product that does the same job for the customer.\n` +
+          '"directory": a listing, review, booking, marketplace or comparison site the answer points the customer to.\n' +
+          '"other": a name that is not a choice between such providers. That is a manufacturer, supplier, material, component, technology, software or method that these providers use or sell (an implant maker in an answer about dental clinics, a coffee roaster in an answer about cafes), and any association, regulator, certificate or award.\n' +
+          'Leave out anything that is only a part of another option (its bar, restaurant, spa or room types), and leave out places, landmarks, generic terms and publications that are only cited as sources. ' +
           'A name is a proper name: a company, a brand or a product with a name of its own. A plain description of a product, such as "editable welcome book template", is not a name. Give the brand or seller behind it when the answer names one (for "Evolve\'s free welcome book template" that is "Evolve"), otherwise leave it out.',
-        maxTokens: 500
+        maxTokens: 600
       });
       const arr = Array.isArray(j) ? j : (j && j.named);
-      if (Array.isArray(arr)) list = arr.map((x) => ({ name: bareName(clean(x && x.name, 80)), kind: x && x.kind === 'directory' ? 'directory' : 'business' }));
+      if (Array.isArray(arr)) list = arr.map((x) => ({ name: bareName(clean(x && x.name, 80)), kind: kindOf(x && x.kind) })).filter((x) => x.kind !== 'other');
     } catch (e) { /* the shape of the answer is read instead */ }
   }
   return list || namedByShape(text);
@@ -848,12 +883,48 @@ const KNOWN_HOSTS = [
   [/(^|\.)(youtube|instagram|facebook|tiktok|linkedin|x|twitter|pinterest|threads)\.(com|net)$/, 'Social network'],
   [/(^|\.)(google)\.[a-z.]+$/, 'Google']
 ];
-function hostKind(host, rivalKeys) {
+const KIND = { rival: 'A rival\'s own site', listing: 'Listing or review site', article: 'Article or guide', forum: 'Forum', official: 'Official body', supplier: 'A supplier\'s site' };
+// Pages nobody can be added to: the own website of another business. Being absent from them is not a gap.
+const THEIRS = new Set([KIND.rival, KIND.supplier]);
+// What can be done about a page the business is not on, by what the page is. Nothing for the kinds left out.
+const PAGE_ACT = { [KIND.listing]: 'claim or create your listing', [KIND.forum]: 'answer the thread honestly, as the business', [KIND.official]: 'see whether its register or member list can include you', [KIND.article]: 'ask the editor to add you' };
+function hostKind(host, rivalKeys, dirKeys) {
   const h = String(host || '').toLowerCase();
   for (const [re, label] of KNOWN_HOSTS) if (re.test(h)) return label;
-  const key = h.replace(/\.[a-z.]{2,8}$/, '').replace(/[^a-z0-9]/g, '');
-  if (key.length >= 5 && rivalKeys.some((k) => k.includes(key) || key.includes(k))) return 'A rival\'s own site';
-  return 'Article or guide';
+  const key = h.replace(/^www\./, '').replace(/\.[a-z.]{2,8}$/, '').replace(/[^a-z0-9]/g, '');
+  const near = (k) => k.includes(key) || key.includes(k);
+  // a listing site the answers pointed customers to is one here too, whether or not the list above knows it
+  if (key.length >= 5 && (dirKeys || []).some(near)) return KIND.listing;
+  if (key.length >= 5 && rivalKeys.some(near)) return KIND.rival;
+  return KIND.article;
+}
+
+// The pages no list knows are told apart by a model, from address and title alone: another provider's own website, a
+// listing site, an article, a forum, an official body or a supplier. Without an answer in time they stay as they are.
+async function sortPages(check, pages, ms) {
+  const open = pages.filter((p) => p.kind === KIND.article);
+  if (!open.length || !llm.available() || !(ms >= 3000)) return;
+  const what = check.profile.category || 'business like ' + check.project.brand;
+  try {
+    const j = await llm.generateJSON({
+      budgetMs: Math.min(ms, 12000), timeoutMs: Math.min(ms, 10000),
+      system: 'You sort web pages by what they are, from their address and title alone. When you cannot tell, you say "article".',
+      prompt: `A customer is choosing ${aOrAn(what)}. An AI assistant read these pages to answer them:\n` + open.map((p, i) => `${i + 1}. ${p.host}${p.title ? ' | ' + clean(p.title, 90) : ''}`).join('\n') +
+        '\n\nReturn {"pages": [{"n": 1, "kind": "..."}]} with one kind for every page:\n' +
+        `"rival": the own website of one ${what}, a provider the customer could choose\n` +
+        '"listing": a directory, marketplace, booking, review or comparison site that lists many providers\n' +
+        '"article": an article, blog post, guide or news page by a publisher\n' +
+        '"forum": a forum or community thread\n' +
+        '"official": a regulator, professional association, government or standards body\n' +
+        '"supplier": the own website of a manufacturer, supplier or software maker whose products such providers use',
+      maxTokens: 400
+    });
+    for (const x of (j && Array.isArray(j.pages) ? j.pages : [])) {
+      const page = open[parseInt(x && x.n, 10) - 1];
+      const kind = KIND[String((x && x.kind) || '').toLowerCase()];
+      if (page && kind) page.kind = kind;
+    }
+  } catch (e) { console.error('[vr] page kinds', e.message); }
 }
 
 // The pages the engines read to answer, most used first. The ones we can open are read for the business and its rivals.
@@ -861,6 +932,7 @@ async function stepReading(check, rows, deadline) {
   const own = (check.project.domains || []).map(analyze.cleanDomain);
   const rivals = registry(rows, 'business').slice(0, 8);
   const rivalKeys = rivals.flatMap((r) => r.variants.map(squash)).filter((k) => k.length >= 5);
+  const dirKeys = registry(rows, 'directory').flatMap((r) => r.variants.map(squash)).filter((k) => k.length >= 5);
   const map = new Map();
   for (const r of rows.filter(answered)) {
     const add = (s, cited) => {
@@ -888,10 +960,11 @@ async function stepReading(check, rows, deadline) {
     for (const e of p.engines) same.engines.add(e);
     map.delete(key);
   }
-  const pages = [...map.values()].map((p) => ({ url: p.url, host: p.host, title: clean(p.title && p.title !== p.host ? p.title : '', 110), n: p.answers.size, cited: p.cited.size, engines: [...p.engines], kind: hostKind(p.host, rivalKeys), status: p.url ? 'pending' : 'host', you: null, rivals: [] }))
+  const pages = [...map.values()].map((p) => ({ url: p.url, host: p.host, title: clean(p.title && p.title !== p.host ? p.title : '', 110), n: p.answers.size, cited: p.cited.size, engines: [...p.engines], kind: hostKind(p.host, rivalKeys, dirKeys), status: p.url ? 'pending' : 'host', you: null, rivals: [] }))
     .sort((a, b) => b.cited - a.cited || b.n - a.n || a.host.localeCompare(b.host)).slice(0, 14);
   const mine = brandEntity(check);
   const toOpen = pages.filter((p) => p.url && /^https?:\/\//i.test(p.url) && !/\.(pdf|docx?|xlsx?|pptx?|zip)$/i.test(p.url.split('?')[0])).slice(0, 10);
+  const sorting = sortPages(check, pages, deadline - Date.now() - 2500);
   await Promise.all(toOpen.map(async (p) => {
     const ms = Math.min(7000, deadline - Date.now() - 1500);
     if (ms < 2000) { p.status = 'skipped'; return; }
@@ -907,12 +980,14 @@ async function stepReading(check, rows, deadline) {
     p.rivals = rivals.filter((rv) => rv.variants.some((v) => analyze.findTerm(textNorm, v) >= 0)).map((rv) => rv.name).slice(0, 6);
     if (!p.title) { const t = String(r.text).match(/<title\b[^>]*>([\s\S]*?)<\/title>/i); if (t) p.title = clean(auditLib.stripTags(t[1]), 110); }
   }));
-  for (const p of pages) if (p.status === 'pending') p.status = 'skipped';
+  await sorting;
+  for (const p of pages) { if (p.status === 'pending') p.status = 'skipped'; p.theirs = THEIRS.has(p.kind); }
   const read = pages.filter((p) => p.status === 'read');
+  // a rival is on its own website as a matter of course, so who is "on the most pages" is counted on the others
   const count = {};
-  for (const p of read) for (const name of p.rivals) count[name] = (count[name] || 0) + 1;
+  for (const p of read.filter((x) => !x.theirs)) for (const name of p.rivals) count[name] = (count[name] || 0) + 1;
   const top = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
-  return { pages, opened: read.length, you: read.filter((p) => p.you).length, top: top ? { name: top[0], n: top[1] } : null };
+  return { pages, opened: read.length, theirs: read.filter((p) => p.theirs).length, you: read.filter((p) => p.you).length, top: top ? { name: top[0], n: top[1] } : null };
 }
 
 async function stepAudit(check, deadline) {
@@ -1105,15 +1180,35 @@ function fixesOf(check, rows, ctx) {
   const unknown = knows.filter((x) => x.knows === 'no' || x.knows === 'other' || x.knows === 'partly');
   if (org && org.about && (unknown.length || !s.description)) add({ id: 'about', rung: 'known', impact: unknown.length ? 3 : 2, minutes: 10, who: 'you', title: 'Give AI one paragraph it can quote about you', why: unknown.length ? `${andList(unknown.map((x) => engines.LABEL[x.e] || x.e))} could not say clearly who you are. Engines repeat the plainest description they find, so write it for them.` : 'Engines repeat the plainest description of a business they can find. Yours is spread across the page.', steps: ['Put this paragraph near the top of your home page or About page, as plain text.', 'Use the same wording on your Google Business Profile and directory listings, so every source agrees.'], ai: true, asset: { kind: 'text', lang: 'Text', label: 'About paragraph', body: org.about } });
 
-  const missing = ((reading && reading.pages) || []).filter((x) => x.status === 'read' && x.you === false);
+  // Pages the engines read and the business is not on. Another business's own website is not a gap, and nothing can be
+  // asked of a social network or an encyclopedia, so the steps name only pages where something can be done.
+  const read = ((reading && reading.pages) || []).filter((x) => x.status === 'read');
+  const open = read.filter((x) => !x.theirs);
+  const missing = open.filter((x) => x.you === false && PAGE_ACT[x.kind]);
   if (missing.length) {
     const withRivals = missing.filter((x) => x.rivals.length);
     const list = (withRivals.length ? withRivals : missing).slice(0, 4);
-    add({ id: 'listings', rung: 'named', impact: 3, minutes: 45, who: 'you', title: 'Get onto the pages AI reads', why: `The engines built their answers from ${reading.pages.length} pages. Of the ${reading.opened} we could open, you are on ${reading.you}.` + (reading.top ? ` ${reading.top.name} is on ${reading.top.n}.` : '') + ' An engine can only name businesses it finds in what it reads.', steps: list.map((x) => `${x.host}${x.rivals.length ? ' names ' + andList(x.rivals.slice(0, 3)) + ', not you' : ' does not mention you'}: ${x.kind === 'Listing or review site' ? 'claim or create your listing' : x.kind === 'Forum' ? 'answer the thread honestly, as the business' : 'ask the editor to add you'}.`), ai: !!(assets && assets.pitch), asset: assets && assets.pitch ? { kind: 'text', lang: 'Email', label: 'Note to an editor', body: assets.pitch } : null, links: list.map((x) => ({ url: x.url, host: x.host })) });
+    const theirs = read.length - open.length;
+    const onThem = open.filter((x) => x.you).length;
+    const count = theirs
+      ? `Of the ${read.length} we could open, ${theirs === 1 ? 'one is another business\'s own website' : (NUMBER[theirs] || theirs) + ' are other businesses\' own websites'}. On the other ${open.length} you are named ${onThem ? 'on ' + onThem : 'on none'}.`
+      : `Of the ${read.length} we could open, you are on ${onThem}.`;
+    add({ id: 'listings', rung: 'named', impact: 3, minutes: 45, who: 'you', title: 'Get onto the pages AI reads', why: `The engines built their answers from ${reading.pages.length} pages. ${count}` + (reading.top ? ` ${reading.top.name} is on ${reading.top.n}.` : '') + ' An engine can only name businesses it finds in what it reads.', steps: list.map((x) => `${x.host}${x.rivals.length ? ' names ' + andList(x.rivals.slice(0, 3)) + ', not you' : ' does not mention you'}: ${PAGE_ACT[x.kind]}.`), ai: !!(assets && assets.pitch), asset: assets && assets.pitch ? { kind: 'text', lang: 'Email', label: 'Note to an editor', body: assets.pitch } : null, links: list.map((x) => ({ url: x.url, host: x.host })) });
   }
   if (weakest && weakest.answers && weakest.named < weakest.answers) {
     const pg = assets && assets.page;
-    add({ id: 'page', rung: 'named', impact: 3, minutes: 90, who: 'you', title: 'Publish a page for the search you are missing', why: `For the search "${weakest.keyword}"${weakest.volume ? ` (about ${weakest.volume.toLocaleString('en-US')} Google searches a month in ${COUNTRY[check.ask.country] || 'your customers\' country'})` : ''} you are named in ${weakest.named} of ${weakest.answers} answers. No page on your site answers it in its own words, so engines have nothing of yours to lift.`, steps: [`Create one page for this search, with the customer question as its heading: "${weakest.question}"`, 'Answer it in the first two sentences, then add detail, prices or steps a customer needs.', 'Link to it from your home page.'], ai: !!pg, asset: pg ? { kind: 'text', lang: 'Draft', label: 'Page draft', body: `Title: ${pg.title}\nAddress: /${pg.slug}\n\n${pg.intro}\n\n` + (pg.faq || []).map((x) => `${x.q}\n${x.a}`).join('\n\n') } : null });
+    const lead = `For the search "${weakest.keyword}"${weakest.volume ? ` (about ${weakest.volume.toLocaleString('en-US')} Google searches a month in ${COUNTRY[check.ask.country] || 'your customers\' country'})` : ''} you are named in ${weakest.named} of ${weakest.answers} answers.`;
+    // Is one of the pages we read on the site already about this search? Its words in the address, title or main heading.
+    const pagesRead = ((audit && audit.pages) || []).filter((x) => x.ok);
+    const own = kwLib.matchPage(weakest.keyword, pagesRead);
+    const faqText = pg ? (pg.faq || []).map((x) => `${x.q}\n${x.a}`).join('\n\n') : '';
+    if (own && own.score >= 0.75) {
+      const which = own.path === '/' ? 'Your home page' : 'Your page ' + own.path;
+      add({ id: 'page', rung: 'named', impact: 3, minutes: 45, who: 'you', title: 'Make your page for this search the one AI quotes', why: `${lead} ${which} is already about this search, so a new page is not what is missing. Engines lift the plain answer they find near the top of a page, and they name the businesses they meet on the pages they read.`, steps: [`Put the customer question on that page as a heading: "${weakest.question}"`, 'Answer it in the first two sentences under that heading, as plain text, then add the detail, prices or steps a customer needs.'].concat(missing.length ? ['Then work on the pages the engines read, the fix above: most of these answers are built from them.'] : []), ai: !!pg, asset: pg ? { kind: 'text', lang: 'Draft', label: 'Section draft', body: `${pg.intro}\n\n${faqText}`.trim() } : null });
+    } else {
+      const seen = pagesRead.length > 1 ? `None of the ${pagesRead.length} pages we read on your site is about it, so engines have nothing of yours to lift.` : 'A page that answers it in your own words gives engines something of yours to lift.';
+      add({ id: 'page', rung: 'named', impact: 3, minutes: 90, who: 'you', title: 'Publish a page for the search you are missing', why: `${lead} ${seen}`, steps: [`Create one page for this search, with the customer question as its heading: "${weakest.question}"`, 'Answer it in the first two sentences, then add detail, prices or steps a customer needs.', 'Link to it from your home page.'], ai: !!pg, asset: pg ? { kind: 'text', lang: 'Draft', label: 'Page draft', body: `Title: ${pg.title}\nAddress: /${pg.slug}\n\n${pg.intro}\n\n${faqText}` } : null });
+    }
   }
   const faq = assets && assets.faq;
   if (faq && faq.length >= 2) add({ id: 'faq', rung: 'cited', impact: 2, minutes: 20, title: 'Answer customer questions in a marked-up FAQ', why: has('faq_no_schema') ? `Your home page answers ${s.faqCount} questions without FAQ markup, so engines cannot tell question from answer.` : 'Engines quote short question and answer pairs more readily than long copy. Yours are drafted from what your own page says.', steps: ['Add these questions and answers to your home page or a FAQ page as visible text.', 'Paste the markup below into the <head> of that page.', 'Correct anything that is not exactly right before you publish.'], ai: true, asset: { kind: 'code', lang: 'JSON-LD', label: 'FAQ markup', body: '<script type="application/ld+json">\n' + jsonLd([fixes.faqSchema(faq)]) + '\n</script>' }, extra: { label: 'Questions and answers', body: faq.map((x) => `${x.q}\n${x.a}`).join('\n\n') } });
@@ -1337,5 +1432,5 @@ module.exports = {
   normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom, sameBusiness, nameWords, bareName, readAnswer, searchVolumes, pickTopics, othersOf, alike, sameSubject, demandOf, CANDIDATES,
   get, save, update, results, rowsOf, start, runFree, runFull, pump, work, maybeFinish, finalizeStep, tick,
   markPaid, setEmail, sendReady, startRecheck, count, stats,
-  stateOf, isNamed, registry, tally, previewOf, compose, matrixOf, ladderOf, fixesOf, topicNumbers, placeNamed, namedByShape, probeQuestion, unitsFor, tasksFor, andList
+  stateOf, isNamed, registry, tally, previewOf, compose, matrixOf, ladderOf, fixesOf, topicNumbers, extractNamed, placeNamed, namedByShape, hostKind, sortPages, KIND, probeQuestion, unitsFor, tasksFor, andList
 };

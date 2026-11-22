@@ -43,6 +43,7 @@ const polar = http.createServer((req, res) => {
   fx.env(await redis.listen());
   const polarPort = await listen(polar);
   Object.assign(process.env, { POLAR_ACCESS_TOKEN: 'polar_oat', POLAR_API_BASE: 'http://127.0.0.1:' + polarPort, POLAR_WEBHOOK_SECRET: 'whsec_' + Buffer.from('polar-secret-key').toString('base64'), VR_UNLOCK_KEY: 'unlock-key-for-tests', CRON_SECRET: 'cronkey' });
+  const realAdsVolumes = require('../api/_lib/keywords.js').adsVolumes; // the stand-ins replace it below
   const calls = fx.install();
   const core = require('../api/_lib/vr/core.js');
   const state = require('../api/_lib/vr/state.js');
@@ -146,15 +147,19 @@ const polar = http.createServer((req, res) => {
   assert(r.demand.known === 5 && r.demand.total === 1340 && r.demand.country === 'GB' && r.demand.top.keyword === 'boutique hotel alfama' && r.demand.gap.keyword === 'romantic hotels lisbon' && r.demand.gap.named === 1, 'the demand behind the report: 1,340 searches a month, and the biggest gap is not the search with the fewest answers naming the business');
   assert(r.voice[0].name === 'Hotel Marquês Azul' && r.voice[0].n === 37 && r.voice.find((v) => v.you).n === 15 && r.dirs[0].name === 'TripAdvisor', 'who gets named instead, with the spellings merged');
   const rd = r.reading;
-  assert(rd.opened === 8 && rd.you === 2 && rd.top.name === 'The Lumiar House' && rd.top.n === 7, 'the pages the engines read were opened: the business is on 2 of 8');
+  assert(rd.opened === 8 && rd.you === 2 && rd.theirs === 1 && rd.top.name === 'The Lumiar House' && rd.top.n === 6, 'the pages the engines read were opened: the business is on 2 of 8, and a rival is not counted on its own website');
   const lw = rd.pages.find((p) => p.host === 'lisbonweekender.example');
   assert(lw.status === 'read' && lw.you === false && lw.rivals.length === 4 && rd.pages.filter((p) => p.host === 'lisbonweekender.example').length === 1, 'a page cited by address and by site name is one row, read for the business and its rivals');
   assert(rd.pages.find((p) => p.host === 'tripadvisor.com').status === 'refused' && rd.pages.find((p) => p.host === 'reddit.com').kind === 'Forum' && rd.pages.find((p) => p.host === 'lumiarhouse.example').kind === 'A rival\'s own site', 'pages that refuse the reader are marked; kinds of pages are told apart');
+  const lumiar = rd.pages.find((p) => p.host === 'lumiarhouse.example'), journal = rd.pages.find((p) => p.host === 'citybreakjournal.example');
+  assert(lumiar.theirs === true && journal.kind === 'Article or guide' && journal.theirs === false && rd.pages.filter((p) => p.theirs).length === 1 && calls.llm.some((x) => /^You sort web pages/.test(x)), 'a rival\'s own website is set apart, and the pages no list knows are sorted from address and title');
   assert(r.probe.engines.find((x) => x.e === 'grok').knows === 'other' && r.probe.engines.find((x) => x.e === 'claude').knows === 'no' && r.probe.check.length === 2, 'asked by name: one engine mixes the business up with another, and two claims need checking');
   assert(r.says.descriptors.includes('family-run') && r.says.basedOn === 15, 'the words the engines use for the business');
   assert(r.fixes[0].id === 'robots' && r.fixes[0].asset.body.includes('User-agent: Claude-SearchBot') && !r.fixes[0].asset.body.includes('ClaudeBot\n'), 'the first fix lets the blocked search crawler in, and leaves the training crawler to the owner');
   const fx2 = Object.fromEntries(r.fixes.map((f) => [f.id, f]));
   assert(fx2.org.asset.body.includes('"@type": "LocalBusiness"') && fx2.org.asset.body.includes('Rua das Flores') && fx2.faq.asset.body.includes('FAQPage') && fx2.llms.asset.body.startsWith('# Casa Aldora') && fx2.listings.steps.length >= 3 && fx2.page.why.includes('"romantic hotels lisbon" (about 480 Google searches a month in the United Kingdom) you are named in 1 of 10') && fx2.page.steps[0].includes('Where should a couple stay') && fx2.page.asset.body.includes('romantic'), 'the fix kit: organization markup, FAQ markup, llms.txt, the pages to get onto and a page for the search with the biggest gap');
+  assert(fx2.listings.why.includes('Of the 8 we could open, one is another business\'s own website. On the other 7 you are named on 2. The Lumiar House is on 6.') && !fx2.listings.steps.join(' ').includes('lumiarhouse') && fx2.listings.steps.length === 4 && fx2.listings.steps.every((x) => /ask the editor to add you\.$/.test(x)), 'the pages to get onto leave out a rival\'s own website');
+  assert(fx2.page.title === 'Publish a page for the search you are missing' && fx2.page.why.includes('None of the 3 pages we read on your site is about it') && !/No page on your site/.test(JSON.stringify(r.fixes)), 'the page fix says what was read, not what was not');
   assert(r.fixes.every((f, i) => f.n === i + 1 && f.why && f.minutes > 0) && r.fixes.map((f) => f.impact).join('') === r.fixes.map((f) => f.impact).sort((a, b) => b - a).join(''), 'fixes are numbered, biggest win first');
   assert(calls.emails.length === 1 && calls.emails[0].to === 'owner@casaaldora.example' && calls.emails[0].text.includes('https://silitlabs.com/check/' + id) && !/app\.test|aiseodeck/.test(calls.emails[0].text + calls.emails[0].html), 'the buyer is emailed the link once, at the site\'s address');
   const mailer = require('../api/_lib/email');
@@ -164,6 +169,10 @@ const polar = http.createServer((req, res) => {
   assert(rep.stage === 'report' && rep.answers.length === 54 && rep.report.fixes.length === r.fixes.length && rep.email === 'o•••@casaaldora.example', 'the report page gets every answer; the email is masked');
   const repHtml = V.app(rep);
   assert(/AI names Casa Aldora in 15 of 49 answers/.test(repHtml) && /Start here/.test(repHtml) && /Second ask/.test(repHtml) && /you are not on it/.test(repHtml) && /Mixes you up/.test(repHtml) && /Copy the brief for my web person/.test(repHtml), 'the report page renders every section');
+  assert(/We could open 8 of these 10 pages\. One is the own website of another business, where nobody else is listed\. On the other 7 you are named on 2\. The Lumiar House is on 6\./.test(repHtml.replace(/<[^>]+>/g, '')) && /their own website/.test(repHtml) && /From the 15 answers that name you: 14 positive, 1 neutral, 0 negative\./.test(repHtml), 'the pages section counts a rival\'s own website apart, and the tone of the answers is given');
+  const mute = JSON.parse(JSON.stringify(rep)); mute.report.says.sentiment = { positive: 0, neutral: 0, negative: 0 }; delete mute.report.reading.theirs; for (const p of mute.report.reading.pages) delete p.theirs;
+  const muteHtml = V.app(mute);
+  assert(!/positive, \d+ neutral/.test(muteHtml) && /The words AI uses for you/.test(muteHtml) && /We could open 8 of these 10 pages\. You are on 2\./.test(muteHtml.replace(/<[^>]+>/g, '')), 'a tone that could not be read is left out, and a report built before today still renders');
   assert(/<span>Searches<\/span>5, made about 1,340 times a month on Google/.test(repHtml) && /Most searched<\/span>/.test(repHtml) && /Biggest gap<\/span>/.test(repHtml) && /Best result<\/span>/.test(repHtml) && /named least on quiet hotel lisbon \(0 of 9\), but fewer people search it/.test(repHtml) && /Searches a month<\/th>/.test(repHtml) && /Searches we weighed and did not ask/.test(repHtml) && rep.others.length === 4, 'the report is laid out by search: where the demand is, the biggest gap, the best result and the searches that were weighed');
   assert(/udm=50&q=romantic%20hotels%20lisbon/.test(repHtml) && /chatgpt\.com\/\?q=Where%20should%20a%20couple/.test(repHtml), 'to ask it yourself, Google gets the search and a chat engine gets the question');
   assert(!/[—–]/.test(repHtml.replace(/<pre[\s\S]*?<\/pre>/g, '')) && !/İ/.test(repHtml), 'no long dashes and no dotted capital I in the page');
@@ -282,6 +291,91 @@ const polar = http.createServer((req, res) => {
   assert(V.notesFor({ state: 'named', topic: 't1', you: true, rank: 1, of: 2, card: true, pages: 1, named: [{ name: 'Casa Aldora', kind: 'business', you: true }, { name: 'The Lumiar House', kind: 'business' }] }, {}).some((n) => /your own business card/.test(n.text)), 'and the margin says so');
   const shell2 = await core.start('appshell.example', { ip: 'visitor3b' });
   assert(shell2.id && shell2.id !== other.id && !shell2.cached, 'a draft whose searches could not be worked out is not handed to the next visitor');
+
+  console.log('\nWhat the first paid report taught');
+  // (a) a name providers only use or belong to is not someone named in the business's place
+  c = await core.get(id2);
+  const mixed = 'Casa Aldora and The Lumiar House both have Hästens beds. Hotel Marquês Azul is recommended by Turismo de Lisboa. Compare prices on Booking.com.';
+  const got = await core.extractNamed(c, { text: 'Which small hotels in Lisbon are comfortable?' }, mixed, 12000);
+  assert(got.map((x) => x.name + ':' + x.kind).join('|') === 'Casa Aldora:business|The Lumiar House:business|Hotel Marquês Azul:business|Booking.com:directory|Hotel That Is Not There:business', 'a bed maker and a tourist board in an answer about hotels are left out; rivals and listing sites stay');
+  const lastNames = callsL.llm.length;
+  const placed = core.placeNamed(c, { text: mixed, mentioned: true, idx: 0 }, got);
+  assert(placed.of === 3 && placed.rank === 1 && placed.named.length === 4 && !JSON.stringify(placed.named).includes('Hästens') && callsL.llm.length === lastNames, 'so the business is first of three, not of five');
+  // (b) pages: a listing site the answers named, and the kinds a model tells from address and title
+  assert(core.hostKind('hotelfinder.example', [], ['hotelfinder', 'lisbonstays']) === core.KIND.listing && core.hostKind('www.lisbonstays.co.uk', ['lumiarhouse'], ['hotelfinder', 'lisbonstays']) === core.KIND.listing && core.hostKind('lumiarhouse.example', ['thelumiarhouse'], ['hotelfinder']) === core.KIND.rival && core.hostKind('grandhotelbelem.example', ['thelumiarhouse'], ['hotelfinder']) === core.KIND.article && core.hostKind('tripadvisor.co.uk', [], []) === 'Listing or review site', 'a site the answers called a listing site is one; an unknown site starts as an article');
+  const sorted = [{ host: 'grandhotelbelem.example', title: 'Grand Hotel Belém | Official site', kind: core.KIND.article }, { host: 'hastens.example', title: 'Hästens beds', kind: core.KIND.article }, { host: 'turismolisboa.example', title: 'Visit Lisboa', kind: core.KIND.article }, { host: 'lisbonforum.example', title: 'Where to stay?', kind: core.KIND.article }, { host: 'unknown.example', title: '', kind: core.KIND.article }, { host: 'reddit.com', title: 'r/lisboa', kind: 'Forum' }];
+  await core.sortPages(c, sorted, 9000);
+  assert(sorted.map((x) => x.kind).join('|') === 'A rival\'s own site|A supplier\'s site|Official body|Forum|Article or guide|Forum', 'another provider, a supplier, an official body and a forum are told apart; what the model does not know stays an article');
+  const untouched = [{ host: 'grandhotelbelem.example', title: '', kind: core.KIND.article }];
+  await core.sortPages(c, untouched, 1000);
+  assert(untouched[0].kind === core.KIND.article, 'with no time left the pages are not sorted, and the step goes on');
+  const pg = (host, kind, extra) => Object.assign({ url: 'https://' + host + '/x', host, title: host, n: 3, cited: 1, engines: ['openai'], kind, status: 'read', you: false, rivals: [], theirs: kind === core.KIND.rival || kind === core.KIND.supplier }, extra || {});
+  const mixedPages = [pg('hotelfinderlisbon.example', core.KIND.listing, { rivals: ['The Lumiar House'] }), pg('turismolisboa.example', core.KIND.official), pg('lisbonforum.example', core.KIND.forum), pg('grandhotelbelem.example', core.KIND.rival), pg('hastens.example', core.KIND.supplier), pg('youtube.com', 'Social network'), pg('wikipedia.org', 'Encyclopedia'), pg('alfamaguide.example', core.KIND.article, { you: true })];
+  const byKind = core.fixesOf(await core.get(id), await core.rowsOf(id), { reading: { pages: mixedPages, opened: 8, theirs: 2, you: 1, top: { name: 'The Lumiar House', n: 1 } }, audit: (await core.get(id)).work.audit, assets: {}, probe: r.probe, t: core.tally(await core.rowsOf(id)) }).find((f) => f.id === 'listings');
+  assert(byKind.steps.join('\n') === 'hotelfinderlisbon.example names The Lumiar House, not you: claim or create your listing.' && byKind.why.includes('Of the 8 we could open, two are other businesses\' own websites. On the other 6 you are named on 1.'), 'when one page names a rival, that is the one to start with');
+  const noRivals = core.fixesOf(await core.get(id), await core.rowsOf(id), { reading: { pages: mixedPages.map((x) => Object.assign({}, x, { rivals: [] })), opened: 8, theirs: 2, you: 1, top: null }, audit: (await core.get(id)).work.audit, assets: {}, probe: r.probe, t: core.tally(await core.rowsOf(id)) }).find((f) => f.id === 'listings');
+  assert(noRivals.steps.join('\n') === 'hotelfinderlisbon.example does not mention you: claim or create your listing.\nturismolisboa.example does not mention you: see whether its register or member list can include you.\nlisbonforum.example does not mention you: answer the thread honestly, as the business.' && !/grandhotel|hastens|youtube|wikipedia/.test(JSON.stringify(noRivals.steps) + JSON.stringify(noRivals.links)), 'a listing site, an official body and a forum each get their own step; another business, a supplier, a social network and an encyclopedia get none');
+  const onlyTheirs = core.fixesOf(await core.get(id), await core.rowsOf(id), { reading: { pages: [pg('grandhotelbelem.example', core.KIND.rival), pg('youtube.com', 'Social network')], opened: 2, theirs: 1, you: 0, top: null }, audit: (await core.get(id)).work.audit, assets: {}, probe: r.probe, t: core.tally(await core.rowsOf(id)) }).find((f) => f.id === 'listings');
+  assert(!onlyTheirs, 'when nothing can be done about the pages that were read, the fix is not offered');
+  // (c) the page fix looks at the pages we read on the site before it says one is missing
+  const rowsDone = await core.rowsOf(id);
+  const doneCheck = await core.get(id);
+  const ctx = (pages) => ({ reading: r.reading, audit: Object.assign({}, doneCheck.work.audit, { pages }), assets: { page: { title: 'T', slug: 's', intro: 'Intro text.', faq: [{ q: 'Q?', a: 'A.' }] } }, probe: r.probe, t: core.tally(rowsDone) });
+  const hasPage = core.fixesOf(doneCheck, rowsDone, ctx([{ path: '/', ok: true, title: 'Casa Aldora | Boutique hotel in Alfama', h1: ['A quiet house'], description: '' }, { path: '/romantic-hotel-lisbon', ok: true, title: 'A romantic hotel in Lisbon with a view', h1: ['Romantic stays'], description: '' }])).find((f) => f.id === 'page');
+  assert(hasPage.title === 'Make your page for this search the one AI quotes' && hasPage.why.includes('Your page /romantic-hotel-lisbon is already about this search, so a new page is not what is missing.') && hasPage.steps.length === 3 && hasPage.asset.label === 'Section draft' && hasPage.asset.body === 'Intro text.\n\nQ?\nA.' && hasPage.minutes === 45, 'when the site already has a page for the search, the fix is to sharpen it, not to publish another');
+  const homeIsIt = core.fixesOf(doneCheck, rowsDone, ctx([{ path: '/', ok: true, title: 'Romantic hotels in Lisbon | Casa Aldora', h1: [], description: '' }])).find((f) => f.id === 'page');
+  const noAudit = core.fixesOf(doneCheck, rowsDone, Object.assign(ctx([]), { audit: null })).find((f) => f.id === 'page');
+  const weakDesc = core.fixesOf(doneCheck, rowsDone, ctx([{ path: '/', ok: true, title: 'Casa Aldora', h1: [], description: 'Romantic hotels in Lisbon for couples.' }, { path: '/gone', ok: false, title: 'Romantic hotels Lisbon', h1: [], description: '' }])).find((f) => f.id === 'page');
+  assert(homeIsIt.why.includes('Your home page is already about this search') && noAudit.title === 'Publish a page for the search you are missing' && noAudit.why.endsWith('A page that answers it in your own words gives engines something of yours to lift.') && weakDesc.title === 'Publish a page for the search you are missing', 'the home page can be that page; a mention in a description, a page that did not open or no pages read do not count as one');
+  // (d) searches the first lookup has no number for are asked of Google Ads once, when a check starts
+  const callsA = fx.install({ ads: { 'alfama hotel near fado houses': 320, 'boutique hotel alfama': 9999 } });
+  const two = await core.searchVolumes(['boutique hotel alfama', 'Alfama hotel near Fado houses', 'lisbon hotel with a butler'], 'GB', 'en', 5000, () => 8000);
+  assert(two.known && two.map['boutique hotel alfama'] === 590 && two.map['alfama hotel near fado houses'] === 320 && !('lisbon hotel with a butler' in two.map) && two.asked === 2 && two.filled === 1 && callsA.ads.length === 1 && callsA.ads[0].list.join('|') === 'alfama hotel near fado houses|lisbon hotel with a butler' && callsA.ads[0].country === 'GB' && callsA.ads[0].timeoutMs === 8000, 'only the searches without a number are asked of Google Ads, and a number the first lookup gave is kept');
+  const picked = core.pickTopics(fx.SEARCHES, two.map, 5);
+  assert((await core.searchVolumes(['boutique hotel alfama', 'alfama hotel near fado houses'], 'GB', 'en', 5000)).asked === 0 && (await core.searchVolumes(['alfama hotel near fado houses'], 'GB', 'en', 5000, 2000)).asked === 0 && callsA.ads.length === 1 && picked.length >= 1, 'it is not asked without leave, nor when there is no time left for it');
+  const kwA = await core.start('casaaldora.example', { ip: 'kwA', fresh: true });
+  c = await core.get(kwA.id);
+  assert(callsA.ads.length === 2 && callsA.ads[1].list.join() === 'alfama hotel near fado houses' && c.topics.map((t) => t.keyword + ' ' + t.volume).join('|') === 'boutique hotel alfama 590|romantic hotels lisbon 480|alfama hotel near fado houses 320|quiet hotel lisbon 110|hotels near santa apolonia station 90' && c.others[0].keyword === 'lisbon hotel with roof terrace' && c.others[0].volume === 70, 'a check that starts gets the missing number, and the search it belongs to takes its place among the five');
+  const adsDay = 'vrads:' + new Date().toISOString().slice(0, 10);
+  assert(parseInt(await kv.command('GET', adsDay), 10) >= 2, 'each of these lookups is counted for the day');
+  await kv.del(adsDay);
+  process.env.VR_ADS_LOOKUPS_PER_DAY = '1';
+  await core.searchVolumes(['alfama hotel near fado houses'], 'GB', 'en', 5000, 8000);
+  const pastCap = await core.searchVolumes(['alfama hotel near fado houses'], 'GB', 'en', 5000, 8000);
+  assert(callsA.ads.length === 3 && pastCap.known && pastCap.asked === 0 && !('alfama hotel near fado houses' in pastCap.map), 'the second lookup has a daily cap of its own; past it the first numbers stand');
+  process.env.VR_ADS_LOOKUPS_PER_DAY = '0';
+  assert((await core.searchVolumes(['alfama hotel near fado houses'], 'GB', 'en', 5000, 8000)).asked === 0 && callsA.ads.length === 3, 'and it can be turned off');
+  delete process.env.VR_ADS_LOOKUPS_PER_DAY;
+  await kv.del(adsDay);
+  const callsD = fx.install({ ads: 'down' });
+  const down = await core.searchVolumes(['boutique hotel alfama', 'alfama hotel near fado houses'], 'GB', 'en', 5000, 8000);
+  assert(down.known && down.map['boutique hotel alfama'] === 590 && down.asked === 1 && down.filled === 0 && callsD.ads.length === 1, 'when Google Ads does not answer, the numbers already found are used');
+  fx.install();
+  // the request itself, against a stand-in for DataForSEO that answers the way its documentation says
+  const adsSeen = [];
+  const adsApi = http.createServer((req, res) => {
+    const ch = [];
+    req.on('data', (x) => ch.push(x));
+    req.on('end', () => {
+      const body = JSON.parse(Buffer.concat(ch).toString() || '[]');
+      adsSeen.push({ path: req.url, method: req.method, auth: req.headers.authorization, body });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (body[0].keywords.includes('rate limited')) return res.end(JSON.stringify({ status_code: 20000, tasks: [{ status_code: 40202, status_message: 'Rate limit per minute exceeded.', result: null }] }));
+      res.end(JSON.stringify({ status_code: 20000, tasks: [{ status_code: 20000, status_message: 'Ok.', cost: 0.09, result: [
+        { keyword: 'Alfama Hotel near fado houses', spell: null, location_code: 2826, language_code: 'en', search_volume: 320, competition: 'LOW', monthly_searches: [] },
+        { keyword: 'lisbon hotel with a butler', location_code: null, language_code: null, search_volume: null, competition: null, monthly_searches: null }
+      ] }] }));
+    });
+  });
+  const adsPort = await listen(adsApi);
+  process.env.DATAFORSEO_API_BASE = 'http://127.0.0.1:' + adsPort;
+  const fromAds = await realAdsVolumes(['Alfama hotel near Fado houses', 'lisbon hotel with a butler', 'what is a boutique hotel?', 'lisbon hotel with a butler'], 'GB', 'en', 4000);
+  assert(JSON.stringify(fromAds) === '{"alfama hotel near fado houses":{"volume":320}}' && adsSeen.length === 1 && adsSeen[0].path === '/v3/keywords_data/google_ads/search_volume/live' && adsSeen[0].method === 'POST' && /^Basic /.test(adsSeen[0].auth) && adsSeen[0].body.length === 1 && adsSeen[0].body[0].keywords.join('|') === 'alfama hotel near fado houses|lisbon hotel with a butler|what is a boutique hotel' && adsSeen[0].body[0].location_code === 2826 && adsSeen[0].body[0].language_code === 'en', 'Google Ads is asked in one request for the country, and only searches it has a number for come back');
+  let adsError = '';
+  try { await realAdsVolumes(['rate limited'], 'GB', 'en', 4000); } catch (e) { adsError = e.message; }
+  assert(/Rate limit/.test(adsError) && JSON.stringify(await realAdsVolumes(['a/b testing tool', '  '], 'GB', 'en', 4000)) === '{}' && adsSeen.length === 2, 'a refusal is an error for the caller to catch, and a search Google Ads would turn down is never sent');
+  adsApi.close();
+  delete process.env.DATAFORSEO_API_BASE;
 
   console.log('\nWhen things go wrong');
   const shell = await core.get(other.id);
