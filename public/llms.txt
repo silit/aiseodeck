@@ -10,6 +10,11 @@ Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, 
 - [Privacy policy](https://aiseodeck.silitlabs.com/privacy)
 - [Terms of use](https://aiseodeck.silitlabs.com/terms)
 
+## AI Visibility Report
+
+- [AI Visibility Report](https://aiseodeck.silitlabs.com/ai-visibility-report): for any website, no Webflow needed. The free check reads the site, finds the searches its customers make with their monthly Google searches, and shows what ChatGPT, Google AI Overviews and Gemini answer for one of them, word for word. The full report is a single payment of $29: the five searches made most often on six AI engines, each chat engine asked twice, where the most searches end in an answer without the business, the pages the engines read, and a fix kit with text and code to paste.
+- [Sample report](https://aiseodeck.silitlabs.com/ai-visibility-report/sample): a complete report for a made-up hotel
+
 ## Guides
 
 - [How to check if ChatGPT recommends your business](https://silitlabs.com/guides/check-if-chatgpt-recommends-your-business/): a repeatable manual check across AI engines
