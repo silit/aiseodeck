@@ -1,6 +1,6 @@
 // A made-up business and everything the AI Visibility Report needs to run without any network: a mock Redis, the
-// business's website, canned answers from every AI engine, the pages those answers cite and the replies of the
-// writing model. Used by test/vr.js and by scripts/vr-sample.js, which freezes one run of it as the public sample.
+// business's website, the searches its customers make and how often, canned answers from every AI engine, the pages
+// those answers cite and the replies of the writing model. Used by test/vr.js and by scripts/vr-sample.js, which freezes one run of it as the public sample.
 // Casa Aldora and every hotel and publication here are invented; their sites live on the reserved .example domain.
 const http = require('http');
 
@@ -117,15 +117,36 @@ async function getText(url) {
   return { ok: true, status: 200, url, contentType: 'text/html', text: page.html };
 }
 
-/* ---- the questions and what each engine answers ---- */
+/* ---- the searches, how often each is made, and what each engine answers ---- */
+// The five searches the report is built on, most searched first. Each has canned answers below.
 const TOPICS = [
-  { question: 'What is a good boutique hotel in Alfama, Lisbon for a weekend?', keyword: 'boutique hotel alfama lisbon' },
-  { question: 'Where should a couple stay in Lisbon with a view and walkable to everything?', keyword: 'romantic hotel lisbon with view' },
-  { question: 'Which small hotels in Lisbon are quiet at night?', keyword: 'quiet hotel lisbon old town' },
-  { question: 'I arrive in Lisbon by train late at night. Which hotel near Santa Apolónia station is easy to reach?', keyword: 'hotel near santa apolonia station lisbon' },
-  { question: 'Which Lisbon hotels include breakfast and have a terrace?', keyword: 'lisbon hotel with terrace breakfast included' }
+  { keyword: 'boutique hotel alfama', question: 'What is a good boutique hotel in Alfama, Lisbon for a weekend?' },
+  { keyword: 'romantic hotels lisbon', question: 'Where should a couple stay in Lisbon with a view and walkable to everything?' },
+  { keyword: 'quiet hotel lisbon', question: 'Which small hotels in Lisbon are quiet at night?' },
+  { keyword: 'hotels near santa apolonia station', question: 'I arrive in Lisbon by train late at night. Which hotel near Santa Apolónia station is easy to reach?' },
+  { keyword: 'lisbon hotel with roof terrace', question: 'Which Lisbon hotels include breakfast and have a terrace?' }
 ];
-const PROFILE = { brand: 'Casa Aldora', aliases: [], category: 'boutique hotel', place: 'Alfama, Lisbon', country: '', customers_country: 'GB', language: 'en', summary: 'A family-run 14-room boutique hotel in a restored townhouse in Alfama, Lisbon.', topics: TOPICS };
+// What the writing model finds on the home page: ten searches in the order it thought of them. Half make the report.
+// One is another wording of the main search and is searched more; it must not push the main one out or sit beside it.
+const SEARCHES = [
+  TOPICS[0],
+  { keyword: 'small hotel lisbon old town', question: 'Which small hotels are in the old town of Lisbon?' },
+  TOPICS[3],
+  TOPICS[1],
+  { keyword: 'boutique hotels in alfama lisbon', question: 'What are the best boutique hotels in Alfama, Lisbon?' },
+  TOPICS[2],
+  { keyword: 'family run hotel lisbon', question: 'Is there a family-run hotel in Lisbon you would recommend?' },
+  TOPICS[4],
+  { keyword: 'lisbon hotel with courtyard', question: 'Which Lisbon hotels have a courtyard to sit in?' },
+  { keyword: 'alfama hotel near fado houses', question: 'Which hotel in Alfama is close to the Fado houses?' }
+];
+// Google searches a month by the country they are made in. A search that is missing has too few to measure.
+const VOLUMES = {
+  GB: { 'boutique hotel alfama': 590, 'romantic hotels lisbon': 480, 'quiet hotel lisbon': 110, 'hotels near santa apolonia station': 90, 'lisbon hotel with roof terrace': 70,
+    'boutique hotels in alfama lisbon': 720, 'small hotel lisbon old town': 50, 'family run hotel lisbon': 40, 'lisbon hotel with courtyard': 30 },
+  IE: { 'boutique hotel alfama': 70, 'romantic hotels lisbon': 50, 'quiet hotel lisbon': 10, 'hotels near santa apolonia station': 20, 'boutique hotels in alfama lisbon': 90 }
+};
+const PROFILE = { brand: 'Casa Aldora', aliases: [], category: 'boutique hotel', place: 'Alfama, Lisbon', country: '', customers_country: 'GB', language: 'en', summary: 'A family-run 14-room boutique hotel in a restored townhouse in Alfama, Lisbon.', searches: SEARCHES };
 
 // ANSWERS[topic][engine] = one answer for Google, two for a chat engine (first ask, second ask).
 const ANSWERS = {
@@ -299,10 +320,10 @@ function llmJSON(opts) {
   }
   if (/page titles and meta descriptions/.test(sys)) return { title: 'Casa Aldora | Quiet boutique hotel in Alfama, Lisbon', description: 'A family-run 14-room boutique hotel in a restored Alfama townhouse, with a lemon-tree courtyard, a roof terrace over the Tagus and breakfast included.' };
   if (/draft a web page/.test(sys)) {
-    return { title: 'A quiet small hotel in Lisbon\'s old town', slug: 'quiet hotel lisbon old town', intro: 'Casa Aldora is a 14-room hotel on a quiet lane in Alfama. The rooms at the back face a courtyard with two lemon trees, away from the street.', faq: [
-      { q: 'Which rooms are the quietest?', a: 'The courtyard rooms at the back of the house. Ask for one when you book.' },
-      { q: 'Is Alfama noisy at night?', a: 'Alfama is calmer than Bairro Alto. Ask the hotel which nights have Fado nearby if you are a light sleeper.' },
-      { q: 'How late is the roof terrace open?', a: 'The roof terrace is open to guests until midnight.' }
+    return { title: 'A romantic small hotel in Lisbon, with a view over the Tagus', slug: 'romantic hotel lisbon', intro: 'Casa Aldora is a 14-room hotel in a restored 18th-century townhouse in Alfama, the oldest quarter of Lisbon. Its roof terrace looks over the tiled rooftops to the Tagus river and is open to guests until midnight.', faq: [
+      { q: 'Does the hotel have a view?', a: 'Yes. The roof terrace looks over the rooftops of Alfama to the Tagus river. It is open to guests until midnight.' },
+      { q: 'What can a couple walk to from the hotel?', a: 'The castle, the cathedral and the Fado houses of Alfama are all less than ten minutes away on foot.' },
+      { q: 'Is breakfast included?', a: 'Yes. Breakfast is included and served in the courtyard under two lemon trees.' }
     ] };
   }
   if (/short factual description/.test(sys)) return { about: 'Casa Aldora is a family-run boutique hotel in Alfama, the oldest quarter of Lisbon. Its fourteen rooms are in a restored 18th-century townhouse on a quiet lane, six minutes on foot from Santa Apolónia station. Breakfast is served in a courtyard with two lemon trees, and a roof terrace looks over the Tagus. Rooms start at 140 euros a night.', type: 'LocalBusiness', phone: '', email: 'hello@casaaldora.example', street: 'Rua das Flores de Alfama 12', city: 'Lisboa', region: '', postal: '1100-000', country: 'Portugal' };
@@ -313,8 +334,9 @@ const llmText = () => 'Hello,\n\nI run Casa Aldora, a family-run hotel with four
 // Patches the modules the report uses so that nothing leaves this process. Returns what was called.
 function install(opts) {
   opts = opts || {};
-  const calls = { ask: [], llm: [], emails: [], fetched: [] };
+  const calls = { ask: [], llm: [], emails: [], fetched: [], volumes: [] };
   const engines = require('../api/_lib/engines');
+  const keywords = require('../api/_lib/keywords');
   const llm = require('../api/_lib/llm');
   const fetcher = require('../api/_lib/fetcher');
   const email = require('../api/_lib/email');
@@ -337,6 +359,15 @@ function install(opts) {
   llm.generate = async (o) => { calls.llm.push(String(o.system).slice(0, 60)); if (opts.llmDown) throw new Error('AI provider: down'); return llmText(o); };
   fetcher.getText = async (url) => { calls.fetched.push(url); return getText(url); };
   email.send = async (m) => { calls.emails.push(m); return { id: 'em' + calls.emails.length }; };
+  // monthly searches by country; opts.kwDown stands for the keyword data service being away
+  keywords.volumes = async (list, country) => {
+    calls.volumes.push({ list: list.slice(), country });
+    if (opts.kwDown) throw new Error('Keyword data could not be reached');
+    const known = VOLUMES[country] || {};
+    const out = {};
+    for (const k of list) if (typeof known[k] === 'number') out[k] = { volume: known[k], intent: 'commercial' };
+    return out;
+  };
   return calls;
 }
 
@@ -348,4 +379,4 @@ function env(redisPort) {
   });
 }
 
-module.exports = { mockRedis, install, env, getText, SITE, TOPICS, PROFILE, ANSWERS, SOURCES, pages };
+module.exports = { mockRedis, install, env, getText, SITE, TOPICS, SEARCHES, VOLUMES, PROFILE, ANSWERS, SOURCES, pages };

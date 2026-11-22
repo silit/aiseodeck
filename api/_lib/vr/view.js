@@ -1,7 +1,9 @@
 /* AI Visibility Report: every piece of the pages, as plain functions from data to HTML. The same file runs on the
  * server (first paint, the sample report) and in the browser (the live check), so the two can never drift apart.
  * Colours carry meaning everywhere: marker yellow = the business was named, a rose underline = a rival was named,
- * blue = the business's own site was a source. Pen notes in the margin say what the marks mean. */
+ * blue = the business's own site was a source. Pen notes in the margin say what the marks mean.
+ * A report is built on searches: each is shown the way it is typed into Google, with how often it is made in a month
+ * where that is known, and with the question the chat engines got for it. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.VRView = factory();
@@ -34,6 +36,27 @@
     return { id: e, name: e, short: e, search: e === 'aio' || e === 'aimode' };
   }
   var from = function (st) { return st.ask && st.ask.countryName ? st.ask.countryName : 'the United States'; };
+
+  /* ---------- a search and how often it is made ---------- */
+
+  var num = function (n) { return Number(n).toLocaleString('en-US'); };
+  var counts = function (t) { return !!t && typeof t.volume === 'number' && t.volume >= 10; };
+  var SEARCH_ICON = '<svg class="kw-i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4L14 14"/></svg>';
+  // A search the way it is typed into Google.
+  function kw(text) { return '<span class="kw-t">' + SEARCH_ICON + '<span>' + esc(text) + '</span></span>'; }
+  // Google searches a month: a number, "too few to measure", or nothing at all when nobody looked it up.
+  function volHtml(t, cls) {
+    if (!t || !t.measured) return '';
+    var c = 'vol' + (cls ? ' ' + cls : '');
+    return counts(t) ? '<span class="' + c + '">' + num(t.volume) + '<small> a month</small></span>' : '<span class="' + c + ' none">too few to measure</span>';
+  }
+  function volWords(t) {
+    if (!t || !t.measured) return '';
+    return counts(t) ? 'about ' + num(t.volume) + ' searches a month' : 'too few searches to measure';
+  }
+  var topicOf = function (st, id) { return (st.topics || []).filter(function (x) { return x.id === id; })[0] || null; };
+  var measuredAny = function (st) { return (st.topics || []).some(function (t) { return t.measured; }); };
+  var namedIn = function (m) { return !m.answers ? 'no answer came back' : m.named ? 'named in ' + m.named + ' of ' + m.answers : 'named in none of ' + m.answers; };
 
   /* ---------- one answer, marked up ---------- */
 
@@ -192,43 +215,70 @@
   var PIP = function (s) { return '<i class="pip ' + (isNamed(s) ? 'on' : s === 'pending' ? 'wait' : counted(s) ? 'off' : 'na') + '"></i>'; };
   function matrixHtml(st, matrix) {
     var list = (matrix[0] && matrix[0].cells) || [];
-    var head = '<tr><th scope="col" class="mq">Question</th>' + list.map(function (c) { return '<th scope="col">' + esc(engine(st, c.e).short) + '</th>'; }).join('') + '<th scope="col" class="mt">Named</th></tr>';
+    var vols = measuredAny(st);
+    var head = '<tr><th scope="col" class="mq">Search</th>' + (vols ? '<th scope="col" class="mv">Searches a month</th>' : '') + list.map(function (c) { return '<th scope="col">' + esc(engine(st, c.e).short) + '</th>'; }).join('') + '<th scope="col" class="mt">Named</th></tr>';
     var rows = matrix.map(function (m) {
-      var t = (st.topics || []).filter(function (x) { return x.id === m.topic; })[0] || { question: '' };
-      return '<tr><th scope="row" class="mq">' + esc(t.question) + '</th>' + m.cells.map(function (c) {
+      var t = topicOf(st, m.topic) || { keyword: '' };
+      var v = !t.measured ? '' : counts(t) ? num(t.volume) : '<span aria-hidden="true">&lt;10</span><span class="sr">too few to measure</span>';
+      return '<tr><th scope="row" class="mq">' + kw(t.keyword) + '</th>' + (vols ? '<td class="mv">' + v + '</td>' : '') + m.cells.map(function (c) {
         var words = c.samples.map(function (s) { return isNamed(s) ? 'named' : s === 'pending' ? 'waiting' : counted(s) ? 'not named' : s === 'none' ? 'no AI answer' : 'no answer'; }).join(', ');
         return '<td><span class="pips" aria-hidden="true">' + c.samples.map(PIP).join('') + '</span><span class="sr">' + words + '</span></td>';
       }).join('') + '<td class="mt">' + (m.answers ? m.named + ' of ' + m.answers : '') + '</td></tr>';
     }).join('');
-    return '<div class="scroll"><table class="matrix"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
-      '<p class="legend"><span><i class="pip on"></i> named you</span><span><i class="pip off"></i> answered without you</span><span><i class="pip na"></i> no AI answer</span><span>Two dots: the same question asked twice.</span></p>';
+    return '<div class="scroll"><table class="matrix' + (vols ? ' has-v' : '') + '"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="legend"><span><i class="pip on"></i> named you</span><span><i class="pip off"></i> answered without you</span><span><i class="pip na"></i> no AI answer</span><span>Two dots: the same question asked twice.</span>' +
+      (vols ? '<span>Searches a month: on Google, in ' + esc(from(st)) + '.</span>' : '') + '</p>';
   }
 
-  /* ---------- stage: what we read, and the question ---------- */
+  /* ---------- stage: what we read, and the search to check ---------- */
 
   function draft(st) {
     var s = st.site;
     var free = (st.engines || []).filter(function (e) { return e.free; });
     var names = andList(free.map(function (e) { return e.name; })) || 'the AI engines';
     var first = st.topics[0];
-    var alts = st.topics.slice(1).map(function (t) { return '<button type="button" class="alt" data-topic="' + esc(t.id) + '" data-q="' + esc(t.question) + '">' + esc(t.question) + '</button>'; }).join('');
+    var vols = measuredAny(st);
+    var max = Math.max.apply(null, st.topics.map(function (t) { return counts(t) ? t.volume : 0; }).concat([1]));
     var countries = (st.countries || []).map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === st.ask.country ? ' selected' : '') + '>' + esc(c[1]) + '</option>'; }).join('');
     var h1 = s.read ? 'We read ' + esc(s.host) + '. Is this you?' : 'We could not read ' + esc(s.host) + '. We can still ask AI about you.';
-    var sub = s.read ? 'Check what we understood, pick the question, and we put it to ' + esc(names) + '.' : 'Your site turned our reader away, which is a finding in itself. Tell us who you are and we ask the engines.';
+    var sub = s.read ? (first ? 'Check what we understood, pick the search to check, and we put it to ' + esc(names) + '.' : 'Check what we understood, write the question, and we put it to ' + esc(names) + '.')
+      : 'Your site turned our reader away, which is a finding in itself. Tell us who you are and we ask the engines.';
+    // each search is a row to pick; the line under it is its share of the most searched one
+    var rows = st.topics.map(function (t, i) {
+      return '<label class="kw"' + (vols ? ' style="--w:' + (counts(t) ? Math.max(2, Math.round(t.volume / max * 100)) : 0) + '%"' : '') + '><input type="radio" name="topic" value="' + esc(t.id) + '" data-q="' + esc(t.question) + '"' + (i === 0 ? ' checked' : '') + '>' + kw(t.keyword) + volHtml(t) + '</label>';
+    }).join('');
+    var left = (st.others || []).filter(counts).slice(0, 4);
+    var gets = function (list, what) { return list.length ? esc(andList(list.map(function (e) { return e.search ? e.name : e.short; }))) + (list.length === 1 ? ' gets ' : ' get ') + what + '. ' : ''; };
+    var searches = first ? '<fieldset class="field searches"><legend>The search to check</legend>' +
+      '<p class="hint">What your customers type into Google, taken from your home page.' + (vols ? '<span class="vol-note"> The numbers are Google searches a month in ' + esc(from(st)) + ', most searched first.</span>' : '') + '</p>' +
+      '<div class="kw-list" data-country="' + esc(st.ask.country) + '" data-name="' + esc(from(st)) + '">' + rows + '</div>' +
+      '<p class="hint stale" id="vr-stale" hidden></p>' +
+      (left.length ? '<p class="hint left-out">Left out, because fewer people search them: ' + left.map(function (o) { return esc(o.keyword) + ' (' + num(o.volume) + ')'; }).join(', ') + '.</p>' : '') + '</fieldset>' : '';
+    var question = first
+      ? '<div class="field"><label for="vr-q">How a customer asks AI for it</label><textarea id="vr-q" name="question" rows="3" maxlength="170" required data-topic="' + esc(first.id) + '">' + esc(first.question) + '</textarea>' +
+        '<p class="hint">' + gets(free.filter(function (e) { return e.search; }), 'the search as it is typed') + gets(free.filter(function (e) { return !e.search; }), 'this question') + 'Change it to the way your customers talk.</p></div>'
+      : '<div class="field"><label for="vr-q">The question a customer asks AI</label><textarea id="vr-q" name="question" rows="3" maxlength="170" required data-topic=""></textarea>' +
+        '<p class="hint">Write it the way a customer who has never heard of you would ask. No brand names.</p></div>';
     return '<section class="stage draft"><div class="lead"><h1>' + h1 + '</h1><p class="sub">' + sub + '</p></div><div class="draft-grid">' +
       '<form class="sheet form" data-act="run" novalidate>' +
       '<div class="field"><label for="vr-brand">Your business</label><input id="vr-brand" name="brand" value="' + esc(s.brand) + '" maxlength="60" autocomplete="organization" required>' +
       (s.summary ? '<p class="hint">' + esc(s.summary) + '</p>' : '') + '</div>' +
-      '<div class="field"><label for="vr-country">Your customers ask from</label><select id="vr-country" name="country">' + countries + '</select>' +
-      '<p class="hint pen">Not always where you are. A hotel in Lisbon is asked about from London.</p></div>' +
-      '<div class="field"><label for="vr-q">The question a customer asks AI</label><textarea id="vr-q" name="question" rows="3" maxlength="170" required data-topic="' + esc(first ? first.id : '') + '">' + esc(first ? first.question : '') + '</textarea>' +
-      (first ? '<p class="hint">Written from your home page. Change it to the way your customers talk.</p>' : '<p class="hint">Write it the way a customer who has never heard of you would ask. No brand names.</p>') + '</div>' +
-      (alts ? '<div class="alts"><p>Or ask one of these instead</p>' + alts + '</div>' : '') +
+      '<div class="field"><label for="vr-country">Your customers are in</label><select id="vr-country" name="country">' + countries + '</select>' +
+      '<p class="hint pen">Not always where you are. A hotel in Lisbon is searched for from London.</p></div>' +
+      searches + question +
       '<p class="form-msg" role="alert"></p>' +
       '<button class="btn mark big" type="submit">Ask ' + esc(names) + '</button>' +
-      '<p class="tiny">Free: one question, ' + plural(free.length || 3, 'AI engine') + ', asked once. About a minute.</p></form>' +
-      '<div class="draft-side"><p class="side-h">Your first finding, before any question is asked</p>' + crawlerSheet({ read: s.read, status: s.status, words: s.words, sample: s.sample, title: s.title }, s.host) + '</div>' +
+      '<p class="tiny">Free: one ' + (first ? 'search' : 'question') + ', ' + plural(free.length || 3, 'AI engine') + ', asked once. About a minute.</p></form>' +
+      '<div class="draft-side"><p class="side-h">Your first finding, before anything is asked</p>' + crawlerSheet({ read: s.read, status: s.status, words: s.words, sample: s.sample, title: s.title }, s.host) + '</div>' +
       '</div></section>';
+  }
+
+  // The search a free check is about, and how often it is made.
+  function searchStrip(st) {
+    var t = topicOf(st, st.freeTopic) || (st.topics || []).filter(function (x) { return x.free; })[0];
+    if (!t) return '';
+    var v = volWords(t);
+    return '<p class="searched"><span class="searched-l">The search</span>' + kw(t.keyword) + (v ? '<span class="searched-v">' + v + ' on Google in ' + esc(from(st)) + '</span>' : '') + '</p>';
   }
 
   /* ---------- stage: the engines are answering ---------- */
@@ -243,7 +293,7 @@
     return 'All ' + slots.length + ' answers are in.';
   }
   function asking(st) {
-    return '<section class="stage asking"><div class="lead"><h1>Asking the AI engines</h1><p class="sub" id="vr-tally" aria-live="polite">' + esc(tallyText(st)) + '</p></div>' +
+    return '<section class="stage asking"><div class="lead"><h1>Asking the AI engines</h1><p class="sub" id="vr-tally" aria-live="polite">' + esc(tallyText(st)) + '</p>' + searchStrip(st) + '</div>' +
       stack(freeGroups(st), st, { id: 'free' }) +
       '<p class="tiny center">Each engine searches the web before it answers, so this takes 20 to 60 seconds. Stay on this page.</p></section>';
   }
@@ -257,11 +307,11 @@
     var missed = live.filter(function (a) { return !isNamed(a.state); });
     var rivals = (st.preview && st.preview.rivals) || [];
     var n = live.length;
-    if (!n) return { h: 'No AI answer came back for this question.', sub: 'Google showed no AI answer and the other engines did not reply. Ask a different question, or come back later.' };
-    if (named.length === n) return { h: n === 1 ? 'The AI engine named you.' : 'All ' + n + ' AI engines named you.', sub: 'One answer is luck. AI changes its mind between asks, so the full report asks every chat engine twice, on ' + word(st.topics.length || 5) + ' questions.' };
+    if (!n) return { h: 'No AI answer came back for this search.', sub: 'Google showed no AI answer and the other engines did not reply. Check a different search, or come back later.' };
+    if (named.length === n) return { h: n === 1 ? 'The AI engine named you.' : 'All ' + n + ' AI engines named you.', sub: 'One answer is luck. AI changes its mind between asks, so the full report asks every chat engine twice, on ' + word(st.topics.length || 5) + ' searches.' };
     if (named.length) return { h: named.length + ' of ' + n + ' AI engines named you. ' + andList(missed.map(function (a) { return engine(st, a.e).short; })) + ' did not.', sub: 'Open each sheet to read the answer word for word. The notes in the margin say what the marks mean for you.' };
     if (rivals.length) return { h: 'None of the ' + n + ' AI engines named you. They named ' + plural(rivals.length, 'other business', 'other businesses') + '.', sub: 'These are the answers your customers get today. The margin notes show who took your place and where the answer came from.' };
-    return { h: 'None of the ' + n + ' AI engines named you, or anyone else.', sub: 'For this question the engines give general advice and name no business. Try a question that asks for a recommendation.' };
+    return { h: 'None of the ' + n + ' AI engines named you, or anyone else.', sub: 'For this search the engines give general advice and name no business. Try a search that asks for a provider.' };
   }
 
   function unlock(st) {
@@ -270,19 +320,22 @@
     var chat = (st.engines || []).filter(function (e) { return !e.search; }).length || 4;
     var search = (st.engines || []).filter(function (e) { return e.search; }).length;
     var total = (st.topics.length || 3) * (chat * 2 + search);
+    var known = (st.topics || []).filter(counts);
+    var sum = known.reduce(function (a, t) { return a + t.volume; }, 0);
     var rows = [
-      ['All ' + plural(st.topics.length || 3, 'question') + ' on ' + plural((st.engines || []).length || 6, 'AI engine'), total + ' answers. Each chat engine is asked twice, because AI changes its mind between asks.' + (lk.engines.length ? ' Adds ' + esc(andList(lk.engines)) + '.' : '') +
-        (lk.topics.length ? '<span class="more-q">Your other ' + (lk.topics.length === 1 ? 'question' : word(lk.topics.length) + ' questions') + ':</span><ul class="more-qs">' + lk.topics.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ul>' : '')],
-      ['The pages AI read', (p.sources ? plural(p.sources, 'page') + ' fed this one question alone. ' : '') + 'We open them and tell you which ones name your rivals and not you.'],
+      ['All ' + plural(st.topics.length || 3, 'search', 'searches') + ' on ' + plural((st.engines || []).length || 6, 'AI engine'), total + ' answers. Each chat engine is asked twice, because AI changes its mind between asks.' + (lk.engines.length ? ' Adds ' + esc(andList(lk.engines)) + '.' : '') +
+        (lk.topics.length ? '<span class="more-q">Your other ' + (lk.topics.length === 1 ? 'search' : word(lk.topics.length) + ' searches') + ':</span><ul class="more-qs">' + lk.topics.map(function (t) { return '<li>' + kw(t.keyword) + volHtml(t) + '</li>'; }).join('') + '</ul>' : '')],
+      sum ? ['Where the most searches end without you', 'These ' + word(st.topics.length) + ' searches are made about ' + num(sum) + ' times a month on Google in ' + esc(from(st)) + '. The report weighs each gap by how often its search is made, so you close the biggest one first.'] : null,
+      ['The pages AI read', (p.sources ? plural(p.sources, 'page') + ' fed this one search alone. ' : '') + 'We open them and tell you which ones name your rivals and not you.'],
       ['Does AI know you by name', 'Each engine is asked what ' + esc(st.site.brand) + ' is. You see where it is right, where it is vague and where it mixes you up.'],
       ['Your fix kit', (p.fixes ? plural(p.fixes, 'fix', 'fixes') + ' found on your site so far, and more once every answer is in. ' : '') + 'Each comes with the text or code to paste and a brief for your web person.'],
-      ['A re-check in 30 days', 'The same questions, asked again, with your before and after.']
-    ];
+      ['A re-check in 30 days', 'The same searches, asked again, with your before and after.']
+    ].filter(Boolean);
     var cta = st.paying ? '<div class="buy paying"><p class="paying-t"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>Your payment is being confirmed. This page opens your report the moment it is.</p></div>'
       : st.canPay
-      ? '<form data-act="unlock" class="buy"><button class="btn mark big" type="submit">Get the full report for ' + esc(st.price.label) + '</button><p class="tiny">One payment through Polar. No subscription and no account. Ready about four minutes later.</p><p class="form-msg" role="alert"></p></form>'
+      ? '<form data-act="unlock" class="buy"><button class="btn mark big" type="submit">Get the full report for ' + esc(st.price.label) + '</button><p class="tiny">One payment through Polar. No subscription and no account. Ready about four minutes later. Every sale is final.</p><p class="form-msg" role="alert"></p></form>'
       : '<div class="buy soon">' + emailForm(st, 'The full report opens for sale shortly. Leave your email and we send you the link when it does.', 'Tell me') + '</div>';
-    return '<section class="unlock" id="full"><div class="unlock-text"><h2>The full report</h2><p class="sub">You have seen one question on ' + plural((st.slots || []).length, 'engine') + ', asked once. Here is what the rest holds, with real numbers from your check.</p>' + cta + '</div>' +
+    return '<section class="unlock" id="full"><div class="unlock-text"><h2>The full report</h2><p class="sub">You have seen one search on ' + plural((st.slots || []).length, 'engine') + ', asked once. Here is what the rest holds, with real numbers from your check.</p>' + cta + '</div>' +
       '<ul class="holds">' + rows.map(function (r) { return '<li><span class="hold-lock">' + ICON.lock + '</span><div><b>' + r[0] + '</b><div class="hold-t">' + r[1] + '</div></div></li>'; }).join('') + '</ul></section>';
   }
 
@@ -299,7 +352,7 @@
     var finding = '<section class="finding"><h2>What a crawler sees on your site</h2><div class="finding-grid">' + crawlerSheet({ read: st.site.read, status: st.site.status, words: st.site.words, sample: st.site.sample, title: st.site.title }, st.site.host) +
       (f.first ? '<div class="found"><p class="found-n">' + (f.n > 1 ? 'First of ' + f.n + ' things we found on your site' : 'One thing we found on your site') + '</p><h3>' + esc(f.first.title) + '</h3><p>' + esc(f.first.detail) + '</p>' + (f.n > 1 ? '<p class="tiny">The other ' + (f.n - 1) + ' are in the full report, each with its fix.</p>' : '') + '</div>'
         : '<div class="found"><h3>Nothing on your site blocks AI crawlers</h3><p>Your page opens, the text is in the code and no AI search crawler is shut out. What is left is being named, and that is decided on other sites.</p></div>') + '</div></section>';
-    return '<section class="stage preview"><div class="lead"><h1>' + esc(v.h) + '</h1><p class="sub">' + esc(v.sub) + '</p></div>' +
+    return '<section class="stage preview"><div class="lead"><h1>' + esc(v.h) + '</h1><p class="sub">' + esc(v.sub) + '</p>' + searchStrip(st) + '</div>' +
       stack(freeGroups(st), st, { id: 'free' }) + also + finding + unlock(st) + '</section>';
   }
 
@@ -345,9 +398,9 @@
       return answers.length ? { e: e, answers: answers } : null;
     }).filter(Boolean);
   }
-  function askLinks(q) {
-    var x = encodeURIComponent(q);
-    var links = [['ChatGPT', 'https://chatgpt.com/?q=' + x], ['Google AI Mode', 'https://www.google.com/search?udm=50&q=' + x], ['Claude', 'https://claude.ai/new?q=' + x], ['Perplexity', 'https://www.perplexity.ai/search?q=' + x]];
+  function askLinks(t) {
+    var x = encodeURIComponent(t.question), k = encodeURIComponent(t.keyword || t.question);
+    var links = [['ChatGPT', 'https://chatgpt.com/?q=' + x], ['Google AI Mode', 'https://www.google.com/search?udm=50&q=' + k], ['Claude', 'https://claude.ai/new?q=' + x], ['Perplexity', 'https://www.perplexity.ai/search?q=' + x]];
     return '<p class="askit">Do not take our word for it. Ask it yourself: ' + links.map(function (l) { return '<a href="' + l[1] + '" target="_blank" rel="noopener noreferrer">' + l[0] + '</a>'; }).join(', ') + '. Your answer may differ. That is the point of asking twice.</p>';
   }
 
@@ -362,7 +415,7 @@
 
   var PAGE_STATUS = { read: '', refused: 'would not open for us', unreachable: 'could not be reached', empty: 'opened empty', skipped: 'not opened', host: 'address not given by the engine' };
   function readingHtml(st, rd) {
-    if (!rd || !rd.pages || !rd.pages.length) return '<p class="empty-note">The engines cited no pages for these questions, or this step could not be completed.</p>';
+    if (!rd || !rd.pages || !rd.pages.length) return '<p class="empty-note">The engines cited no pages for these searches, or this step could not be completed.</p>';
     var rows = rd.pages.map(function (p) {
       var who = p.status !== 'read' ? '<span class="na">' + PAGE_STATUS[p.status] + '</span>'
         : (p.you ? '<mark class="you">you are on it</mark>' : '<span class="miss">you are not on it</span>') + (p.rivals && p.rivals.length ? '<span class="on-it">names ' + p.rivals.slice(0, 3).map(function (n) { return '<span class="rival">' + esc(n) + '</span>'; }).join(', ') + (p.rivals.length > 3 ? ' and ' + (p.rivals.length - 3) + ' more' : '') + '</span>' : '');
@@ -436,7 +489,7 @@
     var c = st.compare;
     if (!c) return '';
     var d = function (a, b) { var x = b - a; return '<span class="delta ' + (x > 0 ? 'up' : x < 0 ? 'down' : '') + '">' + (x > 0 ? '+' : '') + x + '</span>'; };
-    return '<section class="compare"><h2>Then and now</h2><p class="sub">The same questions, first asked on ' + dayOf(c.at) + '. <a href="/check/' + esc(c.id) + '">Open the first report</a>.</p><ul class="cmp">' +
+    return '<section class="compare"><h2>Then and now</h2><p class="sub">The same searches, first asked on ' + dayOf(c.at) + '. <a href="/check/' + esc(c.id) + '">Open the first report</a>.</p><ul class="cmp">' +
       '<li><span>Score</span><b>' + c.score[0] + ' to ' + c.score[1] + '</b>' + d(c.score[0], c.score[1]) + '</li>' +
       '<li><span>Named</span><b>' + c.named[0] + ' of ' + c.answers[0] + ' to ' + c.named[1] + ' of ' + c.answers[1] + '</b>' + d(c.named[0], c.named[1]) + '</li>' +
       '<li><span>Cited</span><b>' + c.cited[0] + ' to ' + c.cited[1] + '</b>' + d(c.cited[0], c.cited[1]) + '</li>' +
@@ -448,11 +501,46 @@
     var rc = st.recheck;
     if (st.parent) return '';
     if (!rc) return '';
-    if (rc.id) return '<section class="again"><h2>Your re-check is ready</h2><p class="sub">The same questions, asked again.</p><a class="btn mark" href="/check/' + esc(rc.id) + '">Open the before and after</a></section>';
-    if (rc.running) return '<section class="again"><h2>Your re-check is running</h2><p class="sub">The same questions are being asked again. Reload in a few minutes.</p></section>';
-    return '<section class="again"><h2>Your re-check</h2><p class="sub">On ' + dayOf(rc.dueAt) + ' we ask the same questions again and show the before and after. It is part of this report.</p>' +
+    if (rc.id) return '<section class="again"><h2>Your re-check is ready</h2><p class="sub">The same searches, asked again.</p><a class="btn mark" href="/check/' + esc(rc.id) + '">Open the before and after</a></section>';
+    if (rc.running) return '<section class="again"><h2>Your re-check is running</h2><p class="sub">The same searches are being asked again. Reload in a few minutes.</p></section>';
+    return '<section class="again"><h2>Your re-check</h2><p class="sub">On ' + dayOf(rc.dueAt) + ' we ask the same searches again and show the before and after. It is part of this report.</p>' +
       emailForm(st, 'Leave an email and we send it to you.', 'Email it to me') +
       (rc.open ? '<form data-act="recheck" class="again-now"><button class="btn" type="submit">Run the re-check now</button><p class="tiny">You have one. AI answers take a few weeks to move, so it tells you most after your fixes have been live for a while.</p><p class="form-msg" role="alert"></p></form>' : '<p class="tiny">Fixed things sooner? From ' + dayOf(rc.earlyAt) + ' you can start it yourself.</p>') + '</section>';
+  }
+
+  // Where the searches are made and where the business is missing: the three rows worth knowing before the table.
+  // With search numbers the gap is the search where the most searches end in an answer without the business.
+  function demandHtml(st, r) {
+    var rows = r.matrix.filter(function (m) { return m.answers; });
+    if (rows.length < 2) return '';
+    var share = function (m) { return m.named / m.answers; };
+    var by = rows.slice().sort(function (a, b) { return share(b) - share(a); });
+    var best = by[0], worst = by[by.length - 1];
+    var row = function (id) { return r.matrix.filter(function (m) { return m.topic === id; })[0]; };
+    var d = r.demand || {};
+    var top = d.top && row(d.top.topic), gap = d.gap && row(d.gap.topic);
+    if (!top) {
+      if (best === worst || best.named === worst.named) return '';
+      return '<p class="sum">You do best on ' + kw((topicOf(st, best.topic) || {}).keyword) + ' (' + best.named + ' of ' + best.answers + ') and worst on ' + kw((topicOf(st, worst.topic) || {}).keyword) + ' (' + worst.named + ' of ' + worst.answers + ').</p>';
+    }
+    var item = function (label, m, cls, note) {
+      var t = topicOf(st, m.topic) || {};
+      var at = (st.topics || []).indexOf(t) + 1;
+      return '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="dm-l">' + label + '</span><a class="dm-k" href="#q' + at + '">' + kw(t.keyword) + '</a><span class="dm-f">' + volHtml(t) + '<span class="dm-n">' + namedIn(m) + '</span></span>' +
+        (note ? '<p class="note inline">' + ARROW + '<span>' + note + '</span></p>' : '') + '</li>';
+    };
+    var items = [];
+    var why = 'More searches end without you here than anywhere else.';
+    if (gap && gap === top) items.push(item('Most searched, and your biggest gap', top, 'gap', why));
+    else {
+      items.push(item('Most searched', top, '', ''));
+      if (gap) items.push(item('Biggest gap', gap, 'gap', why));
+    }
+    if (best.named && best !== top && best !== gap) items.push(item('Best result', best, 'won', ''));
+    // the search with the fewest answers naming the business is not always the one to fix first
+    var aside = gap && worst !== gap && share(worst) < share(gap)
+      ? '<p class="tiny dm-aside">You are named least on ' + esc((topicOf(st, worst.topic) || {}).keyword) + ' (' + worst.named + ' of ' + worst.answers + '), but fewer people search it, so it is not the first gap to close.</p>' : '';
+    return '<ul class="demand">' + items.join('') + '</ul>' + aside;
   }
 
   function report(st) {
@@ -464,27 +552,26 @@
     var chat = r.engines.filter(function (e) { return !engine(st, e).search; });
     var topics = st.topics.map(function (t, i) {
       var m = r.matrix.filter(function (x) { return x.topic === t.id; })[0] || { named: 0, answers: 0 };
-      return '<details class="topic" id="q' + (i + 1) + '"' + (i === 0 ? ' open' : '') + '><summary><h3>' + esc(t.question) + '</h3><span class="topic-n' + (m.named ? '' : ' zero') + '">named in <b>' + m.named + ' of ' + m.answers + '</b></span></summary>' +
-        '<p class="topic-k">Chat engines got the question. Google got the search: <span>' + esc(t.keyword) + '</span></p>' +
-        stack(topicGroups(st, t), st, { id: 'q' + i }) + askLinks(t.question) + '</details>';
+      return '<details class="topic" id="q' + (i + 1) + '"' + (i === 0 ? ' open' : '') + '><summary><h3>' + kw(t.keyword) + '</h3><span class="topic-f">' + volHtml(t, 'topic-v') + '<span class="topic-n' + (m.named ? '' : ' zero') + '">named in <b>' + m.named + ' of ' + m.answers + '</b></span></span></summary>' +
+        '<p class="topic-k">Google got this search as it is typed. The chat engines got it as a question: <q>' + esc(t.question) + '</q></p>' +
+        stack(topicGroups(st, t), st, { id: 'q' + i }) + askLinks(t) + '</details>';
     }).join('');
-    // where the business does best and worst, in one line above the answers
-    var ranked = r.matrix.filter(function (m) { return m.answers; }).slice().sort(function (a, b) { return b.named / b.answers - a.named / a.answers; });
-    var qOf = function (m) { var t = st.topics.filter(function (x) { return x.id === m.topic; })[0]; return t ? t.question : ''; };
-    var best = ranked[0], worst = ranked[ranked.length - 1];
-    var spread = best && worst && best !== worst && best.named !== worst.named
-      ? '<p class="sum">You do best on <q>' + esc(qOf(best)) + '</q> (' + best.named + ' of ' + best.answers + ') and worst on <q>' + esc(qOf(worst)) + '</q> (' + worst.named + ' of ' + worst.answers + ').</p>' : '';
+    var d = r.demand || {};
+    // the searches that were weighed and not asked: each is a page that could be written
+    var spare = (st.others || []).filter(function (o) { return o.measured; });
+    var others = spare.some(counts) ? '<div class="others"><h3>Searches we weighed and did not ask</h3><p class="tiny">We found ' + word(st.topics.length + (st.others || []).length) + ' searches on your home page and asked the ' + word(st.topics.length) + ' made most often. These came next. Each one is a page you could write.</p><ul class="kw-more">' +
+      spare.map(function (o) { return '<li>' + kw(o.keyword) + volHtml(o) + '</li>'; }).join('') + '</ul></div>' : '';
     var probes = (st.answers || []).filter(function (a) { return a.topic === 'b' && a.state !== 'failed'; });
     var toc = [['ladder', 'Where you stand'], ['answers', 'Every answer'], ['rivals', 'Who gets named'], ['reading', 'Pages AI read'], ['known', 'About you'], ['crawler', 'Crawler view'], ['fixes', 'Fix kit'], ['method', 'Method']];
     return '<section class="stage report">' +
       '<header class="rep-head"><p class="rep-meta">AI visibility report for ' + esc(st.site.host) + ', ' + dayOf(r.at) + (st.parent ? ' (re-check)' : '') + '</p><h1>' + esc(headline) + '</h1><p class="sub">' + esc(sub) + '</p>' +
-      '<div class="rep-facts">' + scoreHtml(r) + '<ul class="facts"><li><span>Asked from</span>' + esc(from(st)) + (st.ask.languageName ? ', in ' + esc(st.ask.languageName) : '') + '</li><li><span>Engines</span>' + esc(andList(r.engines.map(function (e) { return engine(st, e).short; }))) + '</li><li><span>Answers</span>' + c.answers + ' read' + (c.none ? ', ' + c.none + ' with no AI answer' : '') + (c.failed ? ', ' + c.failed + ' not answered' : '') + '</li></ul>' +
+      '<div class="rep-facts">' + scoreHtml(r) + '<ul class="facts"><li><span>Searches</span>' + st.topics.length + (d.known && d.total ? ', made about ' + num(d.total) + ' times a month on Google' : '') + '</li><li><span>Asked from</span>' + esc(from(st)) + (st.ask.languageName ? ', in ' + esc(st.ask.languageName) : '') + '</li><li><span>Engines</span>' + esc(andList(r.engines.map(function (e) { return engine(st, e).short; }))) + '</li><li><span>Answers</span>' + c.answers + ' read' + (c.none ? ', ' + c.none + ' with no AI answer' : '') + (c.failed ? ', ' + c.failed + ' not answered' : '') + '</li></ul>' +
       '<div class="rep-acts"><button type="button" class="btn sm" data-copy-link>' + ICON.copy + '<span>Copy the link</span></button><button type="button" class="btn sm" data-print>Save as PDF</button></div></div></header>' +
       compareHtml(st) +
       (r.fixes.length ? '<section class="top3"><h2>If you only do three things</h2><ol>' + r.fixes.slice(0, 3).map(function (f) { return '<li><a href="#fx-' + esc(f.id) + '">' + esc(f.title) + '<small>' + WHO[f.who] + ', ' + mins(f.minutes) + '</small></a></li>'; }).join('') + '</ol></section>' : '') +
       '<nav class="toc" aria-label="Report sections"><ul>' + toc.map(function (t) { return '<li><a href="#' + t[0] + '">' + t[1] + '</a></li>'; }).join('') + '</ul></nav>' +
       '<section class="sec" id="ladder"><h2>Where you stand</h2><p class="sub">Being recommended by AI is a ladder. Each rung rests on the one below it, so the lowest one that wobbles is where to start.</p>' + ladderHtml(r) + '</section>' +
-      '<section class="sec" id="answers"><h2>Every answer, word for word</h2><p class="sub">Yellow marker is you. A rose underline is someone named in your place. Each chat engine was asked twice: a full tab means it named you both times, a half tab once.</p>' + spread + matrixHtml(st, r.matrix) + topics + '</section>' +
+      '<section class="sec" id="answers"><h2>Every answer, word for word</h2><p class="sub">Yellow marker is you. A rose underline is someone named in your place. Each chat engine was asked twice: a full tab means it named you both times, a half tab once.</p>' + demandHtml(st, r) + matrixHtml(st, r.matrix) + topics + others + '</section>' +
       '<section class="sec" id="rivals"><h2>Who gets named instead</h2><p class="sub">Out of ' + plural(c.answers, 'answer') + ', how many name each business.</p>' + voiceHtml(st, r) +
       (r.dirs && r.dirs.length ? '<p class="tiny">The engines also pointed customers to ' + esc(andList(r.dirs.map(function (d) { return d.name + ' (' + d.n + ')'; }))) + '. A listing there puts you in front of the engine and the customer.</p>' : '') + '</section>' +
       '<section class="sec" id="reading"><h2>The pages AI read</h2><p class="sub">An engine has no opinions. It reads a handful of pages and repeats who is on them. These are the pages behind your answers, and whether you are on them.</p>' + readingHtml(st, r.reading) +
@@ -496,10 +583,12 @@
       '<section class="sec" id="fixes"><h2>Your fix kit</h2>' + fixesHtml(st, r) + '</section>' +
       '<section class="sec" id="method"><h2>How we measured, and what this cannot tell you</h2><ul class="method">' +
       '<li>' + c.answers + ' answers were collected on ' + dayOf(r.at) + ', asked from ' + esc(from(st)) + ', each in a fresh session with no chat history.</li>' +
-      '<li>Chat engines got each question the way a customer writes it. Google got the search the way people type it. Each chat engine was asked twice.</li>' +
+      '<li>Google got each search the way people type it. The chat engines got the same search as a question, the way a customer writes it. Each chat engine was asked twice.</li>' +
+      (d.known ? '<li>The searches come from your home page. We kept the ones made most often on Google in ' + esc(from(st)) + '. The numbers are monthly estimates from Google Ads keyword data, so read them as sizes, not as exact counts.</li>'
+        : '<li>The searches come from your home page. Their search numbers could not be looked up this time, so they are in the order we found them.</li>') +
       '<li>The score is 50% how often you are named, 30% how often your site is cited and 20% how early your name comes.</li>' +
       '<li>AI answers shift by the day, the place and the person. Read this as a snapshot. The re-check shows the direction.</li>' +
-      '<li>Nobody outside the AI companies knows how many people ask a given question. Any tool that shows that number is guessing, so we do not show one.</li>' +
+      '<li>' + (d.known ? 'Every number of searches here is for Google. ' : '') + 'Nobody outside the AI companies knows how often an AI is asked something. Any tool that shows that number is guessing, so we do not show one.</li>' +
       (r.skipped && r.skipped.length ? '<li>One part of this report could not be completed this time: ' + esc(r.skipped.join(', ')) + '.</li>' : '') + '</ul></section>' +
       recheckHtml(st) + '<p class="print-only">Made with AI Visibility Report by AI SEO Deck: ' + esc(st.home || '') + '</p></section>';
   }
@@ -522,6 +611,13 @@
   function brief(st) {
     var r = st.report;
     var lines = ['Website fixes for ' + st.site.host, 'From the AI visibility report of ' + dayOf(r.at) + '. AI engines named us in ' + r.counts.named + ' of ' + r.counts.answers + ' answers.', ''];
+    var vols = measuredAny(st);
+    lines.push('Searches checked' + (vols ? ', with Google searches a month in ' + from(st) : '') + ':');
+    (st.topics || []).forEach(function (t) {
+      var m = r.matrix.filter(function (x) { return x.topic === t.id; })[0];
+      lines.push('- ' + t.keyword + (t.measured ? ' (' + (counts(t) ? num(t.volume) : 'too few to measure') + ')' : '') + (m && m.answers ? ': ' + namedIn(m) + ' answers' : ''));
+    });
+    lines.push('');
     r.fixes.forEach(function (f) {
       lines.push(f.n + '. ' + f.title + ' (' + WHO[f.who].toLowerCase() + ', ' + mins(f.minutes) + ')');
       lines.push('Why: ' + f.why);
@@ -533,5 +629,5 @@
     return lines.join('\n');
   }
 
-  return { esc: esc, plural: plural, andList: andList, dayOf: dayOf, when: when, app: app, draft: draft, asking: asking, preview: preview, building: building, report: report, sheet: sheet, stack: stack, freeGroups: freeGroups, tallyText: tallyText, verdict: verdict, notesFor: notesFor, crawlerSheet: crawlerSheet, matrixHtml: matrixHtml, brief: brief, tabState: tabState };
+  return { esc: esc, plural: plural, andList: andList, dayOf: dayOf, when: when, app: app, draft: draft, asking: asking, preview: preview, building: building, report: report, sheet: sheet, stack: stack, freeGroups: freeGroups, tallyText: tallyText, verdict: verdict, notesFor: notesFor, crawlerSheet: crawlerSheet, matrixHtml: matrixHtml, brief: brief, tabState: tabState, kw: kw, volHtml: volHtml, searchStrip: searchStrip, demandHtml: demandHtml };
 });

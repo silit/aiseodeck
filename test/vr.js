@@ -67,7 +67,10 @@ const polar = http.createServer((req, res) => {
   const id = started.id;
   let c = await core.get(id);
   assert(core.ID_RE.test(id) && c.status === 'draft', 'a check is created as a draft with a long random id');
-  assert(c.project.brand === 'Casa Aldora' && c.profile.category === 'boutique hotel' && c.topics.length === 5 && c.topics[0].keyword === 'boutique hotel alfama lisbon', 'the business, what it is and five customer questions are worked out from the home page');
+  assert(c.project.brand === 'Casa Aldora' && c.profile.category === 'boutique hotel' && c.topics.length === 5 && c.topics[0].keyword === 'boutique hotel alfama' && /^What is a good boutique hotel/.test(c.topics[0].question), 'the business, what it is and the searches its customers make are worked out from the home page, each with its question');
+  assert(calls.volumes.length === 1 && calls.volumes[0].country === 'GB' && calls.volumes[0].list.length === 10 && c.topics.map((t) => t.volume).join() === '590,480,110,90,70' && c.topics.every((t) => t.looked === 'GB'), 'ten searches are looked up in the customers\' country and the five made most often are kept, most searched first');
+  assert(!c.topics.concat(c.others).some((t) => t.keyword === 'boutique hotels in alfama lisbon') && c.others.map((o) => o.keyword + ':' + o.volume).join('|') === 'small hotel lisbon old town:50|family run hotel lisbon:40|lisbon hotel with courtyard:30|alfama hotel near fado houses:null', 'another wording of the main search is dropped even though it is searched more; the rest are kept aside with their numbers');
+  assert(core.pickTopics(fx.SEARCHES, fx.VOLUMES.GB, 3).map((t) => t.keyword).join('|') === 'boutique hotel alfama|romantic hotels lisbon|quiet hotel lisbon' && core.pickTopics([{ keyword: 'main thing', question: 'q' }, { keyword: 'side thing', question: 'q' }, { keyword: 'third thing', question: 'q' }], { 'side thing': 100, 'third thing': 50 }, 2).map((t) => t.keyword).join('|') === 'side thing|main thing', 'the main thing the business sells always makes the report, placed by its own number');
   assert(c.ask.country === 'GB' && c.ask.language === 'en', 'the question is asked from where the customers are, not where the business is');
   assert(c.site.words > 300 && c.site.blockedBots.includes('Claude-SearchBot') && !c.site.llms && c.site.sitemap && !c.site.orgSchema && !c.site.description, 'the home page is read like a crawler: words, robots.txt, llms.txt, sitemap, structured data');
   const found = core.findingsOf(c.site).map((f) => f.code);
@@ -75,7 +78,9 @@ const polar = http.createServer((req, res) => {
   const again = await core.start('https://www.casaaldora.example/rooms', { ip: 'visitor2' });
   assert(again.id === id && again.cached, 'a second visitor of the same website within a week gets the same check');
   let draft = await pub(id);
-  assert(draft.stage === 'draft' && draft.countries.length === 18 && !draft.slots && !draft.report && /Is this you/.test(V.app(draft)), 'the draft shows what was read and asks for the question');
+  const draftHtml = V.app(draft);
+  assert(draft.stage === 'draft' && draft.countries.length === 18 && !draft.slots && !draft.report && /Is this you/.test(draftHtml), 'the draft shows what was read and asks which search to check');
+  assert(draft.topics[0].measured && draft.others.length === 4 && (draftHtml.match(/type="radio"/g) || []).length === 5 && /590<small> a month<\/small>/.test(draftHtml) && /Google searches a month in the United Kingdom, most searched first/.test(draftHtml) && /Left out, because fewer people search them: small hotel lisbon old town \(50\), family run hotel lisbon \(40\), lisbon hotel with courtyard \(30\)\./.test(draftHtml), 'the searches are there to pick from, each with its monthly number, and the ones left out are named');
 
   console.log('\nThe free check');
   assert((await core.runFree(id, { topic: 't0', question: 'x', country: 'GB' })).ok, 'a question left as it is starts the check');
@@ -87,7 +92,7 @@ const polar = http.createServer((req, res) => {
   assert(c.status === 'preview', 'the free check ends in a preview');
   const freeAsks = calls.ask.slice();
   assert(freeAsks.length === 3 && freeAsks.every((a) => a.country === 'GB'), 'three engine calls, each from the customers\' country');
-  assert(freeAsks.find((a) => a.engine === 'aio').prompt === 'boutique hotel alfama lisbon' && /^What is a good boutique hotel/.test(freeAsks.find((a) => a.engine === 'openai').prompt), 'Google gets the search, chat engines get the question');
+  assert(freeAsks.find((a) => a.engine === 'aio').prompt === 'boutique hotel alfama' && /^What is a good boutique hotel/.test(freeAsks.find((a) => a.engine === 'openai').prompt), 'Google gets the search, chat engines get the question');
   let prev = await pub(id);
   const gpt = prev.slots.find((s) => s.e === 'openai'), aio = prev.slots.find((s) => s.e === 'aio');
   assert(gpt.state === 'both' && gpt.rank === 2 && gpt.of === 4 && gpt.cited, 'ChatGPT: named second of four and the site is a source');
@@ -101,6 +106,7 @@ const polar = http.createServer((req, res) => {
   assert(!prev.report && !prev.answers && !/Almada Terrace|application\/ld\+json|Porto/.test(prevJson) && prev.findings.first.title.includes('Claude-SearchBot'), 'nothing of the paid report is sent before payment: one finding, counts for the rest');
   const html = V.app(prev);
   assert(/2 of 3 AI engines named you/.test(html) && /Get the full report for \$29/.test(html) && /You, named 2nd of 4/.test(html), 'the preview page gives the verdict, the pen notes and the price');
+  assert(/about 590 searches a month on Google in the United Kingdom/.test(html) && prev.locked.topics.length === 4 && prev.locked.topics[0].keyword === 'romantic hotels lisbon' && prev.locked.topics[0].volume === 480 && /Your other four searches/.test(html) && /made about 1,340 times a month on Google in the United Kingdom/.test(html), 'it says how often the search is made, and lists the other searches with their numbers');
   assert((await core.pump(id, 5000)).status === 'preview' && (await core.runFree(id, {})).already, 'a finished free check does no more work, and cannot be run twice');
 
   console.log('\nPaying');
@@ -132,11 +138,12 @@ const polar = http.createServer((req, res) => {
   c = await until(id, 'done', 60);
   assert(c.status === 'done' && c.report, 'the report is built in steps and ends as done');
   const r = c.report;
-  assert(calls.ask.length === 54 && calls.ask.filter((a) => /^What is Casa Aldora in Alfama, Lisbon\?/.test(a.prompt)).length === 4, '51 more engine calls: five questions on six engines, chat engines twice, and four asked about the business by name');
+  assert(calls.ask.length === 54 && calls.ask.filter((a) => /^What is Casa Aldora in Alfama, Lisbon\?/.test(a.prompt)).length === 4, '51 more engine calls: five searches on six engines, chat engines twice, and four asked about the business by name');
   assert(r.counts.answers === 49 && r.counts.named === 15 && r.counts.cited === 7 && r.counts.first === 6 && r.counts.none === 1 && r.score === 24, 'named in 15 of 49 answers, cited in 7, first in 6, one search with no AI answer: score 24');
   assert(r.ladder.map((x) => x.state).join() === 'partly,partly,partly,partly,partly' && r.start === 'readable' && r.ladder[0].p === 0.83 && r.ladder[2].p === 0.31 && r.ladder[4].p === 0.12, 'the ladder: every rung judged and measured, the lowest that wobbles is where to start');
   const m0 = r.matrix[0].cells;
-  assert(m0.find((x) => x.e === 'openai').samples.join() === 'both,absent' && m0.find((x) => x.e === 'gemini').samples.join() === 'both,named' && r.matrix[2].cells.find((x) => x.e === 'aio').samples[0] === 'none' && r.matrix[3].named === 7 && r.matrix[2].named === 0, 'asked twice: ChatGPT named the business once and not the second time; one question is won, one is lost outright');
+  assert(m0.find((x) => x.e === 'openai').samples.join() === 'both,absent' && m0.find((x) => x.e === 'gemini').samples.join() === 'both,named' && r.matrix[2].cells.find((x) => x.e === 'aio').samples[0] === 'none' && r.matrix[3].named === 7 && r.matrix[2].named === 0, 'asked twice: ChatGPT named the business once and not the second time; one search is won, one is lost outright');
+  assert(r.demand.known === 5 && r.demand.total === 1340 && r.demand.country === 'GB' && r.demand.top.keyword === 'boutique hotel alfama' && r.demand.gap.keyword === 'romantic hotels lisbon' && r.demand.gap.named === 1, 'the demand behind the report: 1,340 searches a month, and the biggest gap is not the search with the fewest answers naming the business');
   assert(r.voice[0].name === 'Hotel Marquês Azul' && r.voice[0].n === 37 && r.voice.find((v) => v.you).n === 15 && r.dirs[0].name === 'TripAdvisor', 'who gets named instead, with the spellings merged');
   const rd = r.reading;
   assert(rd.opened === 8 && rd.you === 2 && rd.top.name === 'The Lumiar House' && rd.top.n === 7, 'the pages the engines read were opened: the business is on 2 of 8');
@@ -147,7 +154,7 @@ const polar = http.createServer((req, res) => {
   assert(r.says.descriptors.includes('family-run') && r.says.basedOn === 15, 'the words the engines use for the business');
   assert(r.fixes[0].id === 'robots' && r.fixes[0].asset.body.includes('User-agent: Claude-SearchBot') && !r.fixes[0].asset.body.includes('ClaudeBot\n'), 'the first fix lets the blocked search crawler in, and leaves the training crawler to the owner');
   const fx2 = Object.fromEntries(r.fixes.map((f) => [f.id, f]));
-  assert(fx2.org.asset.body.includes('"@type": "LocalBusiness"') && fx2.org.asset.body.includes('Rua das Flores') && fx2.faq.asset.body.includes('FAQPage') && fx2.llms.asset.body.startsWith('# Casa Aldora') && fx2.listings.steps.length >= 3 && fx2.page.why.includes('quiet at night'), 'the fix kit: organization markup, FAQ markup, llms.txt, the pages to get onto and a page for the weakest question');
+  assert(fx2.org.asset.body.includes('"@type": "LocalBusiness"') && fx2.org.asset.body.includes('Rua das Flores') && fx2.faq.asset.body.includes('FAQPage') && fx2.llms.asset.body.startsWith('# Casa Aldora') && fx2.listings.steps.length >= 3 && fx2.page.why.includes('"romantic hotels lisbon" (about 480 Google searches a month in the United Kingdom) you are named in 1 of 10') && fx2.page.steps[0].includes('Where should a couple stay') && fx2.page.asset.body.includes('romantic'), 'the fix kit: organization markup, FAQ markup, llms.txt, the pages to get onto and a page for the search with the biggest gap');
   assert(r.fixes.every((f, i) => f.n === i + 1 && f.why && f.minutes > 0) && r.fixes.map((f) => f.impact).join('') === r.fixes.map((f) => f.impact).sort((a, b) => b - a).join(''), 'fixes are numbered, biggest win first');
   assert(calls.emails.length === 1 && calls.emails[0].to === 'owner@casaaldora.example' && calls.emails[0].text.includes('https://app.test/check/' + id), 'the buyer is emailed the link once');
   assert(c.recheck && c.recheck.dueAt > Date.now() + 29 * 86400000 && (await kv.smembers('vr:due')).includes(id), 'a re-check is scheduled for 30 days later');
@@ -155,8 +162,10 @@ const polar = http.createServer((req, res) => {
   assert(rep.stage === 'report' && rep.answers.length === 54 && rep.report.fixes.length === r.fixes.length && rep.email === 'o•••@casaaldora.example', 'the report page gets every answer; the email is masked');
   const repHtml = V.app(rep);
   assert(/AI names Casa Aldora in 15 of 49 answers/.test(repHtml) && /Start here/.test(repHtml) && /Second ask/.test(repHtml) && /you are not on it/.test(repHtml) && /Mixes you up/.test(repHtml) && /Copy the brief for my web person/.test(repHtml), 'the report page renders every section');
+  assert(/<span>Searches<\/span>5, made about 1,340 times a month on Google/.test(repHtml) && /Most searched<\/span>/.test(repHtml) && /Biggest gap<\/span>/.test(repHtml) && /Best result<\/span>/.test(repHtml) && /named least on quiet hotel lisbon \(0 of 9\), but fewer people search it/.test(repHtml) && /Searches a month<\/th>/.test(repHtml) && /Searches we weighed and did not ask/.test(repHtml) && rep.others.length === 4, 'the report is laid out by search: where the demand is, the biggest gap, the best result and the searches that were weighed');
+  assert(/udm=50&q=romantic%20hotels%20lisbon/.test(repHtml) && /chatgpt\.com\/\?q=Where%20should%20a%20couple/.test(repHtml), 'to ask it yourself, Google gets the search and a chat engine gets the question');
   assert(!/[—–]/.test(repHtml.replace(/<pre[\s\S]*?<\/pre>/g, '')) && !/İ/.test(repHtml), 'no long dashes and no dotted capital I in the page');
-  assert(V.brief(rep).includes('1. Let AI search crawlers into robots.txt') && V.brief(rep).includes('User-agent: Claude-SearchBot'), 'the brief for the web person is plain text with every fix');
+  assert(V.brief(rep).includes('1. Let AI search crawlers into robots.txt') && V.brief(rep).includes('User-agent: Claude-SearchBot') && V.brief(rep).includes('Searches checked, with Google searches a month in the United Kingdom:') && V.brief(rep).includes('- romantic hotels lisbon (480): named in 1 of 10 answers'), 'the brief for the web person is plain text with the searches and every fix');
 
   console.log('\nThe pages and addresses');
   const handler = require('../api/index.js');
@@ -179,6 +188,7 @@ const polar = http.createServer((req, res) => {
   const own = await request(port, 'POST', '/check/' + id2 + '/run', { body: { topic: '', question: 'Which Alfama hotel has the best breakfast?', brand: 'Casa Aldora', country: 'IE' } });
   c = await core.get(id2);
   assert(own.json.ok && c.topics[0].question === 'Which Alfama hotel has the best breakfast?' && c.topics[0].edited && c.topics.length === 5 && c.ask.country === 'IE' && c.freeTopic === 't0', 'a visitor\'s own question takes the first place and is asked from the country they chose');
+  assert(c.topics[0].volume === null && c.topics[1].keyword === 'boutique hotel alfama' && c.topics[1].volume === 70 && c.topics.concat(c.others).every((t) => t.looked === 'IE') && calls.volumes[calls.volumes.length - 1].country === 'IE', 'and the search numbers are looked up again for that country');
   for (let i = 0; i < 6; i++) { const p = await request(port, 'POST', '/check/' + id2 + '/pump', { body: {} }); if (p.json.status !== 'running') break; }
   assert((await core.get(id2)).status === 'preview', 'the open page keeps the check moving until the preview');
   const un = await request(port, 'POST', '/check/' + id2 + '/unlock', { body: {} });
@@ -216,6 +226,38 @@ const polar = http.createServer((req, res) => {
   assert((await pay.handleWebhook(refund, sign(refund, 'msg_4'), { verify: billing.polar.verify })).body.refunded, 'a refund is recorded');
   const closed = await pub(id);
   assert(closed.stage === 'closed' && !closed.report && /This report is closed/.test(V.app(closed)), 'a refunded report is closed');
+
+  console.log('\nSearches and their questions');
+  const callsK = fx.install();
+  const kw1 = await core.start('casaaldora.example', { ip: 'kw1', fresh: true });
+  await core.runFree(kw1.id, { topic: 't1', question: 'Where should a couple stay in Lisbon for a romantic weekend with a view?', country: 'GB' });
+  c = await core.get(kw1.id);
+  assert(c.freeTopic === 't1' && c.topics[1].edited && c.topics[1].keyword === 'romantic hotels lisbon' && c.topics[1].volume === 480 && callsK.volumes.length === 1, 'a reworded question keeps its search and its number, and nothing is looked up again');
+  assert(callsK.ask.every((a) => (a.engine === 'aio' ? a.prompt === 'romantic hotels lisbon' : /romantic weekend/.test(a.prompt))), 'Google still gets the search, the chat engines get the question as the visitor put it');
+  const kw2 = await core.start('casaaldora.example', { ip: 'kw2', fresh: true });
+  await core.runFree(kw2.id, { topic: 't2', question: 'Which hotels in Lisbon have parking for an electric car?', country: 'GB' });
+  c = await core.get(kw2.id);
+  assert(c.topics[2].keyword === 'hotels lisbon have parking electric car' && c.topics[2].volume === null && c.topics[2].looked === 'GB' && c.topics[0].volume === 590 && /too few searches to measure on Google in the United Kingdom/.test(V.app(await pub(kw2.id))), 'a question about something else becomes a search of its own, and a search too small to measure is called that');
+  assert(core.sameSubject({ keyword: 'romantic hotels lisbon', question: fx.TOPICS[1].question }, 'Which Lisbon hotels are romantic?') && !core.sameSubject({ keyword: 'boutique hotel alfama', question: fx.TOPICS[0].question }, 'Where can I rent a car in Lisbon?'), 'sharing the city alone does not make it the same search');
+  const kw3 = await core.start('casaaldora.example', { ip: 'kw3', fresh: true });
+  const lookups = callsK.volumes.length;
+  await core.runFree(kw3.id, { topic: 't0', question: fx.TOPICS[0].question, country: 'IE' });
+  c = await core.get(kw3.id);
+  assert(callsK.volumes.length === lookups + 1 && callsK.volumes[lookups].country === 'IE' && callsK.volumes[lookups].list.length === 9 && c.topics.map((t) => t.volume).join() === '70,50,10,20,' && c.others[0].volume === null, 'another country gets its own search numbers before the engines are asked');
+  fx.install({ kwDown: true });
+  const kw4 = await core.start('casaaldora.example', { ip: 'kw4', fresh: true });
+  c = await core.get(kw4.id);
+  assert(c.topics.map((t) => t.keyword).join('|') === 'boutique hotel alfama|small hotel lisbon old town|hotels near santa apolonia station|romantic hotels lisbon|quiet hotel lisbon' && c.topics.every((t) => t.volume === null && t.looked === ''), 'without the keyword data the searches keep the order they were found in');
+  const plain = V.app(await pub(kw4.id));
+  assert(/The search to check/.test(plain) && !/class="vol/.test(plain) && !/Google searches a month/.test(plain) && !/Left out/.test(plain), 'and the page shows them without numbers instead of guessing');
+  const callsL = fx.install();
+  await core.runFree(kw4.id, { topic: 't0', question: fx.TOPICS[0].question, country: 'GB' });
+  c = await core.get(kw4.id);
+  assert(callsL.volumes.length === 1 && c.topics[0].volume === 590 && c.topics[1].volume === 50 && c.topics.every((t) => t.looked === 'GB'), 'numbers that were missing are looked up when the check starts');
+  process.env.VR_LOOKUPS_PER_DAY = '1';
+  const capped = await core.searchVolumes(['boutique hotel alfama'], 'GB', 'en');
+  delete process.env.VR_LOOKUPS_PER_DAY;
+  assert(capped.known === false && callsL.volumes.length === 1, 'past the day\'s cap no lookup is paid for, and the check goes on without numbers');
 
   console.log('\nWhen things go wrong');
   const shell = await core.get(other.id);

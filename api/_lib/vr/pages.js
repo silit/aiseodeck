@@ -50,7 +50,7 @@ function shell(o) {
 function goForm(id, button) {
   return '<form class="go" novalidate><div class="go-row"><label class="sr" for="' + id + '">Your website address</label><input id="' + id + '" name="url" type="text" inputmode="url" autocomplete="url" autocapitalize="none" spellcheck="false" placeholder="yourbusiness.com" required>' +
     '<button class="btn mark" type="submit">' + button + '</button></div><p class="form-msg" role="alert"></p>' +
-    '<ul class="reading" hidden aria-live="polite"><li>Opening your site</li><li>Reading it the way an AI crawler does</li><li>Working out what your customers ask AI</li></ul></form>';
+    '<ul class="reading" hidden aria-live="polite"><li>Opening your site</li><li>Reading it the way an AI crawler does</li><li>Working out what your customers search for</li><li>Looking up how often each search is made</li></ul></form>';
 }
 
 // The sample check that plays in the hero: the free answers of the made-up hotel.
@@ -64,14 +64,15 @@ const FAQ = () => [
   ['Which AI engines do you ask?', 'The free check asks ' + freeNames() + '. The full report asks ' + allNames() + '. Each one runs a live web search before it answers, the same as when a customer asks.'],
   ['Is this the answer my customer would get?', 'It is the same kind of answer, asked the same way: from your customers\' country, in a fresh session with no chat history. AI answers change from one ask to the next, which is why the report asks every chat engine twice and shows you both.'],
   ['Do I need an account?', 'No. The address of your check is your report. Leave an email only if you want the link sent to you.'],
-  ['What do I get for ' + priceLabel() + '?', cap(topicsWord()) + ' customer questions on every engine, each chat engine asked twice, about ' + answersAbout() + ' answers in all. Who gets named in your place, the pages the engines read, what they say about you by name, what a crawler sees on your site, a fix kit with the text and code to paste, and a re-check after 30 days.'],
+  ['How do you pick the searches?', 'We read your home page and list the searches a customer would make to find a business like yours. Then we look up how often each one is made on Google in your customers\' country and keep the ' + topicsWord() + ' made most often. Each search also gets a question, the way a customer would put it to an AI assistant: Google gets the search, the chat engines get the question. You can reword the question before the free check runs.'],
+  ['Is the search number how often people ask AI?', 'No. It is how often the search is made on Google in a month. Nobody outside the AI companies knows how often an AI is asked something. Google searches are the best public sign of what your customers want, so we use them to decide which gap to close first, and we say what the number is.'],
+  ['What do I get for ' + priceLabel() + '?', 'The ' + topicsWord() + ' searches your customers make most, on every engine, each chat engine asked twice, about ' + answersAbout() + ' answers in all. Where the most searches end in an answer without you, who gets named in your place, the pages the engines read, what they say about you by name, what a crawler sees on your site, a fix kit with the text and code to paste, and a re-check after 30 days.'],
   ['My site is on WordPress, Wix, Shopify or something else. Does it work?', 'Yes. The report reads your public pages the way any crawler does and never needs access to your site. The fixes are plain text and code that you or your web person paste in.'],
   ['How are the fixes made?', 'The checks on your site are plain rules: is a crawler shut out, are your words in the page code, is there structured data. Drafts such as FAQ answers are written by an AI model from the words on your own site and are marked as drafts, so you read them before you publish.'],
-  ['What if the report cannot be built?', 'If the engines do not answer and we cannot deliver your report, you get your money back in full. Write to info@silitlabs.com.'],
+  ['Can I get a refund?', 'No. The report is made for your website the moment you pay, so every sale is final. That is why the free check comes first: you read real answers before you decide. If a report cannot be built, we build it again at no charge. Write to info@silitlabs.com.'],
   ['I use Webflow. Is there more?', 'AI SEO Deck is our Webflow app. It tracks your keywords every week and applies the fixes to your site for you.']
 ];
-// The size of a full report in words: 'five' questions, about 50 answers (each chat engine twice, Google once).
-const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+// The size of a full report in words: 'five' searches, about 50 answers (each chat engine twice, Google once).
 const topicsWord = () => core.NUMBER[core.topicCount()];
 const answersAbout = () => { const on = engines.enabled(); const chat = on.length ? on.filter((e) => !core.SEARCH.includes(e)).length : 4; const search = on.length ? on.length - chat : 2; return core.topicCount() * (chat * 2 + search); };
 const freeNames = () => V.andList(engines.freeEngines().map((e) => engines.LONG[e])) || 'ChatGPT, Google AI Overviews and Gemini';
@@ -84,28 +85,30 @@ function landingBody() {
   const demo = hero ? '<div class="hero-demo"><div id="hero-demo">' + V.stack(V.freeGroups(hero), hero, { id: 'hero' }) + '</div><p class="demo-cap"><span>A made-up hotel, to show the idea. A yellow tab means that engine named it.</span><button type="button" data-replay>Play it again</button></p></div>' : '';
   const body = '<div class="wrap">' +
     '<section class="hero"><div class="hero-text"><h1>Read what AI tells your customers about you</h1>' +
-    '<p class="sub">Type your website. We ask ' + esc(freeNames()) + ' the question your customers ask, show you the answers word for word, and mark every place you are named, or someone else is.</p>' +
+    '<p class="sub">Type your website. We find what your customers search for, put the most searched one to ' + esc(freeNames()) + ', show you the answers word for word, and mark every place you are named, or someone else is.</p>' +
     goForm('url-top', 'Read my answers') + '<p class="tiny">Free. About a minute. No sign-up and no email.</p></div>' + demo + '</section>' +
 
     '<section class="band" id="details"><h2>Details other AI trackers skip</h2><p class="sub">A score tells you something is wrong. These tell you what, and what to do about it on Monday.</p><ul class="skip">' +
+    '<li><h3>Built on what people search, weighed by how often</h3><p>Your report starts from the searches your customers make, each with its monthly Google searches in their country. A gap on a search made 500 times a month comes before a gap on one made 50 times.</p>' +
+    '<div class="show mini-kw" aria-hidden="true"><span class="gap"><b>romantic hotels lisbon</b><i>480 a month</i><em>named in 1 of 10</em></span><span><b>quiet hotel lisbon</b><i>110 a month</i><em>named in 0 of 9</em></span></div></li>' +
     '<li><h3>Asked twice, because AI changes its mind</h3><p>Ask the same question twice and you can get two different lists of businesses. One answer is luck, so every chat engine is asked twice and you read both.</p>' +
     '<div class="show mini-tabs" aria-hidden="true"><span class="tab is-half"><span class="tab-n">ChatGPT</span><span class="pips"><i class="pip on"></i><i class="pip off"></i></span></span><span class="tab is-named"><span class="tab-n">Gemini</span><span class="pips"><i class="pip on"></i><i class="pip on"></i></span></span><span class="tab is-absent"><span class="tab-n">Claude</span><span class="pips"><i class="pip off"></i><i class="pip off"></i></span></span></div></li>' +
     '<li><h3>Asked from where your customers are</h3><p>A hotel in Lisbon is asked about from London. AI answers change with the country of the person asking, so we ask from theirs, not yours.</p>' +
     '<div class="show where" aria-hidden="true"><span>Business in Lisbon</span><i>asked from</i><span>the United Kingdom</span></div></li>' +
     '<li><h3>The pages AI read</h3><p>An engine has no opinions. It reads a handful of pages and repeats who is on them. We open those pages and tell you which ones name your rivals and not you.</p>' +
     '<ul class="show mini-pages" aria-hidden="true"><li class="gap">The best boutique hotels in Alfama <span>you are not on it</span></li><li>Hotels in Alfama: a local guide <span>you are on it</span></li></ul></li>' +
-    '<li class="wide"><h3>Your site through a crawler\'s eyes</h3><p>Most AI crawlers read the page code and do not run JavaScript. If your words only appear once scripts have loaded, AI reads an empty page. The report shows your home page exactly as a crawler gets it.</p>' +
+    '<li><h3>Your site through a crawler\'s eyes</h3><p>Most AI crawlers read the page code and do not run JavaScript. If your words only appear once scripts have loaded, AI reads an empty page. The report shows your home page exactly as a crawler gets it.</p>' +
     '<div class="show mini-raw" aria-hidden="true"><span>Loading...</span><b>9 words in the page code</b></div></li>' +
-    '<li class="wide"><h3>Known, named, cited, first</h3><p>Being unknown to AI and being unrecommended are different problems with different fixes. The report finds the lowest rung that wobbles, so you start in the right place.</p>' +
+    '<li><h3>Known, named, cited, first</h3><p>Being unknown to AI and being unrecommended are different problems with different fixes. The report finds the lowest rung that wobbles, so you start in the right place.</p>' +
     '<div class="show mini-rungs" aria-hidden="true"><span class="y">Readable</span><span class="y">Known</span><span class="n">Named</span><span class="n">Cited</span><span class="n">First</span></div></li>' +
     '</ul></section>' +
 
-    '<section class="price" id="price"><div class="plan"><h2>The free check</h2><p class="plan-price">$0</p><ul><li>One customer question, written from your own home page</li><li>' + esc(freeNames()) + ', asked once</li><li>Every answer word for word, with notes in the margin</li><li>Your home page as an AI crawler reads it</li><li>The first thing we find on your site</li></ul><a class="btn" href="#url-top">Check my website</a></div>' +
-    '<div class="plan paid"><h2>The full report</h2><p class="plan-price">' + price + '<small>once</small></p><ul><li>' + cap(topicsWord()) + ' questions on ' + esc(allNames()) + '</li><li>Every chat engine asked twice, about ' + answersAbout() + ' answers in all</li><li>Who gets named in your place, and how often</li><li>The pages AI read, and whether you are on them</li><li>What AI says about you by name, and claims your site does not back up</li><li>A fix kit: what to change, who does it, how long it takes, the text or code to paste</li><li>One click copies a brief for your web person</li><li>A re-check after 30 days, with your before and after</li></ul>' +
-    '<a class="btn mark" href="' + PATH + '/sample">Open the sample report</a><p class="tiny">One payment through Polar. No subscription and no account. You start with the free check and decide after you have read your answers.</p></div></section>' +
+    '<section class="price" id="price"><div class="plan"><h2>The free check</h2><p class="plan-price">$0</p><ul><li>What your customers search for, with how often each search is made</li><li>One of those searches on ' + esc(freeNames()) + ', asked once</li><li>Every answer word for word, with notes in the margin</li><li>Your home page as an AI crawler reads it</li><li>The first thing we find on your site</li></ul><a class="btn" href="#url-top">Check my website</a></div>' +
+    '<div class="plan paid"><h2>The full report</h2><p class="plan-price">' + price + '<small>once</small></p><ul><li>The ' + topicsWord() + ' searches your customers make most, on ' + esc(allNames()) + '</li><li>Every chat engine asked twice, about ' + answersAbout() + ' answers in all</li><li>Where the most searches end in an answer without you</li><li>Who gets named in your place, and how often</li><li>The pages AI read, and whether you are on them</li><li>What AI says about you by name, and claims your site does not back up</li><li>A fix kit: what to change, who does it, how long it takes, the text or code to paste</li><li>One click copies a brief for your web person</li><li>A re-check after 30 days, with your before and after</li></ul>' +
+    '<a class="btn mark" href="' + PATH + '/sample">Open the sample report</a><p class="tiny">One payment through Polar. No subscription and no account. You start with the free check and decide after you have read your answers, because every sale is final.</p></div></section>' +
 
     '<section class="band" id="honest"><h2>What this report cannot tell you</h2><p class="sub">We would rather lose a sale than sell you a number nobody has.</p><div class="cant">' +
-    '<div><h3>How many people ask AI your question</h3><p>Nobody outside the AI companies knows. A tool that shows "AI search volume" is estimating, so we do not show one.</p></div>' +
+    '<div><h3>How many people ask AI your question</h3><p>Nobody outside the AI companies knows. A tool that shows "AI search volume" is estimating. We show how often the search is made on Google, and we call it that.</p></div>' +
     '<div><h3>What AI will say tomorrow</h3><p>Answers shift by the day, the place and the person. Your report is a dated snapshot, and the re-check shows the direction.</p></div>' +
     '<div><h3>A guaranteed place in the answer</h3><p>Nobody can promise that. The fix kit covers what is in your hands: being readable, being described clearly, and being on the pages AI reads.</p></div></div></section>' +
 
@@ -123,14 +126,14 @@ function landing() {
   const body = landingBody();
   const ld = [
     { '@context': 'https://schema.org', '@type': 'Organization', '@id': 'https://silitlabs.com/#organization', name: 'Silit Labs', url: 'https://silitlabs.com', email: 'info@silitlabs.com' },
-    { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'AI Visibility Report', url: appUrl() + PATH, applicationCategory: 'BusinessApplication', operatingSystem: 'Any', description: 'Shows what ChatGPT, Google AI and Gemini answer when customers ask about what a business sells, and what to fix.', publisher: { '@id': 'https://silitlabs.com/#organization' },
+    { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'AI Visibility Report', url: appUrl() + PATH, applicationCategory: 'BusinessApplication', operatingSystem: 'Any', description: 'Shows what ChatGPT, Google AI and Gemini answer for the searches a business\'s customers make, and what to fix.', publisher: { '@id': 'https://silitlabs.com/#organization' },
       offers: [{ '@type': 'Offer', name: 'Free check', price: '0', priceCurrency: 'USD' }, { '@type': 'Offer', name: 'Full report', price: (core.price() / 100).toFixed(2), priceCurrency: 'USD' }] },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ().map((f) => ({ '@type': 'Question', name: f[0], acceptedAnswer: { '@type': 'Answer', text: f[1] } })) }
   ];
   return shell({
     title: 'AI Visibility Report: see what ChatGPT tells your customers about you',
     ogTitle: 'Read what AI tells your customers about you',
-    description: 'Type your website. We ask ChatGPT, Google AI and Gemini the question your customers ask, show the answers word for word and mark where you are named. Free check, full report ' + price + ' once.',
+    description: 'Type your website. We find what your customers search for, ask ChatGPT, Google AI and Gemini, show the answers word for word and mark where you are named. Free check, full report ' + price + ' once.',
     canonical: appUrl() + PATH, index: true,
     nav: LANDING_NAV,
     head: ld.map((x) => '<script type="application/ld+json">' + safeJson(x) + '</script>').join(''),
@@ -152,7 +155,7 @@ function checkPage(state, o) {
 function samplePage() {
   if (!SAMPLE || !SAMPLE.report) return errorPage('The sample is not ready', 'Run a free check instead. It takes about a minute.');
   return shell({
-    title: 'Sample AI visibility report: a made-up hotel in Lisbon', description: 'A complete AI visibility report for a made-up hotel: every answer from six AI engines, the pages they read, and the fix kit.', canonical: appUrl() + PATH + '/sample', index: true,
+    title: 'Sample AI visibility report: a made-up hotel in Lisbon', description: 'A complete AI visibility report for a made-up hotel: the five searches its customers make most, every answer from six AI engines, the pages they read, and the fix kit.', canonical: appUrl() + PATH + '/sample', index: true,
     nav: '<a class="btn sm mark" href="' + PATH + '">Check my website</a>',
     before: '<div class="sample-bar"><div class="wrap">This is a sample. Casa Aldora, the other hotels and the publications in it are made up. <a href="' + PATH + '">Run the free check on your own site</a></div></div>',
     body: '<div class="wrap" id="app" data-stage="report">' + V.app(SAMPLE.report) + '</div>', boot: { page: 'sample', state: SAMPLE.report, still: true }

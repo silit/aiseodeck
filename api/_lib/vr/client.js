@@ -126,13 +126,10 @@
       placeNotes(panel);
       return;
     }
-    if ((el = t.closest('.alt'))) {
-      var q = $('#vr-q');
-      if (!q) return;
-      var prev = q.value, prevTopic = q.getAttribute('data-topic');
-      q.value = el.getAttribute('data-q'); q.setAttribute('data-topic', el.getAttribute('data-topic'));
-      el.setAttribute('data-q', prev); el.setAttribute('data-topic', prevTopic || ''); el.textContent = prev;
-      q.focus();
+    if ((el = t.closest('.dm-k'))) {
+      // a search named above the table: open its answers and go there
+      var topic = D.getElementById(el.getAttribute('href').slice(1));
+      if (topic) { e.preventDefault(); topic.open = true; topic.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); placeNotes(topic); }
       return;
     }
     if ((el = t.closest('[data-copy]'))) { var pre = D.getElementById(el.getAttribute('data-copy')); if (pre) copyText(pre.textContent, el); return; }
@@ -142,9 +139,31 @@
     if ((el = t.closest('[data-replay]'))) { playHero(true); return; }
     if ((el = t.closest('.toc a, .top3 a'))) { var sec = D.getElementById(el.getAttribute('href').slice(1)); if (sec) { e.preventDefault(); sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); } }
   });
+  // The search picked on the first screen brings its question with it; a question the visitor reworded is kept for
+  // as long as the page is open, so trying another search does not lose it.
+  var worded = {};
   D.addEventListener('change', function (e) {
     var c = e.target;
-    if (!c.getAttribute || !c.getAttribute('data-done')) return;
+    if (!c.getAttribute) return;
+    if (c.name === 'topic' && c.type === 'radio') {
+      var q = $('#vr-q');
+      if (!q) return;
+      worded[q.getAttribute('data-topic')] = q.value;
+      q.setAttribute('data-topic', c.value);
+      q.value = worded[c.value] != null ? worded[c.value] : c.getAttribute('data-q');
+      return;
+    }
+    if (c.id === 'vr-country') {
+      // the search numbers on the page are for the country we guessed; another country gets its own when the check starts
+      var list = $('.kw-list'), note = D.getElementById('vr-stale');
+      if (!list || !note || !$('.vol', list)) return;
+      var moved = c.value !== list.getAttribute('data-country');
+      list.parentNode.classList.toggle('stale', moved);
+      note.hidden = !moved;
+      note.textContent = moved ? 'Those numbers were for ' + list.getAttribute('data-name') + '. We look them up for ' + c.options[c.selectedIndex].text + ' when the check starts.' : '';
+      return;
+    }
+    if (!c.getAttribute('data-done')) return;
     var list = readDone(), id = c.getAttribute('data-done'), i = list.indexOf(id);
     if (c.checked && i < 0) list.push(id);
     if (!c.checked && i >= 0) list.splice(i, 1);
@@ -170,8 +189,10 @@
       if (brand.value.trim().length < 2) { msg(f, 'Type the name of your business.'); brand.focus(); return; }
       if (q.value.trim().length < 8) { msg(f, 'Write the question a customer would ask, in a full sentence.'); q.focus(); return; }
       busy(true); msg(f, '');
-      // the topic is kept only while its text is unchanged; an edited question is sent as the visitor's own
-      api.run(st.id, { topic: q.getAttribute('data-topic') || '', question: q.value.trim(), brand: brand.value.trim(), country: $('#vr-country', f).value }).then(function (r) {
+      // the search that is picked, and its question as it now reads; the server decides whether a reworded
+      // question still belongs to that search
+      var pick = $('input[name=topic]:checked', f);
+      api.run(st.id, { topic: pick ? pick.value : q.getAttribute('data-topic') || '', question: q.value.trim(), brand: brand.value.trim(), country: $('#vr-country', f).value }).then(function (r) {
         if (r && r.error) { busy(false); msg(f, r.error); return; }
         refresh(true);
       }, function () { busy(false); msg(f, 'We could not reach the server. Check your connection and try again.'); });
@@ -212,7 +233,7 @@
     var i = 0, tick;
     var host = url.replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
     if (steps[0]) steps[0].textContent = 'Opening ' + host;
-    function step() { steps.forEach(function (li, k) { li.className = k < i ? 'done' : k === i ? 'now' : ''; }); if (i < steps.length - 1) { i++; tick = setTimeout(step, 2600); } }
+    function step() { steps.forEach(function (li, k) { li.className = k < i ? 'done' : k === i ? 'now' : ''; }); if (i < steps.length - 1) { i++; tick = setTimeout(step, 2200); } }
     step();
     var stop = function () { clearTimeout(tick); btn.disabled = false; f.classList.remove('busy'); if (list) list.hidden = true; };
     api.start(url).then(function (r) {

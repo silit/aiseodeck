@@ -1,5 +1,5 @@
 // Builds one self-contained HTML page that plays the whole AI Visibility Report as a click-through preview: the landing
-// page, the question screen, a live check, the free result, the report being built and the full report. It uses the
+// page, the screen where the search is picked, a live check, the free result, the report being built and the full report. It uses the
 // real styles, the real rendering (view.js) and the real browser code (client.js); only the server is replaced by a
 // script that answers from the frozen sample (api/_lib/vr/sample.json). No network, nothing is asked or charged.
 // The page has no <html>/<head>/<body> of its own, so it can be published as a preview artifact as it is.
@@ -84,7 +84,7 @@ const DEMO_BEFORE = function (S) {
     page: 'landing', demo: true,
     hero: { engines: S.preview.engines, ask: S.preview.ask, site: S.preview.site, topics: S.preview.topics, slots: S.preview.slots },
     api: {
-      start: function () { demo.set('draft'); return soon({ id: 'demo' }, 5600); },
+      start: function () { demo.set('draft'); return soon({ id: 'demo' }, 7600); },
       state: function () { return soon(state()); },
       run: function () { demo.set('asking'); return soon({ ok: true }, 350); },
       pump: function () { return soon({ status: stage }, 900); },
@@ -151,7 +151,7 @@ const DEMO_AFTER = function () {
 
 const bar = '<div class="pv"><div class="wrap"><p>Önizleme: yayında değil. <span>Veriler uydurma bir otele ait. Gerçek sürümde yazılan site okunur ve yapay zekalara sorulur.</span></p>' +
   '<div class="pv-nav" role="group" aria-label="Önizleme adımları">' +
-  [['acilis', 'Açılış'], ['soru', 'Soru ekranı'], ['canli', 'Canlı kontrol'], ['sonuc', 'Ücretsiz sonuç'], ['hazirlaniyor', 'Rapor hazırlanıyor'], ['rapor', 'Tam rapor']]
+  [['acilis', 'Açılış'], ['soru', 'Arama seçimi'], ['canli', 'Canlı kontrol'], ['sonuc', 'Ücretsiz sonuç'], ['hazirlaniyor', 'Rapor hazırlanıyor'], ['rapor', 'Tam rapor']]
     .map(([v, t], i) => '<button type="button" data-view="' + v + '" aria-pressed="' + (i === 0) + '">' + t + '</button>').join('') + '</div></div></div>';
 
 const html = '<title>AI Visibility Report</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n' + pages.FONTS +

@@ -1,9 +1,11 @@
 'use strict';
 // AI Visibility Report: a one-off check of any website, with no account and no Webflow.
-// A visitor gives a website. We read its home page the way an AI crawler does, work out who the business is and what
-// its customers ask, put one question to the free engines and show the answers word for word. Paying once unlocks the
-// full report: three questions on every engine, each chat engine asked twice, the pages the engines read, what they
-// say about the business by name, and a fix kit. Thirty days later the same questions are asked again.
+// A visitor gives a website. We read its home page the way an AI crawler does, work out who the business is and which
+// searches its customers make, look up how often each is searched and keep the most searched ones. Every search has a
+// customer question: Google gets the search, the chat engines get the question. The free check puts one search to the
+// free engines and shows the answers word for word. Paying once unlocks the full report: every search on every
+// engine, each chat engine asked twice, the pages the engines read, what they say about the business by name, and a
+// fix kit. Thirty days later the same searches are asked again.
 //
 // Keys (all start with "vr"):
 //   vr:{id}        the check record
@@ -45,9 +47,11 @@ const COUNTRY = { US: 'the United States', GB: 'the United Kingdom', IE: 'Irelan
 const TLD_COUNTRY = { uk: 'GB', ie: 'IE', ca: 'CA', au: 'AU', de: 'DE', fr: 'FR', nl: 'NL', es: 'ES', it: 'IT', tr: 'TR', ae: 'AE', sa: 'SA', pl: 'PL', se: 'SE', in: 'IN', br: 'BR', mx: 'MX', us: 'US' };
 
 const price = () => { const c = parseInt(process.env.VR_PRICE_CENTS || '', 10); return Number.isFinite(c) && c >= 100 ? c : 2900; };
-// How many customer questions a report asks. Each one is about 10 answers (18 cents) in the report and again in the re-check.
+// How many searches a report covers. Each one is about 10 answers (18 cents) in the report and again in the re-check.
 const topicCount = () => { const n = parseInt(process.env.VR_TOPICS || '', 10); return n >= 3 && n <= 6 ? n : 5; };
-const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+// How many searches the page is asked for; the most searched of them make the report.
+const CANDIDATES = 10;
 const appUrl = () => (process.env.APP_URL || '').replace(/\/+$/, '');
 const clean = (s, max) => String(s == null ? '' : s).replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, max || 300);
 const squash = (s) => analyze.norm(s).replace(/ /g, '');
@@ -183,42 +187,42 @@ const validCountry = (c) => { c = String(c || '').toUpperCase(); return COUNTRY[
 async function understand(site, host, budgetMs) {
   const base = {
     brand: guessBrand(site, host), aliases: [], category: '', place: '', country: guessCountry(host), customersCountry: guessCountry(host) || 'US',
-    language: /^[a-z]{2}/i.test(site.lang) ? site.lang.slice(0, 2).toLowerCase() : 'en', summary: '', topics: [], byAi: false
+    language: /^[a-z]{2}/i.test(site.lang) ? site.lang.slice(0, 2).toLowerCase() : 'en', summary: '', candidates: [], byAi: false
   };
   if (!site.read.ok || !llm.available()) return base;
-  const n = topicCount();
   let j;
   try {
     j = await llm.generateJSON({
       budgetMs: budgetMs || 16000,
       timeoutMs: 14000,
-      system: 'You study the home page of a business website. You work out who the business is and which questions its potential customers put to AI assistants such as ChatGPT. Only use what the page says. No em dashes.',
+      system: 'You study the home page of a business website. You work out who the business is, which searches its potential customers make to find a business like it, and how they would put the same need to an AI assistant such as ChatGPT. Only use what the page says. No em dashes.',
       prompt: `Website: ${host}\nLanguage attribute: ${site.lang || 'not set'}\nTitle: ${site.title || '(none)'}\nMeta description: ${site.description || '(none)'}\nMain heading: ${(site.h1 || [])[0] || '(none)'}\nText on the page: ${clean(site.text, 2600) || '(none)'}\n\n` +
         'Return {"brand": "the business name the way customers say it, without slogans or legal suffixes", "aliases": ["0 to 3 other spellings or short forms customers use"], ' +
         '"category": "what the business is in 2 to 5 lowercase words, for example boutique hotel, family dentist, accounting software", ' +
         '"place": "the city or area it serves if it is a local business, else an empty string", "country": "ISO 3166-1 alpha-2 code of the country the business is in, or an empty string", ' +
         '"customers_country": "ISO code of the country most of its customers search from. It differs from country when the business sells to visitors or buyers abroad, such as hotels, clinics for medical travel, exporters and online products. One of US, GB, IE, CA, AU, DE, FR, NL, ES, IT, TR, AE, SA, PL, SE, IN, BR, MX", ' +
         '"language": "ISO 639-1 code of the language those customers write in", "summary": "one plain sentence under 140 characters: what the business offers and for whom", ' +
-        `"topics": [${NUMBER[n]} items like {"question": "...", "keyword": "..."}]}\n\n` +
-        `Rules for the ${n} topics: each question is one a potential customer who has never heard of this business types into an AI assistant when choosing a provider like it, in the customers' language, under 110 characters. ` +
-        'An AI assistant must be able to answer it by naming specific businesses or products. The first asks for the best option for the main thing the business sells, with the place when it is local. ' +
-        'The second is about a specific need, feature or kind of customer the page stresses. The third is a comparison, price or how to choose question. ' +
-        'The fourth starts from the customer\'s own situation or problem, not from the product. The fifth asks for a recommendation that depends on a concrete fact the page states, such as a location, an opening time or something included. ' +
-        (n > 5 ? 'The sixth is for a different occasion or kind of customer than the first. ' : '') +
-        'Every question is about a different need. Never include the business name or any brand name. "keyword" is the same search the way people type it into Google, 2 to 6 lowercase words.',
-      maxTokens: 900
+        `"searches": [${NUMBER[CANDIDATES]} items like {"keyword": "...", "question": "..."}]}\n\n` +
+        `Rules for the ${NUMBER[CANDIDATES]} searches: each "keyword" is a search that a potential customer who has never heard of this business types into Google when choosing a provider like it: 2 to 5 lowercase words, the way people really type, in the customers' language, with the place when the business is local. It has to fit this business closely, so that the searcher would be glad to find it, and it is never broader than the business itself: a small hotel in one quarter of a city is not found for "hotels" or "city breaks". ` +
+        'Each "question" is the same need the way that person would put it to an AI assistant: one natural sentence under 110 characters that an assistant can answer by naming specific businesses or products. ' +
+        'The first search is the main thing the business sells. The others cover a specific need or feature the page stresses, a kind of customer, a comparison or price search, a search that starts from the customer\'s own situation, and searches tied to a concrete fact the page states, such as a location, an opening time or something included. ' +
+        'Every search is about a different need: no two may differ only in word order, a plural or a filler word. Never include the business name or any brand name.',
+      maxTokens: 1500
     });
   } catch (e) { console.error('[vr] understand', e.message); return base; }
-  if (!j || typeof j !== 'object' || (!j.brand && !Array.isArray(j.topics))) return base;
+  const list = j && typeof j === 'object' ? (Array.isArray(j.searches) ? j.searches : Array.isArray(j.topics) ? j.topics : null) : null;
+  if (!j || typeof j !== 'object' || (!j.brand && !list)) return base;
   const brand = clean(j.brand, 60) || base.brand;
   const brandKey = squash(brand);
-  const topics = [];
-  for (const t of Array.isArray(j.topics) ? j.topics : []) {
+  const candidates = [];
+  for (const t of list || []) {
     const q = clean(t && t.question, 170);
-    if (q.length < 8 || (brandKey.length >= 4 && squash(q).includes(brandKey))) continue;
-    if (topics.some((x) => squash(x.question) === squash(q))) continue;
-    topics.push({ question: q, keyword: kwLib.clean(t.keyword) || keywordFrom(q) });
-    if (topics.length >= n) break;
+    if (q.length < 8) continue;
+    const k = kwLib.clean(t.keyword) || keywordFrom(q);
+    if (!k || (brandKey.length >= 4 && (squash(q).includes(brandKey) || squash(k).includes(brandKey)))) continue;
+    if (candidates.some((x) => squash(x.question) === squash(q) || x.keyword === k)) continue;
+    candidates.push({ keyword: k, question: q });
+    if (candidates.length >= CANDIDATES) break;
   }
   return {
     brand,
@@ -229,7 +233,7 @@ async function understand(site, host, budgetMs) {
     customersCountry: validCountry(j.customers_country) || validCountry(j.country) || base.customersCountry,
     language: /^[a-z]{2}$/i.test(String(j.language || '')) ? String(j.language).toLowerCase() : base.language,
     summary: clean(j.summary, 170),
-    topics,
+    candidates,
     byAi: true
   };
 }
@@ -242,6 +246,75 @@ function keywordFrom(question) {
   const lead = /\b(best|top|good|recommend)/i.test(question) ? ['best'] : [];
   return kwLib.clean(lead.concat(kept).slice(0, 6).join(' ')) || kwLib.clean(question);
 }
+
+/* ---------- which searches a report is built on ---------- */
+
+// Monthly Google searches for a list of keywords in one country: { known, map: { keyword: number } }. known is false
+// when the keyword data service is not set up, does not answer, or the day's lookups are used up (each one costs
+// about 1.3 cents, and a check is started far more often than it is bought); the report then works without numbers.
+async function searchVolumes(keywords, country, language, timeoutMs) {
+  const list = [...new Set((keywords || []).map((k) => kwLib.clean(k)).filter(Boolean))];
+  if (!list.length || !kwLib.available()) return { known: false, map: {} };
+  try {
+    const used = await kv.incr('vrkw:' + day());
+    if (used === 1) await kv.expire('vrkw:' + day(), 3 * 86400);
+    if (used > (parseInt(process.env.VR_LOOKUPS_PER_DAY || '', 10) || 600)) return { known: false, map: {} };
+    const got = await kwLib.volumes(list, country, language, timeoutMs || 7000);
+    const map = {};
+    for (const k of list) if (got[k] && typeof got[k].volume === 'number') map[k] = got[k].volume;
+    return { known: true, map };
+  } catch (e) { console.error('[vr] volumes', e.message); return { known: false, map: {} }; }
+}
+
+const stemK = (w) => w.replace(/(ies|es|s)$/, (m) => (m === 'ies' ? 'y' : '')).slice(0, 12);
+const wordsOf = (text) => [...new Set(kwLib.tokens(text).map(stemK))];
+// "boutique hotel lisbon" and "boutique hotels in lisbon" are one search.
+function alike(a, b) {
+  const A = wordsOf(a), B = new Set(wordsOf(b));
+  if (!A.length || !B.size) return false;
+  const both = A.filter((w) => B.has(w)).length;
+  return both / (A.length + B.size - both) >= 0.75;
+}
+// Whether a question a visitor reworded is still about the search it belongs to: it keeps half of what the question
+// it replaces was about, or it holds every word of the search. "hotel" and "lisbon" alone do not make it the same.
+function sameSubject(topic, question) {
+  const about = (text) => wordsOf(text).filter((w) => !Q_STOP.has(w));
+  const q = new Set(about(question));
+  const kept = (words) => (words.length ? words.filter((w) => q.has(w)).length / words.length : 0);
+  return kept(about(topic.question)) >= 0.5 || kept(about(topic.keyword)) === 1;
+}
+
+// The searches of a report: the most searched candidates, never two that are nearly the same, and always the first
+// candidate, which is the main thing the business sells. Most searched first; searches without a number keep their order.
+function pickTopics(cands, vols, n) {
+  const rows = (cands || []).map((c, i) => ({ keyword: c.keyword, question: c.question, i, volume: vols && typeof vols[c.keyword] === 'number' ? vols[c.keyword] : null }));
+  const byDemand = (a, b) => (b.volume == null ? -1 : b.volume) - (a.volume == null ? -1 : a.volume) || a.i - b.i;
+  const picked = [];
+  const take = (r) => { if (picked.length < n && !picked.includes(r) && !picked.some((x) => alike(x.keyword, r.keyword))) picked.push(r); };
+  if (rows[0]) take(rows[0]);
+  rows.slice().sort(byDemand).forEach(take);
+  for (const r of rows) if (picked.length < n && !picked.includes(r)) picked.push(r); // near-duplicates only when nothing else is left
+  return picked.sort(byDemand).map((r) => ({ keyword: r.keyword, question: r.question, volume: r.volume }));
+}
+
+// The candidates that did not make the report and are not another wording of one that did, most searched first.
+function othersOf(cands, vols, picked) {
+  return (cands || []).filter((c) => !picked.some((p) => p.keyword === c.keyword || alike(p.keyword, c.keyword)))
+    .map((c, i) => ({ keyword: c.keyword, volume: vols && typeof vols[c.keyword] === 'number' ? vols[c.keyword] : null, i }))
+    .sort((a, b) => (b.volume == null ? -1 : b.volume) - (a.volume == null ? -1 : a.volume) || a.i - b.i)
+    .slice(0, CANDIDATES - 1).map((c) => ({ keyword: c.keyword, volume: c.volume }));
+}
+
+// Writes fresh search numbers into the topics and the searches beside them. looked is the country the numbers are
+// for; '' means they were not looked up.
+function setVolumes(check, vols) {
+  for (const t of check.topics.concat(check.others || [])) {
+    if (vols && vols.known) { t.volume = typeof vols.map[t.keyword] === 'number' ? vols.map[t.keyword] : null; t.looked = check.ask.country; }
+    else if (t.looked !== check.ask.country) { t.volume = null; t.looked = ''; }
+  }
+}
+const needVolumes = (check) => check.topics.some((t) => t.looked !== check.ask.country);
+const keywordsOf = (check) => check.topics.concat(check.others || []).map((t) => t.keyword);
 
 /* ---------- storing a check ---------- */
 
@@ -278,8 +351,9 @@ async function lastProgress(check) { const p = await kv.getJSON('vrp:' + check.i
 const lock = (name, ttl) => store.lock('vr:' + name, ttl);
 const unlock = (name) => store.unlock('vr:' + name);
 
-function topicsFrom(list) {
-  return (list || []).slice(0, topicCount()).map((t, i) => ({ id: 't' + i, question: clean(t.question, 170), keyword: kwLib.clean(t.keyword) || keywordFrom(t.question), edited: false }));
+// looked: the country whose search numbers the topics carry ('' when they were not looked up).
+function topicsFrom(list, looked) {
+  return (list || []).slice(0, topicCount()).map((t, i) => ({ id: 't' + i, keyword: kwLib.clean(t.keyword) || keywordFrom(t.question), question: clean(t.question, 170), volume: typeof t.volume === 'number' ? t.volume : null, looked: looked || '', edited: false }));
 }
 
 // Free checks are capped per visitor and per day; a website checked in the last week shows that check again.
@@ -306,13 +380,18 @@ async function start(input, ctx) {
   if (!read.site || !read.reachable) return { error: 'We could not reach ' + n.host + '. Check the spelling, or try again in a minute.', code: 'unreachable' };
   const site = read.site;
   const who = await understand(site, n.host, 16000);
+  const askCountry = who.customersCountry || 'US';
+  const vols = await searchVolumes(who.candidates.map((c) => c.keyword), askCountry, who.language || 'en');
+  const picked = pickTopics(who.candidates, vols.map, topicCount());
+  const looked = vols.known ? askCountry : '';
   const check = {
     v: 1, id: random(16), at: Date.now(), status: 'draft', phase: '', ip: ctx.ip || '',
     url: n.origin, host: n.host, site,
     project: { brand: who.brand, aliases: who.aliases, domains: [n.host.replace(/:\d+$/, '')], competitors: [], country: who.country, language: who.language },
     profile: { category: who.category, place: who.place, summary: who.summary, byAi: who.byAi },
-    ask: { country: who.customersCountry || 'US', language: who.language || 'en' },
-    topics: topicsFrom(who.topics), freeTopic: '',
+    ask: { country: askCountry, language: who.language || 'en' },
+    topics: topicsFrom(picked, looked), freeTopic: '',
+    others: othersOf(who.candidates, vols.map, picked).map((o) => Object.assign(o, { looked })),
     run: null, preview: null, report: null, work: {}, paid: null, recheck: null, parent: '', email: ''
   };
   await save(check);
@@ -383,7 +462,9 @@ async function begin(id, phase, list, have, change) {
   return check;
 }
 
-// The free check: one question on the free engines. opts: { topic, question, brand, country }.
+// The free check: one search on the free engines. opts: { topic, question, brand, country }.
+// The visitor picks one of the searches and may reword its question. A question about something else becomes a search
+// of its own, and a new country or a new search gets its numbers looked up before the engines are asked.
 async function runFree(id, opts) {
   opts = opts || {};
   const now = await get(id);
@@ -400,22 +481,33 @@ async function runFree(id, opts) {
   const used = await kv.incr('vrfree:' + day());
   if (used === 1) await kv.expire('vrfree:' + day(), 3 * 86400);
   if (used > cap) return { error: 'Today\'s free checks are all taken. Come back tomorrow.', code: 'limit' };
-  let already = false;
-  const check = await begin(id, 'free', list, null, (c) => {
-    if (c.status !== 'draft') { already = true; return false; }
+  const choose = (c) => {
     if (brand.length >= 2 && brand !== c.project.brand) { c.project.brand = brand; c.project.aliases = []; c.profile.byAi = false; }
     const country = validCountry(opts.country);
     if (country) c.ask.country = country;
     let topic = c.topics.find((t) => t.id === opts.topic);
     if (question.length >= 8) {
       if (!topic) {
-        // a question of their own takes the first place; the suggested ones move down
-        topic = { id: 't0', question, keyword: keywordFrom(question), edited: true };
+        // a question of their own takes the first place; the suggested searches move down
+        topic = { id: 't0', keyword: keywordFrom(question), question, volume: null, looked: '', edited: true };
         c.topics = [topic].concat(c.topics.filter((t) => squash(t.question) !== squash(question)).slice(0, topicCount() - 1)).map((t, i) => Object.assign(t, { id: 't' + i }));
-      } else if (squash(question) !== squash(topic.question)) { topic.question = question; topic.keyword = keywordFrom(question); topic.edited = true; }
+      } else if (squash(question) !== squash(topic.question)) {
+        if (!sameSubject(topic, question)) { topic.keyword = keywordFrom(question); topic.volume = null; topic.looked = ''; }
+        topic.question = question; topic.edited = true;
+      }
     }
     if (!topic) topic = c.topics[0];
     c.freeTopic = topic.id;
+  };
+  // tried on a copy first, to see whether search numbers are missing for the choice
+  const trial = JSON.parse(JSON.stringify(now));
+  choose(trial);
+  const vols = needVolumes(trial) ? await searchVolumes(keywordsOf(trial), trial.ask.country, trial.ask.language, 5000) : null;
+  let already = false;
+  const check = await begin(id, 'free', list, null, (c) => {
+    if (c.status !== 'draft') { already = true; return false; }
+    choose(c);
+    setVolumes(c, vols);
   });
   if (!check) return { error: 'This check no longer exists.', code: 'gone' };
   if (!already) await count('asked');
@@ -429,15 +521,18 @@ async function runFull(id) {
   if (!list.length) return { error: 'The AI engines cannot be reached right now.' };
   const now = await get(id);
   if (!now) return { error: 'gone' };
-  if (!now.topics.length) return { error: 'This check has no questions yet.' };
+  if (!now.topics.length) return { error: 'This check has no searches yet.' };
   const all = await results(id);
   const have = {};
   for (const [field, r] of Object.entries(all)) {
     if (r && r.ok && Date.now() - (r.at || 0) < DAY) have[field] = true; else await kv.command('HDEL', 'vrres:' + id, field);
   }
+  // searches that have no numbers yet (looked up for another country, or the service was away) are looked up now
+  const vols = needVolumes(now) ? await searchVolumes(keywordsOf(now), now.ask.country, now.ask.language) : null;
   await begin(id, 'full', list, have, (c) => {
     if (c.status === 'running' && c.phase === 'full') return false;
     if (!c.freeTopic) c.freeTopic = c.topics[0].id;
+    setVolumes(c, vols);
   });
   return { ok: true };
 }
@@ -871,13 +966,31 @@ function topicNumbers(check, rows) {
   return check.topics.map((t) => {
     const rs = rows.filter((r) => r && r.k === t.id);
     const ok = rs.filter(answered);
-    return { id: t.id, question: t.question, keyword: t.keyword, answers: ok.length, named: ok.filter((r) => r.mentioned).length, cited: ok.filter((r) => r.cited).length };
+    return { id: t.id, question: t.question, keyword: t.keyword, volume: typeof t.volume === 'number' ? t.volume : null, answers: ok.length, named: ok.filter((r) => r.mentioned).length, cited: ok.filter((r) => r.cited).length };
   });
 }
+// The search to work on first: where the most searches end with an answer that leaves the business out. Without
+// search numbers it is the search with the smallest share of answers naming the business.
 function weakestTopic(check, rows) {
   const list = topicNumbers(check, rows).filter((t) => t.answers);
   if (!list.length) return check.topics[0] || null;
+  const missed = (t) => (t.volume || 0) * (1 - t.named / t.answers);
+  if (list.some((t) => missed(t) > 0)) return list.sort((a, b) => missed(b) - missed(a) || a.named / a.answers - b.named / b.answers)[0];
   return list.sort((a, b) => a.named / a.answers - b.named / b.answers || b.answers - a.answers)[0];
+}
+
+// The demand behind a report: monthly Google searches in the customers' country. top is the most searched search, gap
+// the one where the most searches meet an answer without the business. Nothing here says how often AI is asked.
+function demandOf(check, matrix) {
+  const rows = check.topics.map((t) => { const m = (matrix || []).find((x) => x.topic === t.id) || { named: 0, answers: 0 }; return { topic: t.id, keyword: t.keyword, volume: typeof t.volume === 'number' ? t.volume : null, named: m.named, answers: m.answers }; });
+  const known = rows.filter((r) => r.volume != null);
+  const out = { country: check.ask.country, known: known.length, of: rows.length, total: known.reduce((a, r) => a + r.volume, 0), top: null, gap: null };
+  if (!known.length) return out;
+  out.top = known.slice().sort((a, b) => b.volume - a.volume)[0];
+  const missed = (r) => r.volume * (1 - r.named / r.answers);
+  const gap = known.filter((r) => r.answers && r.named < r.answers && r.volume > 0).sort((a, b) => missed(b) - missed(a))[0];
+  out.gap = gap || null;
+  return out;
 }
 
 /* ---------- the report ---------- */
@@ -961,7 +1074,7 @@ function fixesOf(check, rows, ctx) {
   }
   if (weakest && weakest.answers && weakest.named < weakest.answers) {
     const pg = assets && assets.page;
-    add({ id: 'page', rung: 'named', impact: 3, minutes: 90, who: 'you', title: 'Publish a page that answers the question', why: `For "${weakest.question}" you are named in ${weakest.named} of ${weakest.answers} answers. No page on your site answers this question in its own words, so engines have nothing of yours to lift.`, steps: ['Create one page for this question, with the question as its heading.', 'Answer it in the first two sentences, then add detail, prices or steps a customer needs.', 'Link to it from your home page.'], ai: !!pg, asset: pg ? { kind: 'text', lang: 'Draft', label: 'Page draft', body: `Title: ${pg.title}\nAddress: /${pg.slug}\n\n${pg.intro}\n\n` + (pg.faq || []).map((x) => `${x.q}\n${x.a}`).join('\n\n') } : null });
+    add({ id: 'page', rung: 'named', impact: 3, minutes: 90, who: 'you', title: 'Publish a page for the search you are missing', why: `For the search "${weakest.keyword}"${weakest.volume ? ` (about ${weakest.volume.toLocaleString('en-US')} Google searches a month in ${COUNTRY[check.ask.country] || 'your customers\' country'})` : ''} you are named in ${weakest.named} of ${weakest.answers} answers. No page on your site answers it in its own words, so engines have nothing of yours to lift.`, steps: [`Create one page for this search, with the customer question as its heading: "${weakest.question}"`, 'Answer it in the first two sentences, then add detail, prices or steps a customer needs.', 'Link to it from your home page.'], ai: !!pg, asset: pg ? { kind: 'text', lang: 'Draft', label: 'Page draft', body: `Title: ${pg.title}\nAddress: /${pg.slug}\n\n${pg.intro}\n\n` + (pg.faq || []).map((x) => `${x.q}\n${x.a}`).join('\n\n') } : null });
   }
   const faq = assets && assets.faq;
   if (faq && faq.length >= 2) add({ id: 'faq', rung: 'cited', impact: 2, minutes: 20, title: 'Answer customer questions in a marked-up FAQ', why: has('faq_no_schema') ? `Your home page answers ${s.faqCount} questions without FAQ markup, so engines cannot tell question from answer.` : 'Engines quote short question and answer pairs more readily than long copy. Yours are drafted from what your own page says.', steps: ['Add these questions and answers to your home page or a FAQ page as visible text.', 'Paste the markup below into the <head> of that page.', 'Correct anything that is not exactly right before you publish.'], ai: true, asset: { kind: 'code', lang: 'JSON-LD', label: 'FAQ markup', body: '<script type="application/ld+json">\n' + jsonLd([fixes.faqSchema(faq)]) + '\n</script>' }, extra: { label: 'Questions and answers', body: faq.map((x) => `${x.q}\n${x.a}`).join('\n\n') } });
@@ -981,12 +1094,14 @@ function compose(check, rows) {
   const ladder = ladderOf(check, t, probe);
   const rivals = registry(rows, 'business');
   const s = check.site;
+  const matrix = matrixOf(check, rows, list);
   return {
     at: Date.now(), engines: list, ask: check.ask,
     counts: { answers: t.answers, named: t.named, cited: t.cited, first: t.first, none: t.none, failed: t.failed },
     score: t.score, parts: { mention: t.mention, cite: t.cite, rank: t.rank },
     ladder: ladder.rungs, start: ladder.start,
-    matrix: matrixOf(check, rows, list),
+    matrix,
+    demand: demandOf(check, matrix),
     voice: [{ name: check.project.brand, n: t.named, you: true }].concat(rivals.slice(0, 8).map((r) => ({ name: r.name, n: r.n, first: r.first }))).sort((a, b) => b.n - a.n || (a.you ? -1 : 1)),
     dirs: registry(rows, 'directory').slice(0, 5).map((r) => ({ name: r.name, n: r.n })),
     reading: w.reading || null,
@@ -1180,7 +1295,7 @@ async function tick(opts) {
 
 module.exports = {
   ID_RE, COUNTRY, FIN_STEPS, SEARCH, RECHECK_EARLY, RECHECK_AFTER, DAY, price, topicCount, NUMBER,
-  normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom,
+  normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom, searchVolumes, pickTopics, othersOf, alike, sameSubject, demandOf, CANDIDATES,
   get, save, update, results, rowsOf, start, runFree, runFull, pump, work, maybeFinish, finalizeStep, tick,
   markPaid, setEmail, sendReady, startRecheck, count, stats,
   stateOf, isNamed, registry, tally, previewOf, compose, matrixOf, ladderOf, fixesOf, topicNumbers, placeNamed, namedByShape, probeQuestion, unitsFor, tasksFor, andList

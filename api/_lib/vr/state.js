@@ -1,7 +1,8 @@
 'use strict';
 // What the browser gets for a check: only what its stage may show. Nothing from the paid report leaves the server
 // before the check is paid. Answers are sent as plain blocks with the business, its rivals and listing sites marked,
-// so the page never has to parse an engine's markdown.
+// so the page never has to parse an engine's markdown. Every search carries how often it is made on Google in a
+// month: a number, null with measured true when there are too few to count, or measured false when nobody looked.
 const analyze = require('../analyze');
 const engines = require('../engines');
 const core = require('./core');
@@ -125,6 +126,8 @@ function engineInfo(list, free) {
   return list.map((e) => ({ id: e, name: engines.LONG[e] || e, short: engines.LABEL[e] || e, search: core.SEARCH.includes(e), free: free.includes(e) }));
 }
 const maskEmail = (e) => { const m = String(e || '').match(/^(.)([^@]*)(@.+)$/); return m ? m[1] + '•••' + m[3] : ''; };
+// A search and its monthly number, for the country the check asks from.
+const searchOf = (check, t) => ({ keyword: t.keyword, volume: typeof t.volume === 'number' ? t.volume : null, measured: !!t.looked && t.looked === check.ask.country });
 
 // opts: { canPay: checkout is set up, now }
 function publicState(check, rows, opts) {
@@ -147,7 +150,7 @@ function publicState(check, rows, opts) {
       read: !!s.read.ok, status: s.read.status || 0, words: s.words, sample: s.sample, appShell: !!s.appShell, title: s.title
     },
     ask: { country: check.ask.country, countryName: core.COUNTRY[check.ask.country] || '', language: check.ask.language, languageName: LANG[check.ask.language] || '' },
-    topics: check.topics.map((t) => ({ id: t.id, question: t.question, keyword: t.keyword, free: t.id === check.freeTopic })),
+    topics: check.topics.map((t) => Object.assign({ id: t.id, question: t.question, free: t.id === check.freeTopic }, searchOf(check, t))),
     engines: engineInfo(stage === 'draft' ? all : ((check.run && full && check.run.engines) || all), (check.run && !full && check.run.engines) || free),
     email: maskEmail(check.email),
     home: (process.env.APP_URL || 'https://aiseodeck.silitlabs.com').replace(/\/+$/, '') + '/ai-visibility-report'
@@ -156,6 +159,7 @@ function publicState(check, rows, opts) {
   if (opts.paying && !paid) st.paying = String(opts.paying); // back from the checkout, payment still being confirmed
   if (stage === 'draft') {
     st.countries = Object.keys(core.COUNTRY).map((c) => [c, core.COUNTRY[c].replace(/^the /, '')]);
+    st.others = (check.others || []).map((o) => searchOf(check, o));
     return st;
   }
   const units = (check.run && check.run.units) || [];
@@ -178,7 +182,7 @@ function publicState(check, rows, opts) {
     // the first finding is free; the rest are counted, not shown
     const found = core.findingsOf(s);
     st.findings = { n: found.length, first: found[0] ? { title: found[0].title, detail: found[0].detail, sev: found[0].sev } : null };
-    st.locked = { engines: all.filter((e) => !freeEngines.includes(e)).map((e) => engines.LONG[e] || e), topics: check.topics.filter((t) => t.id !== check.freeTopic).map((t) => t.question) };
+    st.locked = { engines: all.filter((e) => !freeEngines.includes(e)).map((e) => engines.LONG[e] || e), topics: check.topics.filter((t) => t.id !== check.freeTopic).map((t) => searchOf(check, t)) };
   }
   if (stage === 'building') {
     const total = (check.run && check.run.total) || 0;
@@ -189,6 +193,7 @@ function publicState(check, rows, opts) {
   }
   if (stage === 'report' && paid && check.report) {
     st.report = check.report;
+    st.others = (check.others || []).map((o) => searchOf(check, o));
     st.answers = rows.filter((r) => r && r.p).map((r) => publicAnswer(check, r, unitOf(r)));
     st.doneAt = check.doneAt || 0;
     st.compare = check.compare || null;
