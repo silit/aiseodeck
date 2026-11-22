@@ -104,6 +104,7 @@
       notes.push({ on: 'top', text: 'No business is named here at all. Nothing lost, nothing won.' });
     }
     if (dirs.length) notes.push({ on: 'dir', text: 'It sends the customer to ' + andList(dirs.slice(0, 2).map(function (d) { return d.name; })) + '. Are you listed there?' });
+    if (a.card) notes.push({ on: 'srcs', text: 'Google shows your own business card with this answer.' });
     if (a.cited) notes.push({ on: 'srcs', text: 'Your site is one of its sources.' });
     else if (a.read) notes.push({ on: 'srcs', text: 'It opened your site, then chose not to cite it.' });
     else if (a.pages) notes.push({ on: 'srcs', text: 'Built from ' + plural(a.pages, 'page') + '. None of them is yours.' });

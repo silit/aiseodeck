@@ -369,7 +369,9 @@ async function start(input, ctx) {
   const cached = await kv.getJSON('vrdom:' + n.host);
   if (cached && cached.id && !ctx.fresh) {
     const old = await get(cached.id);
-    if (old && ['preview', 'running', 'draft'].includes(old.status) && !old.paid) { await count('again'); return { id: old.id, cached: true }; }
+    // a draft whose searches could not be worked out is not handed on: the next visitor gets a fresh try
+    const stuck = old && old.status === 'draft' && !old.topics.length && old.site && old.site.read && old.site.read.ok;
+    if (old && ['preview', 'running', 'draft'].includes(old.status) && !old.paid && !stuck) { await count('again'); return { id: old.id, cached: true }; }
   }
   if (ctx.ip && !(await store.rateOk('vrip:' + ctx.ip, parseInt(process.env.VR_FREE_PER_IP || '', 10) || 4, 86400))) return { error: 'You have used today\'s free checks. Come back tomorrow, or open the full report for a check you already ran.', code: 'limit' };
   let read = await readSite(n.origin, n.host);
@@ -552,13 +554,22 @@ const srcOf = (own) => (s) => ({ url: String(s.url || '').slice(0, 400), title: 
 
 function brandEntity(check) { return { name: check.project.brand, aliases: check.project.aliases || [], domains: check.project.domains || [] }; }
 
+// Google's AI answers link business cards (a place on Google, not a page anyone wrote). They are not counted as
+// pages the answer was built from; whether one of them is the business's own card is worth a note of its own.
+const CARD = /^https?:\/\/(?:www\.|maps\.)?google\.[a-z.]{2,8}\/(?:searchviewer|maps|search|travel|localservices)\b/i;
+const isCard = (s) => CARD.test(String((s && s.url) || ''));
+
 function readAnswer(check, unit, engine, ans) {
   const own = (check.project.domains || []).map(analyze.cleanDomain);
   const { out: textNorm } = analyze.normMap(ans.text);
+  const cards = (ans.sources || []).concat(ans.consulted || []).filter(isCard);
+  ans = Object.assign({}, ans, { sources: (ans.sources || []).filter((s) => !isCard(s)), consulted: (ans.consulted || []).filter((s) => !isCard(s)) });
+  const names = [check.project.brand].concat(check.project.aliases || []).filter((x) => String(x || '').trim().length >= 3);
   const b = analyze.detect(brandEntity(check), textNorm, ans.sources);
   const a = analyze.analyzeAnswer(check.project, ans);
   const consulted = (ans.consulted || []).slice(0, 14).map(srcOf(own));
   return {
+    card: cards.some((s) => { const t = analyze.normMap(String(s.title || '')).out; return names.some((n) => analyze.findTerm(t, n) >= 0); }),
     p: unit.id, k: unit.k, q: unit.q, e: engine, ok: true, at: Date.now(), ms: ans.ms, model: ans.model,
     text: ans.text.slice(0, 6000), queries: (ans.queries || []).slice(0, 6),
     mentioned: b.mentioned, idx: b.index, cited: b.cited, citedUrls: b.citedUrls, snippet: a.snippet,
@@ -568,13 +579,19 @@ function readAnswer(check, unit, engine, ans) {
   };
 }
 
+// "Drakes Hotel | A Curious Group of Hotels" is "Drakes Hotel": what follows a bar or a dash is a tagline.
+function bareName(name) {
+  const first = String(name || '').split(/\s+[|•·]\s+|\s+[–—-]\s+/)[0].trim();
+  return first.length >= 3 ? first : String(name || '').trim();
+}
+
 // The businesses an answer names, when no AI call could list them: bold names and names that open a list item.
 function namedByShape(text) {
   const out = [];
   const add = (n) => { n = clean(n, 80).replace(/[:.,;]+$/, ''); if (n.length >= 3 && n.length <= 60 && /^[\p{Lu}\d]/u.test(n) && n.split(' ').length <= 7 && !out.includes(n)) out.push(n); };
   for (const m of String(text).matchAll(/\*\*([^*\n]{3,70})\*\*/g)) add(m[1]);
   for (const m of String(text).matchAll(/^\s*(?:[-*•]|\d+[.)])\s+\[?([^\n:(\[\]]{3,60}?)\]?(?:\s[-:(]|:|$)/gm)) add(m[1].replace(/\*+/g, ''));
-  return out.slice(0, 12).map((name) => ({ name, kind: 'business' }));
+  return out.slice(0, 12).map((name) => ({ name: bareName(name), kind: 'business' }));
 }
 
 async function extractNamed(check, unit, text, budgetMs) {
@@ -583,14 +600,14 @@ async function extractNamed(check, unit, text, budgetMs) {
     try {
       const j = await llm.generateJSON({
         budgetMs: Math.min(budgetMs, 16000), timeoutMs: Math.min(budgetMs, 14000),
-        system: 'You read an AI assistant\'s answer to a customer question and list the specific businesses, brands or products it names as options. Copy each name exactly as written in the answer. Never add a name that is not in the answer.',
+        system: 'You read an AI assistant\'s answer to a customer question and list the specific businesses, brands or products it puts forward as options for what the customer is looking for. Copy each name exactly as written in the answer. Never add a name that is not in the answer.',
         prompt: `Customer question: ${clean(unit.text, 200)}\n\nAnswer:\n${String(text).slice(0, 4500)}\n\n` +
           `Return {"named": [{"name": "...", "kind": "business"}]} in the order they first appear, at most 12. kind is "business" for a specific provider, brand or product the customer could choose${check.profile.category ? ' (the same kind of thing as a ' + check.profile.category + ')' : ''}, ` +
-          'and "directory" for a listing, review, booking, marketplace or comparison site the answer points the customer to. Leave out places, generic terms and publications that are only cited as sources.',
+          'and "directory" for a listing, review, booking, marketplace or comparison site the answer points the customer to. Leave out anything that is only a part of another option (its bar, restaurant, spa or room types), and leave out places, landmarks, generic terms and publications that are only cited as sources.',
         maxTokens: 500
       });
       const arr = Array.isArray(j) ? j : (j && j.named);
-      if (Array.isArray(arr)) list = arr.map((x) => ({ name: clean(x && x.name, 80), kind: x && x.kind === 'directory' ? 'directory' : 'business' }));
+      if (Array.isArray(arr)) list = arr.map((x) => ({ name: bareName(clean(x && x.name, 80)), kind: x && x.kind === 'directory' ? 'directory' : 'business' }));
     } catch (e) { /* the shape of the answer is read instead */ }
   }
   return list || namedByShape(text);
@@ -739,6 +756,15 @@ function stateOf(r) {
 const isNamed = (s) => s === 'both' || s === 'named';
 const answered = (r) => r && r.ok && !r.none && r.k !== 'b';
 
+// "Drakes", "Drakes Hotel" and "Drakes of Brighton" are one business: the shorter name is how the longer one starts.
+// A single short word ("Grand") is not enough to go on, and neither is a long name that merely starts the same way.
+const nameWords = (name) => analyze.norm(name).split(' ').filter((w) => w && w !== 'the');
+function sameBusiness(a, b) {
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (!s.length || s.join('').length < 6 || !s.every((w, i) => l[i] === w)) return false;
+  return s.length >= 2 || l.length <= 3;
+}
+
 // Every other business the answers name, with the spellings merged ("The Lumiar House" and "Lumiar House").
 function registry(rows, kind) {
   const list = [];
@@ -750,8 +776,10 @@ function registry(rows, kind) {
       if (key.length < 3) continue;
       let hit = list.find((c) => c.keys.includes(key));
       if (!hit) hit = list.find((c) => c.keys.some((k) => { const [s, l] = k.length <= key.length ? [k, key] : [key, k]; return s.length >= 5 && l.includes(s) && s.length / l.length >= 0.6; }));
-      if (!hit) { hit = { keys: [], names: {}, n: 0, first: 0, topics: new Set() }; list.push(hit); }
-      if (!hit.keys.includes(key)) hit.keys.push(key);
+      const words = nameWords(x.name);
+      if (!hit) hit = list.find((c) => c.words.some((w) => sameBusiness(w, words)));
+      if (!hit) { hit = { keys: [], words: [], names: {}, n: 0, first: 0, topics: new Set() }; list.push(hit); }
+      if (!hit.keys.includes(key)) { hit.keys.push(key); hit.words.push(words); }
       hit.names[x.name] = (hit.names[x.name] || 0) + 1;
       if (seen.has(hit)) continue;
       seen.add(hit);
@@ -1304,7 +1332,7 @@ async function tick(opts) {
 
 module.exports = {
   ID_RE, COUNTRY, FIN_STEPS, SEARCH, RECHECK_EARLY, RECHECK_AFTER, DAY, price, topicCount, NUMBER,
-  normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom, searchVolumes, pickTopics, othersOf, alike, sameSubject, demandOf, CANDIDATES,
+  normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom, sameBusiness, nameWords, bareName, readAnswer, searchVolumes, pickTopics, othersOf, alike, sameSubject, demandOf, CANDIDATES,
   get, save, update, results, rowsOf, start, runFree, runFull, pump, work, maybeFinish, finalizeStep, tick,
   markPaid, setEmail, sendReady, startRecheck, count, stats,
   stateOf, isNamed, registry, tally, previewOf, compose, matrixOf, ladderOf, fixesOf, topicNumbers, placeNamed, namedByShape, probeQuestion, unitsFor, tasksFor, andList
