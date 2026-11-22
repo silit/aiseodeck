@@ -48,9 +48,11 @@ mark.you{color:var(--mark-ink);background:linear-gradient(100deg,transparent .5%
 /* top bar */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--top);backdrop-filter:saturate(1.3) blur(12px);-webkit-backdrop-filter:saturate(1.3) blur(12px);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;justify-content:space-between;align-items:center;gap:14px;padding-block:11px}
-.brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-weight:800;font-size:16.5px;letter-spacing:-.014em;white-space:nowrap}
-.brand svg{width:27px;height:27px;flex:none}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);font-weight:800;font-size:16.5px;letter-spacing:-.014em;white-space:nowrap}
+.brand a{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+.brand svg{width:27px;height:27px;flex:none;border-radius:7px;box-shadow:0 0 0 1px var(--line)}
 .brand small{font-weight:600;font-size:13.5px;color:var(--faint);letter-spacing:0;border-left:1px solid var(--line);padding-left:10px}
+.brand small a:hover{color:var(--ink)}
 .top nav{display:flex;gap:20px;align-items:center;font-size:14.5px;font-weight:600}
 .top nav a{color:var(--ink2);text-decoration:none;white-space:nowrap}
 .top nav a:hover{color:var(--ink)}

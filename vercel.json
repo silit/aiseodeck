@@ -1,4 +1,26 @@
 {
+  "redirects": [
+    {
+      "source": "/ai-visibility-report",
+      "destination": "https://silitlabs.com/ai-visibility-report",
+      "permanent": true
+    },
+    {
+      "source": "/ai-visibility-report/:rest*",
+      "destination": "https://silitlabs.com/ai-visibility-report/:rest*",
+      "permanent": true
+    },
+    {
+      "source": "/check",
+      "destination": "https://silitlabs.com/ai-visibility-report",
+      "permanent": true
+    },
+    {
+      "source": "/check/:rest*",
+      "destination": "https://silitlabs.com/check/:rest*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/billing/webhook",
@@ -33,19 +55,15 @@
       "destination": "/api/index?path=r/:token"
     },
     {
-      "source": "/ai-visibility-report",
+      "source": "/_vr/ai-visibility-report",
       "destination": "/api/index?path=ai-visibility-report"
     },
     {
-      "source": "/ai-visibility-report/:rest*",
+      "source": "/_vr/ai-visibility-report/:rest*",
       "destination": "/api/index?path=ai-visibility-report/:rest*"
     },
     {
-      "source": "/check",
-      "destination": "/api/index?path=check"
-    },
-    {
-      "source": "/check/:rest*",
+      "source": "/_vr/check/:rest*",
       "destination": "/api/index?path=check/:rest*"
     },
     {

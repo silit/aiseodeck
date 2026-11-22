@@ -158,7 +158,7 @@ const html = '<title>AI Visibility Report</title>\n<meta name="claude:viewport-f
   '\n<style>' + pages.CSS + BAR_CSS + '</style>\n<script>document.documentElement.className="js"</script>\n' +
   bar + pages.top(pages.LANDING_NAV) +
   '<div id="pv-landing"><main>' + pages.landingBody() + '</main></div>' +
-  '<div id="pv-check" hidden><main><div class="wrap" id="app"></div></main></div>' + pages.FOOT +
+  '<div id="pv-check" hidden><main><div class="wrap" id="app"></div></main></div>' + pages.foot() +
   '\n<script>' + pages.VIEW_SRC + '</script>' +
   '\n<script>(' + DEMO_BEFORE.toString() + ')(' + pages.safeJson(sample) + ');</script>' +
   '\n<script>' + pages.CLIENT_SRC + '</script>' +

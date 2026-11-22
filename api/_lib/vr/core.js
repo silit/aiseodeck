@@ -29,6 +29,7 @@ const alerts = require('../alerts');
 const email = require('../email');
 const kwLib = require('../keywords');
 const { random } = require('../crypto');
+const where = require('./where');
 
 const DAY = 86400000;
 const ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
@@ -52,7 +53,6 @@ const topicCount = () => { const n = parseInt(process.env.VR_TOPICS || '', 10); 
 const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 // How many searches the page is asked for; the most searched of them make the report.
 const CANDIDATES = 10;
-const appUrl = () => (process.env.APP_URL || '').replace(/\/+$/, '');
 const clean = (s, max) => String(s == null ? '' : s).replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, max || 300);
 const squash = (s) => analyze.norm(s).replace(/ /g, '');
 const day = (t) => new Date(t || Date.now()).toISOString().slice(0, 10);
@@ -1237,8 +1237,8 @@ async function markPaid(id, info) {
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function sendReady(check) {
-  if (!check.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(check.email) || !appUrl() || !check.report) return;
-  const url = appUrl() + '/check/' + check.id;
+  if (!check.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(check.email) || !check.report) return;
+  const url = where.site() + '/check/' + check.id;
   const c = check.report.counts;
   const again = !!check.parent;
   const subject = again ? `Your 30-day re-check for ${check.project.brand} is ready` : `Your AI visibility report for ${check.project.brand}`;
@@ -1246,7 +1246,7 @@ async function sendReady(check) {
   const keep = 'This link is your report. Keep it: there is no account or password.';
   const later = again ? '' : ' In 30 days we ask the same questions again and send you the before and after.';
   await email.send({
-    to: check.email, subject,
+    as: 'AI Visibility Report', to: check.email, subject,
     text: `${line}\n\nOpen your report: ${url}\n\n${keep}${later}`,
     html: `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#0F1433;max-width:560px"><h2 style="margin:0 0 8px;font-size:21px">${esc(line)}</h2><p style="font-size:14.5px;color:#535A7E;margin:0 0 16px">${again ? 'The same questions, asked again. Your before and after is on the page.' : 'Every answer word for word, the pages AI read, and your fix kit.'}</p><p><a href="${esc(url)}" style="display:inline-block;background:#FFE14D;color:#1B1600;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:700">Open your report</a></p><p style="font-size:12.5px;color:#535A7E">${keep}${later}</p></div>`
   });
