@@ -46,9 +46,17 @@ A second way in, for any website: `/ai-visibility-report`. The visitor types a w
 - Cost: about 1.8 cents an answer, so about $1 a report and $1 a re-check. The free check costs about 5 cents and is limited per visitor and per day (`VR_FREE_PER_IP`, `VR_FREE_PER_DAY`); everything also counts toward `MAX_DAILY_CALLS`. Starting a check looks up its search numbers once (about 1.3 cents), capped by `VR_LOOKUPS_PER_DAY`.
 - `test/vr.js` + `test/vr-fixture.js`: the whole flow against mock engines, Polar and Redis. `node scripts/vr-preview.js <file>` builds a click-through preview from the sample.
 
-Rapor ürününü satışa açmak için (sırayla): 1) Polar'da tek seferlik bir ürün aç, adı "AI Visibility Report", fiyat $29. 2) Polar webhook'unda `order.paid` ve `order.refunded` olaylarını da işaretle (adres aynı). 3) Vercel'e `POLAR_REPORT_PRODUCT_ID` ekle (ürün adı aynen böyleyse gerekmez), kendi denemelerin için `VR_UNLOCK_KEY` ekle. Ürün yokken sayfa çalışır, ücretsiz kontrol yapılır, satın alma yerine "yakında" der ve e-posta toplar.
+Rapor ürünü 22 Kasım 2026'da satışa açıldı. Durum:
+
+- Polar'da tek seferlik "AI Visibility Report" ürünü var, fiyat $29. Ürün adı aynen böyle kaldıkça `POLAR_REPORT_PRODUCT_ID` gerekmez. Ürün arşivlenirse sayfa çalışmaya devam eder, satın alma yerine "yakında" der ve e-posta toplar.
+- AI SEO Deck webhook'unda `order.paid` ve `order.refunded` işaretli (adres aynı). Rapora ait olmayan siparişler yok sayılır.
+- Kendi denemelerin için istersen Vercel'e `VR_UNLOCK_KEY` ekle (12+ karakter): `/check/{id}?key=...` raporu ödemesiz açar.
+- Ücretsiz kontrol aynı ağdan günde 4 kez yapılabilir (`VR_FREE_PER_IP`).
+- Search Console'da `https://aiseodeck.silitlabs.com/` mülkü info@silitlabs.com hesabında, site haritası gönderildi. Doğrulama dosyası `public/google735e5a9a85f8a95e.html`, silme.
 
 İade yok (sayfalarda ve şartlarda yazıyor). Bir rapor kurulamadıysa: aynı site için yeni kontrol başlat, `/check/{id}?key=...` ile aç, bağlantıyı müşteriye gönder. Polar satıştan sonraki 60 gün içinde itirazı önlemek için kendi kararıyla iade edebilir; o zaman `order.refunded` gelir ve rapor kendiliğinden kapanır.
+
+Canlıda bir sorun ararken: Vercel > Logs'ta `[vr]` ara. Her başlatılan kontrol tek satır yazar: `[vr] start <site>: read ... ms, understand ... ms (N searches), volumes ... ms`.
 
 ## Kurulum (Batuhan için, sırayla)
 
