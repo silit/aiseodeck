@@ -192,9 +192,11 @@ async function understand(site, host, budgetMs) {
   if (!site.read.ok || !llm.available()) return base;
   let j;
   try {
+    // a visitor is waiting on the first page, so two providers are asked at once and the first answer is used
     j = await llm.generateJSON({
-      budgetMs: budgetMs || 16000,
-      timeoutMs: 14000,
+      race: true,
+      budgetMs: budgetMs || 24000,
+      timeoutMs: Math.min(22000, (budgetMs || 24000) - 500),
       system: 'You study the home page of a business website. You work out who the business is, which searches its potential customers make to find a business like it, and how they would put the same need to an AI assistant such as ChatGPT. Only use what the page says. No em dashes.',
       prompt: `Website: ${host}\nLanguage attribute: ${site.lang || 'not set'}\nTitle: ${site.title || '(none)'}\nMeta description: ${site.description || '(none)'}\nMain heading: ${(site.h1 || [])[0] || '(none)'}\nText on the page: ${clean(site.text, 2600) || '(none)'}\n\n` +
         'Return {"brand": "the business name the way customers say it, without slogans or legal suffixes", "aliases": ["0 to 3 other spellings or short forms customers use"], ' +
@@ -359,6 +361,9 @@ function topicsFrom(list, looked) {
 // Free checks are capped per visitor and per day; a website checked in the last week shows that check again.
 async function start(input, ctx) {
   ctx = ctx || {};
+  // the page that waits for this has 60 seconds in all: what is left is shared out between the steps
+  const t0 = Date.now();
+  const left = () => 55000 - (Date.now() - t0);
   let n = normalizeUrl(input);
   if (n.error) return { error: URL_ERRORS[n.error] || URL_ERRORS.bad, code: n.error };
   const cached = await kv.getJSON('vrdom:' + n.host);
@@ -379,9 +384,13 @@ async function start(input, ctx) {
   }
   if (!read.site || !read.reachable) return { error: 'We could not reach ' + n.host + '. Check the spelling, or try again in a minute.', code: 'unreachable' };
   const site = read.site;
-  const who = await understand(site, n.host, 16000);
+  const tRead = Date.now() - t0;
+  const who = await understand(site, n.host, Math.max(8000, Math.min(24000, left() - 9000)));
+  const tWho = Date.now() - t0 - tRead;
   const askCountry = who.customersCountry || 'US';
-  const vols = await searchVolumes(who.candidates.map((c) => c.keyword), askCountry, who.language || 'en');
+  const vols = await searchVolumes(who.candidates.map((c) => c.keyword), askCountry, who.language || 'en', Math.max(2500, Math.min(7000, left() - 1500)));
+  // one line per started check: how long each step took, to tune the limits from real numbers
+  console.log(`[vr] start ${n.host}: read ${tRead} ms, understand ${tWho} ms (${who.byAi ? who.candidates.length + ' searches' : 'no answer'}), volumes ${Date.now() - t0 - tRead - tWho} ms (${vols.known ? 'known' : 'not known'})`);
   const picked = pickTopics(who.candidates, vols.map, topicCount());
   const looked = vols.known ? askCountry : '';
   const check = {
