@@ -208,7 +208,8 @@ async function understand(site, host, budgetMs) {
         `Rules for the ${NUMBER[CANDIDATES]} searches: each "keyword" is a search that a potential customer who has never heard of this business types into Google when choosing a provider like it: 2 to 5 lowercase words, the way people really type, in the customers' language, with the place when the business is local. It has to fit this business closely, so that the searcher would be glad to find it, and it is never broader than the business itself: a small hotel in one quarter of a city is not found for "hotels" or "city breaks". ` +
         'Each "question" is the same need the way that person would put it to an AI assistant: one natural sentence under 110 characters that an assistant can answer by naming specific businesses or products. ' +
         'The first search is the main thing the business sells. The others cover a specific need or feature the page stresses, a kind of customer, a comparison or price search, a search that starts from the customer\'s own situation, and searches tied to a concrete fact the page states, such as a location, an opening time or something included. ' +
-        'Every search is about a different need: no two may differ only in word order, a plural or a filler word. Never include the business name or any brand name.',
+        'Use the wording most people type, short and common, not a description of the product: "airbnb welcome book template", not "ready-made welcome book for rental hosts". ' +
+        'Every search is about a different need: no two may differ only in word order, a plural or a filler word. Never include the name of the business itself or of a rival. A platform or tool the customer already uses (such as Airbnb, Shopify or Webflow) may be part of a search when the page is aimed at its users.',
       maxTokens: 1500
     });
   } catch (e) { console.error('[vr] understand', e.message); return base; }
@@ -603,7 +604,8 @@ async function extractNamed(check, unit, text, budgetMs) {
         system: 'You read an AI assistant\'s answer to a customer question and list the specific businesses, brands or products it puts forward as options for what the customer is looking for. Copy each name exactly as written in the answer. Never add a name that is not in the answer.',
         prompt: `Customer question: ${clean(unit.text, 200)}\n\nAnswer:\n${String(text).slice(0, 4500)}\n\n` +
           `Return {"named": [{"name": "...", "kind": "business"}]} in the order they first appear, at most 12. kind is "business" for a specific provider, brand or product the customer could choose${check.profile.category ? ' (the same kind of thing as a ' + check.profile.category + ')' : ''}, ` +
-          'and "directory" for a listing, review, booking, marketplace or comparison site the answer points the customer to. Leave out anything that is only a part of another option (its bar, restaurant, spa or room types), and leave out places, landmarks, generic terms and publications that are only cited as sources.',
+          'and "directory" for a listing, review, booking, marketplace or comparison site the answer points the customer to. Leave out anything that is only a part of another option (its bar, restaurant, spa or room types), and leave out places, landmarks, generic terms and publications that are only cited as sources. ' +
+          'A name is a proper name: a company, a brand or a product with a name of its own. A plain description of a product, such as "editable welcome book template", is not a name. Give the brand or seller behind it when the answer names one (for "Evolve\'s free welcome book template" that is "Evolve"), otherwise leave it out.',
         maxTokens: 500
       });
       const arr = Array.isArray(j) ? j : (j && j.named);
