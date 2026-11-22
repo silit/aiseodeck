@@ -2,8 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://aiseodeck.silitlabs.com/</loc><lastmod>2026-11-16</lastmod></url>
   <url><loc>https://aiseodeck.silitlabs.com/docs</loc><lastmod>2026-11-16</lastmod></url>
-  <url><loc>https://aiseodeck.silitlabs.com/ai-visibility-report</loc><lastmod>2026-11-22</lastmod></url>
-  <url><loc>https://aiseodeck.silitlabs.com/ai-visibility-report/sample</loc><lastmod>2026-11-22</lastmod></url>
-  <url><loc>https://aiseodeck.silitlabs.com/privacy</loc><lastmod>2026-11-22</lastmod></url>
-  <url><loc>https://aiseodeck.silitlabs.com/terms</loc><lastmod>2026-11-22</lastmod></url>
+  <url><loc>https://aiseodeck.silitlabs.com/privacy</loc><lastmod>2026-11-16</lastmod></url>
+  <url><loc>https://aiseodeck.silitlabs.com/terms</loc><lastmod>2026-11-16</lastmod></url>
 </urlset>

@@ -1,6 +1,7 @@
 'use strict';
 // The public addresses of the AI Visibility Report. No account and no session: the id in the address of a check is
 // what gives access to it, so it is long and random, never listed anywhere, and its pages are kept out of search.
+// Visitors use these addresses at silitlabs.com, which passes them on to /_vr here (see where.js and vercel.json).
 //   GET  /ai-visibility-report           the landing page
 //   GET  /ai-visibility-report/sample    the sample report (a made-up business)
 //   POST /check/start                    { url } -> { id }
@@ -12,11 +13,11 @@ const core = require('./core');
 const state = require('./state');
 const pay = require('./pay');
 const pages = require('./pages');
+const where = require('./where');
 const store = require('../store');
 const kv = require('../kv');
 
 const ipKey = (ip) => crypto.createHmac('sha256', process.env.SESSION_SECRET || 'aiseodeck').update('vrip:' + ip).digest('hex').slice(0, 20);
-const baseUrl = (req) => (process.env.APP_URL || '').replace(/\/+$/, '') || 'https://' + req.headers.host;
 const CACHED = { 'Cache-Control': 'public, max-age=300, s-maxage=3600' };
 
 function csp(nonce) {
@@ -37,7 +38,8 @@ async function handle(req, res, path, method, h) {
   if (path.startsWith(pages.PATH + '/')) return send(res, 404, pages.errorPage('Not found', 'There is nothing at this address.'));
   if (path === '/check') return redirect(res, pages.PATH);
 
-  if (method === 'POST' && !h.sameOrigin(req)) return json(res, 403, { error: 'Cross-site request blocked.' });
+  // the pages are read at the site's address, so that is where their forms and buttons post from
+  if (method === 'POST' && !h.sameOrigin(req) && !where.fromSite(req)) return json(res, 403, { error: 'Cross-site request blocked.' });
 
   if (path === '/check/start') {
     if (method !== 'POST') return redirect(res, pages.PATH);
@@ -95,7 +97,7 @@ async function handle(req, res, path, method, h) {
     if (!check) return json(res, 404, { error: 'This check no longer exists.' });
     if (check.paid) return json(res, 200, { started: true });
     if (!(await pay.enabled())) return json(res, 200, { error: 'The full report is not on sale yet. Leave your email and we will tell you when it opens.' });
-    try { const url = await pay.checkoutUrl(check, baseUrl(req)); await core.count('checkout'); return json(res, 200, { url }); }
+    try { const url = await pay.checkoutUrl(check, where.site()); await core.count('checkout'); return json(res, 200, { url }); }
     catch (e) { console.error('[vr] checkout', e.message); return json(res, 200, { error: 'The checkout could not be opened. Try again in a minute.' }); }
   }
   if (action === 'confirm') {

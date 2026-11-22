@@ -4,6 +4,7 @@
 // so the page never has to parse an engine's markdown. Every search carries how often it is made on Google in a
 // month: a number, null with measured true when there are too few to count, or measured false when nobody looked.
 const analyze = require('../analyze');
+const where = require('./where');
 const engines = require('../engines');
 const core = require('./core');
 
@@ -153,7 +154,7 @@ function publicState(check, rows, opts) {
     topics: check.topics.map((t) => Object.assign({ id: t.id, question: t.question, free: t.id === check.freeTopic }, searchOf(check, t))),
     engines: engineInfo(stage === 'draft' ? all : ((check.run && full && check.run.engines) || all), (check.run && !full && check.run.engines) || free),
     email: maskEmail(check.email),
-    home: (process.env.APP_URL || 'https://aiseodeck.silitlabs.com').replace(/\/+$/, '') + '/ai-visibility-report'
+    home: where.home()
   };
   if (stage === 'closed') return st;
   if (opts.paying && !paid) st.paying = String(opts.paying); // back from the checkout, payment still being confirmed

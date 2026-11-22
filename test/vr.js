@@ -156,7 +156,9 @@ const polar = http.createServer((req, res) => {
   const fx2 = Object.fromEntries(r.fixes.map((f) => [f.id, f]));
   assert(fx2.org.asset.body.includes('"@type": "LocalBusiness"') && fx2.org.asset.body.includes('Rua das Flores') && fx2.faq.asset.body.includes('FAQPage') && fx2.llms.asset.body.startsWith('# Casa Aldora') && fx2.listings.steps.length >= 3 && fx2.page.why.includes('"romantic hotels lisbon" (about 480 Google searches a month in the United Kingdom) you are named in 1 of 10') && fx2.page.steps[0].includes('Where should a couple stay') && fx2.page.asset.body.includes('romantic'), 'the fix kit: organization markup, FAQ markup, llms.txt, the pages to get onto and a page for the search with the biggest gap');
   assert(r.fixes.every((f, i) => f.n === i + 1 && f.why && f.minutes > 0) && r.fixes.map((f) => f.impact).join('') === r.fixes.map((f) => f.impact).sort((a, b) => b - a).join(''), 'fixes are numbered, biggest win first');
-  assert(calls.emails.length === 1 && calls.emails[0].to === 'owner@casaaldora.example' && calls.emails[0].text.includes('https://app.test/check/' + id), 'the buyer is emailed the link once');
+  assert(calls.emails.length === 1 && calls.emails[0].to === 'owner@casaaldora.example' && calls.emails[0].text.includes('https://silitlabs.com/check/' + id) && !/app\.test|aiseodeck/.test(calls.emails[0].text + calls.emails[0].html), 'the buyer is emailed the link once, at the site\'s address');
+  const mailer = require('../api/_lib/email');
+  assert(calls.emails[0].as === 'AI Visibility Report' && mailer.sender('AI Visibility Report') === 'AI Visibility Report <hello@silitlabs.com>' && mailer.sender() === 'AI SEO Deck <hello@silitlabs.com>' && mailer.sender('Evil <x@y.z>') === 'Evil x@y.z <hello@silitlabs.com>', 'the email is signed by the report, from the same address; the app\'s own emails keep their name');
   assert(c.recheck && c.recheck.dueAt > Date.now() + 29 * 86400000 && (await kv.smembers('vr:due')).includes(id), 'a re-check is scheduled for 30 days later');
   const rep = await pub(id);
   assert(rep.stage === 'report' && rep.answers.length === 54 && rep.report.fixes.length === r.fixes.length && rep.email === 'o•••@casaaldora.example', 'the report page gets every answer; the email is masked');
@@ -175,7 +177,14 @@ const polar = http.createServer((req, res) => {
   assert(land.status === 200 && /Read what AI tells your customers about you/.test(land.body) && /name="url"/.test(land.body) && /FAQPage/.test(land.body) && /max-age/.test(land.headers['cache-control']), 'the landing page is served, cacheable, with the form and its own FAQ markup');
   const samp = await request(port, 'GET', '/ai-visibility-report/sample');
   assert(samp.status === 200 && /This is a sample/.test(samp.body) && /AI names Casa Aldora/.test(samp.body), 'the sample report is served');
-  assert((await request(port, 'POST', '/check/start', { body: { url: 'casaaldora.example' }, headers: { Origin: 'https://evil.example' } })).status === 403, 'a form posted from another site is blocked');
+  assert(/<link rel="canonical" href="https:\/\/silitlabs\.com\/ai-visibility-report">/.test(land.body) && /<link rel="canonical" href="https:\/\/silitlabs\.com\/ai-visibility-report\/sample">/.test(samp.body) && /og:image" content="https:\/\/silitlabs\.com\/images\/og\/ai-visibility-report\.jpg"/.test(land.body) && /"url":"https:\/\/silitlabs\.com\/ai-visibility-report"/.test(land.body) && /"@id":"https:\/\/silitlabs\.com\/#org"/.test(land.body), 'the pages say they live at silitlabs.com: canonical, share picture and structured data');
+  const links = [...new Set([...land.body.replace(/<script[\s\S]*?<\/script>/g, '').matchAll(/<a [^>]*href="([^"#][^"]*)"/g)].map((m) => m[1]))];
+  assert(links.includes('https://silitlabs.com/') && links.includes('https://silitlabs.com/guides/') && links.includes('https://silitlabs.com/terms/') && links.includes('https://silitlabs.com/privacy/') && links.includes('https://app.test/') && links.includes('/ai-visibility-report/sample') && links.filter((l) => l.startsWith('/')).every((l) => l.startsWith('/ai-visibility-report')), 'links to the site and to AI SEO Deck are written in full; only the report\'s own addresses are relative');
+  assert(/<div class="brand"><a href="https:\/\/silitlabs\.com\/"[^>]*><svg[\s\S]*?<\/svg>Silit Labs<\/a><small><a href="\/ai-visibility-report">AI Visibility Report<\/a><\/small><\/div>/.test(land.body) && !/AI SEO Deck<small>/.test(land.body), 'the top bar carries the site\'s name and the product\'s name');
+  assert((await request(port, 'POST', '/check/start', { body: { url: 'casaaldora.example' }, headers: { Origin: 'https://evil.example' } })).status === 403 && (await request(port, 'POST', '/check/start', { body: { url: 'casaaldora.example' }, headers: { Origin: 'https://silitlabs.com.evil.example' } })).status === 403, 'a form posted from another site is blocked');
+  const fromSite = await request(port, 'POST', '/check/start', { body: { url: 'not a website' }, headers: { Origin: 'https://silitlabs.com' } });
+  const fromWww = await request(port, 'POST', '/check/start', { body: { url: 'not a website' }, headers: { Origin: 'https://www.silitlabs.com' } });
+  assert(fromSite.status === 200 && fromSite.json.error && fromWww.status === 200 && fromWww.json.error, 'a form posted from silitlabs.com, where the pages are read, is let in');
   const viaHttp = await request(port, 'POST', '/check/start', { body: { url: 'casaaldora.example' }, headers: { Origin: 'https://app.test' } });
   assert(viaHttp.status === 200 && core.ID_RE.test(viaHttp.json.id) && viaHttp.json.id !== id, 'a paid report is not handed to the next visitor of the same site: they get a check of their own');
   const id2 = viaHttp.json.id;
@@ -193,6 +202,7 @@ const polar = http.createServer((req, res) => {
   assert((await core.get(id2)).status === 'preview', 'the open page keeps the check moving until the preview');
   const un = await request(port, 'POST', '/check/' + id2 + '/unlock', { body: {} });
   assert(/polar\.test\/checkout/.test(un.json.url) && polarState.checkouts[1].metadata.check_id === id2, 'the unlock button answers with a checkout link for this check');
+  assert(polarState.checkouts[1].success_url === 'https://silitlabs.com/check/' + id2 + '?checkout_id={CHECKOUT_ID}' && polarState.checkouts[1].return_url === 'https://silitlabs.com/check/' + id2, 'the buyer comes back from the checkout to the site\'s address');
   assert((await request(port, 'GET', '/check/' + id2 + '?key=wrong-key-wrong-key')).status === 302 && !(await core.get(id2)).paid, 'a wrong key opens nothing');
   const keyed = await request(port, 'GET', '/check/' + id2 + '?key=unlock-key-for-tests');
   assert(keyed.status === 302 && keyed.headers.location === '/check/' + id2 && (await core.get(id2)).paid.by === 'key', 'our own key opens a report without a payment');
@@ -304,6 +314,22 @@ const polar = http.createServer((req, res) => {
   const today = days[0] || {};
   assert(days.length === 1 && today.start >= 5 && today.asked >= 3 && today.preview >= 3 && today.checkout === 1 && today.paid === 1 && today.opened_by_key >= 1 && today.report_built >= 2 && today.recheck_built >= 1 && today.again === 1, 'each step of the funnel is counted per day, with numbers only');
   assert((await request(port, 'GET', '/cron/vrstats')).status === 401, 'the numbers need the cron secret');
+
+  console.log('\nWhere the report is served');
+  const fs = require('fs');
+  const root = require('path').join(__dirname, '..');
+  const vercel = JSON.parse(fs.readFileSync(root + '/vercel.json', 'utf8'));
+  const to = (src) => (vercel.redirects.find((r) => r.source === src) || {}).destination;
+  assert(to('/ai-visibility-report') === 'https://silitlabs.com/ai-visibility-report' && to('/ai-visibility-report/:rest*') === 'https://silitlabs.com/ai-visibility-report/:rest*' && to('/check/:rest*') === 'https://silitlabs.com/check/:rest*' && to('/check') === 'https://silitlabs.com/ai-visibility-report' && vercel.redirects.every((r) => r.permanent), 'this app\'s own addresses for the report lead to silitlabs.com for good');
+  const served = vercel.rewrites.filter((r) => /ai-visibility-report|check/.test(r.source));
+  assert(served.length === 3 && served.every((r) => r.source.startsWith('/_vr/') && r.destination === '/api/index?path=' + r.source.slice(5)) && vercel.crons.some((c) => c.path === '/cron/vr'), 'the site\'s proxy is answered under /_vr, and the cron stays where it was');
+  const where = require('../api/_lib/vr/where');
+  assert(where.site() === 'https://silitlabs.com' && where.home() === 'https://silitlabs.com/ai-visibility-report' && where.app() === 'https://app.test' && where.fromSite({ headers: { referer: 'https://silitlabs.com/check/abc' } }) && !where.fromSite({ headers: {} }) && !where.fromSite({ headers: { origin: 'https://notsilitlabs.com' } }), 'the report knows its own address from the app\'s');
+  process.env.VR_URL = 'https://staging.example/';
+  assert(where.home() === 'https://staging.example/ai-visibility-report' && where.fromSite({ headers: { origin: 'https://staging.example' } }) && !where.fromSite({ headers: { origin: 'https://silitlabs.com' } }), 'VR_URL moves it');
+  delete process.env.VR_URL;
+  const ownSite = ['index.html', 'llms.txt', 'sitemap.xml', 'terms.html', 'privacy.html', 'docs.html', 'robots.txt'].map((f) => fs.readFileSync(root + '/public/' + f, 'utf8')).join('\n');
+  assert(!/ai-visibility-report|AI Visibility Report/i.test(ownSite), 'the website of AI SEO Deck itself does not mention the report');
 
   console.log('\nThe plans are untouched');
   const none = JSON.stringify({ type: 'subscription.active', data: { id: 'sub_x', product: { name: 'Something else' } } });

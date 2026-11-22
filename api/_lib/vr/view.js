@@ -591,7 +591,7 @@
       '<li>AI answers shift by the day, the place and the person. Read this as a snapshot. The re-check shows the direction.</li>' +
       '<li>' + (d.known ? 'Every number of searches here is for Google. ' : '') + 'Nobody outside the AI companies knows how often an AI is asked something. Any tool that shows that number is guessing, so we do not show one.</li>' +
       (r.skipped && r.skipped.length ? '<li>One part of this report could not be completed this time: ' + esc(r.skipped.join(', ')) + '.</li>' : '') + '</ul></section>' +
-      recheckHtml(st) + '<p class="print-only">Made with AI Visibility Report by AI SEO Deck: ' + esc(st.home || '') + '</p></section>';
+      recheckHtml(st) + '<p class="print-only">Made with AI Visibility Report by Silit Labs: ' + esc(st.home || '') + '</p></section>';
   }
 
   function closed(st) {

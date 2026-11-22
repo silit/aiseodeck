@@ -7,6 +7,7 @@ const V = require('./view');
 const { CSS } = require('./css');
 const core = require('./core');
 const engines = require('../engines');
+const where = require('./where');
 
 const VIEW_SRC = fs.readFileSync(require.resolve('./view.js'), 'utf8');
 const CLIENT_SRC = fs.readFileSync(require.resolve('./client.js'), 'utf8');
@@ -14,23 +15,27 @@ let SAMPLE = null;
 try { SAMPLE = require('./sample.json'); } catch (e) { SAMPLE = null; }
 
 const esc = V.esc;
-const PATH = '/ai-visibility-report';
+const PATH = where.PATH;
+// The picture a shared link shows. It is a file of the site (public/images/og in the site's repo).
+const OG_IMAGE = '/images/og/ai-visibility-report.jpg';
 const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400..800&amp;family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&amp;display=swap">' +
   '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght,BNCE,INFM@400..700,-100..100,0..100&amp;display=swap">';
-const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#F1F2FF"/><circle cx="11" cy="11" r="4" fill="#E8C300"/><circle cx="21" cy="11" r="4" fill="none" stroke="#2F5BFF" stroke-width="2.4"/><circle cx="11" cy="21" r="2" fill="#8A93B8"/><circle cx="21" cy="21" r="4" fill="#E8C300" stroke="#2F5BFF" stroke-width="2.4"/></svg>';
+// The Silit Labs monogram, as on the rest of silitlabs.com.
+const LOGO = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#0B2540"/><path d="M63.5 29.5 A15 15 0 1 0 50 50" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/><path d="M50 50 A15 15 0 1 1 36.5 70.5" fill="none" stroke="#FF7A59" stroke-width="11" stroke-linecap="round"/></svg>';
 
 // JSON inside a <script>: nothing in it can close the tag or start a comment.
 const safeJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-const appUrl = () => (process.env.APP_URL || 'https://aiseodeck.silitlabs.com').replace(/\/+$/, '');
 const priceLabel = () => { const c = core.price(); return '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: c % 100 ? 2 : 0 }); };
 // The sample is made on a test machine, so the address of this product inside it is set here, where it is served.
-if (SAMPLE) for (const k of Object.keys(SAMPLE)) if (SAMPLE[k] && typeof SAMPLE[k] === 'object') SAMPLE[k].home = appUrl() + PATH;
+if (SAMPLE) for (const k of Object.keys(SAMPLE)) if (SAMPLE[k] && typeof SAMPLE[k] === 'object') SAMPLE[k].home = where.home();
 
+// The top bar: the site's name leads to the site, the product's name to the product. Links to the rest of the site
+// and to AI SEO Deck are written in full, so they also work when a page is opened at this app's own address.
 function top(nav) {
-  return '<header class="top"><div class="wrap"><a class="brand" href="' + PATH + '">' + LOGO + 'AI SEO Deck<small>Visibility Report</small></a><nav aria-label="Main">' + nav + '</nav></div></header>';
+  return '<header class="top"><div class="wrap"><div class="brand"><a href="' + where.site() + '/" aria-label="Silit Labs home">' + LOGO + 'Silit Labs</a><small><a href="' + PATH + '">AI Visibility Report</a></small></div><nav aria-label="Main">' + nav + '</nav></div></header>';
 }
-const FOOT = '<footer class="foot"><div class="wrap"><p>AI Visibility Report is made by Silit Labs, the makers of AI SEO Deck for Webflow.</p><nav aria-label="Footer"><a href="/">AI SEO Deck</a><a href="' + PATH + '/sample">Sample report</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><span>info@silitlabs.com</span></nav></div></footer>';
+const foot = () => '<footer class="foot"><div class="wrap"><p>AI Visibility Report is made by Silit Labs, the makers of AI SEO Deck for Webflow.</p><nav aria-label="Footer"><a href="' + where.site() + '/">Silit Labs</a><a href="' + PATH + '/sample">Sample report</a><a href="' + where.site() + '/guides/">Guides</a><a href="' + where.app() + '/">AI SEO Deck</a><a href="' + where.site() + '/terms/">Terms</a><a href="' + where.site() + '/privacy/">Privacy</a><span>info@silitlabs.com</span></nav></div></footer>';
 
 // o: { title, description, canonical, index, nav, body, boot, head, nonce }
 function shell(o) {
@@ -39,11 +44,12 @@ function shell(o) {
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
     '<title>' + esc(o.title) + '</title><meta name="description" content="' + esc(o.description || '') + '">' +
     (o.index ? '' : '<meta name="robots" content="noindex,nofollow">') + (url ? '<link rel="canonical" href="' + esc(url) + '">' : '') +
-    '<link rel="icon" href="/favicon.png"><meta property="og:type" content="website"><meta property="og:title" content="' + esc(o.ogTitle || o.title) + '"><meta property="og:description" content="' + esc(o.description || '') + '">' +
-    (url ? '<meta property="og:url" content="' + esc(url) + '">' : '') + '<meta property="og:image" content="' + appUrl() + '/og.png"><meta name="twitter:card" content="summary_large_image">' +
+    '<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">' +
+    '<meta property="og:type" content="website"><meta property="og:site_name" content="Silit Labs"><meta property="og:title" content="' + esc(o.ogTitle || o.title) + '"><meta property="og:description" content="' + esc(o.description || '') + '">' +
+    (url ? '<meta property="og:url" content="' + esc(url) + '">' : '') + '<meta property="og:image" content="' + where.site() + OG_IMAGE + '"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">' +
     '<meta name="theme-color" content="#E9EDF7" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#1B2147" media="(prefers-color-scheme: dark)">' +
     FONTS + '<style' + n + '>' + CSS + '</style><script' + n + '>document.documentElement.className="js"</script>' + (o.head || '') + '</head><body>' +
-    top(o.nav || '') + (o.before || '') + '<main>' + o.body + '</main>' + FOOT +
+    top(o.nav || '') + (o.before || '') + '<main>' + o.body + '</main>' + foot() +
     '<script' + n + '>window.__VR=' + safeJson(o.boot || {}) + ';</script><script' + n + '>' + VIEW_SRC + '</script><script' + n + '>' + CLIENT_SRC + '</script></body></html>';
 }
 
@@ -112,7 +118,7 @@ function landingBody() {
     '<div><h3>What AI will say tomorrow</h3><p>Answers shift by the day, the place and the person. Your report is a dated snapshot, and the re-check shows the direction.</p></div>' +
     '<div><h3>A guaranteed place in the answer</h3><p>Nobody can promise that. The fix kit covers what is in your hands: being readable, being described clearly, and being on the pages AI reads.</p></div></div></section>' +
 
-    '<section class="band" id="questions"><h2>Questions</h2><div class="faq">' + FAQ().map((f) => '<details><summary>' + esc(f[0]) + '</summary><p>' + esc(f[1]) + (f[0].startsWith('I use Webflow') ? ' <a href="/">See AI SEO Deck</a>.' : '') + '</p></details>').join('') + '</div></section>' +
+    '<section class="band" id="questions"><h2>Questions</h2><div class="faq">' + FAQ().map((f) => '<details><summary>' + esc(f[0]) + '</summary><p>' + esc(f[1]) + (f[0].startsWith('I use Webflow') ? ' <a href="' + where.app() + '/">See AI SEO Deck</a>.' : '') + '</p></details>').join('') + '</div></section>' +
 
     '<section class="last"><h2>See your answers</h2><p class="sub">It takes about a minute, and the first thing you read is what AI told your customer today.</p>' + goForm('url-last', 'Read my answers') + '</section>' +
     '</div>';
@@ -125,8 +131,9 @@ function landing() {
   const price = priceLabel();
   const body = landingBody();
   const ld = [
-    { '@context': 'https://schema.org', '@type': 'Organization', '@id': 'https://silitlabs.com/#organization', name: 'Silit Labs', url: 'https://silitlabs.com', email: 'info@silitlabs.com' },
-    { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'AI Visibility Report', url: appUrl() + PATH, applicationCategory: 'BusinessApplication', operatingSystem: 'Any', description: 'Shows what ChatGPT, Google AI and Gemini answer for the searches a business\'s customers make, and what to fix.', publisher: { '@id': 'https://silitlabs.com/#organization' },
+    // the same @id as the Organization on every page of silitlabs.com, so the report is tied to the same maker
+    { '@context': 'https://schema.org', '@type': 'Organization', '@id': 'https://silitlabs.com/#org', name: 'Silit Labs', url: 'https://silitlabs.com', email: 'info@silitlabs.com' },
+    { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'AI Visibility Report', url: where.home(), applicationCategory: 'BusinessApplication', operatingSystem: 'Any', description: 'Shows what ChatGPT, Google AI and Gemini answer for the searches a business\'s customers make, and what to fix.', publisher: { '@id': 'https://silitlabs.com/#org' },
       offers: [{ '@type': 'Offer', name: 'Free check', price: '0', priceCurrency: 'USD' }, { '@type': 'Offer', name: 'Full report', price: (core.price() / 100).toFixed(2), priceCurrency: 'USD' }] },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ().map((f) => ({ '@type': 'Question', name: f[0], acceptedAnswer: { '@type': 'Answer', text: f[1] } })) }
   ];
@@ -134,7 +141,7 @@ function landing() {
     title: 'AI Visibility Report: see what ChatGPT tells your customers about you',
     ogTitle: 'Read what AI tells your customers about you',
     description: 'Type your website. We find what your customers search for, ask ChatGPT, Google AI and Gemini, show the answers word for word and mark where you are named. Free check, full report ' + price + ' once.',
-    canonical: appUrl() + PATH, index: true,
+    canonical: where.home(), index: true,
     nav: LANDING_NAV,
     head: ld.map((x) => '<script type="application/ld+json">' + safeJson(x) + '</script>').join(''),
     body, boot: { page: 'landing', hero }
@@ -155,7 +162,7 @@ function checkPage(state, o) {
 function samplePage() {
   if (!SAMPLE || !SAMPLE.report) return errorPage('The sample is not ready', 'Run a free check instead. It takes about a minute.');
   return shell({
-    title: 'Sample AI visibility report: a made-up hotel in Lisbon', description: 'A complete AI visibility report for a made-up hotel: the five searches its customers make most, every answer from six AI engines, the pages they read, and the fix kit.', canonical: appUrl() + PATH + '/sample', index: true,
+    title: 'Sample AI visibility report: a made-up hotel in Lisbon', description: 'A complete AI visibility report for a made-up hotel: the five searches its customers make most, every answer from six AI engines, the pages they read, and the fix kit.', canonical: where.home() + '/sample', index: true,
     nav: '<a class="btn sm mark" href="' + PATH + '">Check my website</a>',
     before: '<div class="sample-bar"><div class="wrap">This is a sample. Casa Aldora, the other hotels and the publications in it are made up. <a href="' + PATH + '">Run the free check on your own site</a></div></div>',
     body: '<div class="wrap" id="app" data-stage="report">' + V.app(SAMPLE.report) + '</div>', boot: { page: 'sample', state: SAMPLE.report, still: true }
@@ -169,4 +176,4 @@ function errorPage(title, text, status) {
   });
 }
 
-module.exports = { landing, landingBody, checkPage, samplePage, errorPage, shell, safeJson, top, FOOT, LANDING_NAV, PATH, CSS, VIEW_SRC, CLIENT_SRC, FONTS, LOGO, heroState, sample: () => SAMPLE };
+module.exports = { landing, landingBody, checkPage, samplePage, errorPage, shell, safeJson, top, foot, LANDING_NAV, PATH, OG_IMAGE, CSS, VIEW_SRC, CLIENT_SRC, FONTS, LOGO, heroState, sample: () => SAMPLE };

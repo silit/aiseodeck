@@ -3,8 +3,17 @@
 
 function enabled() { return !!process.env.RESEND_API_KEY; }
 
-async function send({ to, subject, html, text }) {
+// The sender. `as` puts another name on the same address: the AI Visibility Report signs its emails as itself.
+function sender(as) {
   const from = process.env.EMAIL_FROM || 'AI SEO Deck <hello@silitlabs.com>';
+  const name = String(as || '').replace(/[<>"\r\n]/g, '').trim();
+  if (!name) return from;
+  const m = from.match(/<([^<>\s]+)>/);
+  return name + ' <' + (m ? m[1] : from.trim()) + '>';
+}
+
+async function send({ to, subject, html, text, as }) {
+  const from = sender(as);
   if (!process.env.RESEND_API_KEY) {
     console.log('[email skipped]', to, subject);
     return { skipped: true };
@@ -21,4 +30,4 @@ async function send({ to, subject, html, text }) {
   return data;
 }
 
-module.exports = { enabled, send };
+module.exports = { enabled, send, sender };
