@@ -84,6 +84,8 @@ const UNREADABLE = 'The AI reply could not be read. Try again.';
 // of it before they write; a reply that is cut short or is not JSON hands over to the next provider.
 // budgetMs caps the whole call, every provider included, so a page that waits for it stays inside the 60 second
 // function limit. Each provider gets at most 30 seconds of it.
+// race: for a step a visitor is waiting on. The first two providers are asked at the same moment and the first reply
+// that parses is used, so one slow provider cannot use up the whole budget. It costs a second call.
 async function generateJSON(opts) {
   const deadline = Date.now() + ((opts && opts.budgetMs) || 40000);
   const o = Object.assign({}, opts, {
@@ -92,6 +94,25 @@ async function generateJSON(opts) {
   });
   const list = PROVIDERS.filter((p) => env(p.key));
   if (!list.length) throw new Error('No AI provider is set up.');
+  if (opts.race && list.length > 1) {
+    const timeoutMs = Math.max(1000, Math.min((opts && opts.timeoutMs) || 30000, deadline - Date.now()));
+    const unreadable = () => Object.assign(new Error(UNREADABLE), { public: true });
+    const ask = (p) => p.run(Object.assign({}, o, { timeoutMs })).then((text) => {
+      const j = parseJSON(text);
+      if (j == null) throw unreadable();
+      return j;
+    }, (e) => {
+      if (e.cutShort) throw unreadable();
+      alerts.report(p.id, e, 'writing fixes and suggestions');
+      throw e;
+    });
+    try { return await Promise.any(list.slice(0, 2).map(ask)); } catch (e) {
+      const errors = (e && e.errors) || [e];
+      const why = errors.find((x) => x && !x.public) || errors[0];
+      console.error('[aiseodeck] writing failed', (why && why.message) || 'no provider answered in time');
+      throw why || unreadable();
+    }
+  }
   let last = null;
   for (const p of list) {
     const left = deadline - Date.now();
