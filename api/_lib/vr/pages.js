@@ -67,6 +67,7 @@ function heroState() {
 }
 
 const FAQ = () => [
+  ['Is this an AI visibility checker?', 'Yes. The free check is one: it shows whether ' + freeNames() + ' name your business for a search your customers make, with the answers word for word. The full report is the larger version of the same check: ' + topicsWord() + ' searches, every engine, and a fix kit.'],
   ['Which AI engines do you ask?', 'The free check asks ' + freeNames() + '. The full report asks ' + allNames() + '. Each one runs a live web search before it answers, the same as when a customer asks.'],
   ['Is this the answer my customer would get?', 'It is the same kind of answer, asked the same way: from your customers\' country, in a fresh session with no chat history. AI answers change from one ask to the next, which is why the report asks every chat engine twice and shows you both.'],
   ['Do I need an account?', 'No. The address of your check is your report. Leave an email only if you want the link sent to you.'],
@@ -138,9 +139,10 @@ function landing() {
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ().map((f) => ({ '@type': 'Question', name: f[0], acceptedAnswer: { '@type': 'Answer', text: f[1] } })) }
   ];
   return shell({
-    title: 'AI Visibility Report: see what ChatGPT tells your customers about you',
+    // "AI visibility checker" is what people type when they look for the free check (1,300 searches a month in the US, Nov 2026)
+    title: 'AI Visibility Report: a free AI visibility checker for any website',
     ogTitle: 'Read what AI tells your customers about you',
-    description: 'Type your website. We find what your customers search for, ask ChatGPT, Google AI and Gemini, show the answers word for word and mark where you are named. Free check, full report ' + price + ' once.',
+    description: 'A free AI visibility check for any website: what ChatGPT, Google AI and Gemini answer when your customers search, word for word. Full report ' + price + ' once.',
     canonical: where.home(), index: true,
     nav: LANDING_NAV,
     head: ld.map((x) => '<script type="application/ld+json">' + safeJson(x) + '</script>').join(''),
