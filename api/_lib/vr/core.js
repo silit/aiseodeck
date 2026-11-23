@@ -44,7 +44,7 @@ const FULL_WINDOW_MS = 43000;
 const SEARCH = ['aio', 'aimode']; // Google answers searches, so it gets the keyword; chat engines get the question
 const FIN_STEPS = ['reading', 'audit', 'insights', 'assets', 'compose'];
 
-const COUNTRY = { US: 'the United States', GB: 'the United Kingdom', IE: 'Ireland', CA: 'Canada', AU: 'Australia', DE: 'Germany', FR: 'France', NL: 'the Netherlands', ES: 'Spain', IT: 'Italy', TR: 'Turkey', AE: 'the United Arab Emirates', SA: 'Saudi Arabia', PL: 'Poland', SE: 'Sweden', IN: 'India', BR: 'Brazil', MX: 'Mexico' };
+const COUNTRY = engines.COUNTRY_NAME; // one list of the countries we ask from, kept beside the engines
 const TLD_COUNTRY = { uk: 'GB', ie: 'IE', ca: 'CA', au: 'AU', de: 'DE', fr: 'FR', nl: 'NL', es: 'ES', it: 'IT', tr: 'TR', ae: 'AE', sa: 'SA', pl: 'PL', se: 'SE', in: 'IN', br: 'BR', mx: 'MX', us: 'US' };
 
 const price = () => { const c = parseInt(process.env.VR_PRICE_CENTS || '', 10); return Number.isFinite(c) && c >= 100 ? c : 2900; };
