@@ -144,3 +144,25 @@ Goes (until Webflow offers a stable way)
 4. The report moves to its own repository and Vercel project.
 5. End-to-end run on the published webflow.io test site: install, approve, deny, setup, first check, site health, write and apply a fix, the panel in the Designer, disconnect, reconnect, uninstall.
 6. Developer toolkit checks, Preflight receipt, review ZIP, new demo video, screenshots, form. The owner presses submit.
+
+## 8. Rework log and the next steps in the code
+
+Branch `marketplace-rework`. Nothing of it is deployed yet. Run `npm test` after every step.
+
+Done
+- 23 Nov: `/ext/*` answers only the panel's own origin (`https://<client id>.webflow-ext.com`, plus `EXT_ORIGINS`); any other origin, or none, gets 403 and one log line `[aiseodeck] panel: refused origin ...`. CHECK in the end-to-end run that the panel's real origin is the one assumed: if the panel shows no data, read that log line and set `EXT_ORIGINS`.
+- 23 Nov: Webflow 429s back off 2, 4, 8 seconds and stop after three more tries (`MAX_RETRIES` in `api/_lib/webflow.js`).
+
+Next, in this order
+1. Domains and rivals (finding 3).
+   - `store.js`: `domainsOf(meta)` = custom domains plus `<shortName>.webflow.io`; `newSite` and `refreshMeta` set `project.domains` from it and stamp `site.metaAt`.
+   - `index.js`: `applyProjectFields` no longer reads `b.domains`; `parseRivals` keeps names only (text before a comma); new `POST /app/site/refresh` re-reads `GET /v2/sites/:id` and goes back to setup or settings; `handleSetupPage` refreshes from Webflow instead of fetching the home page, and takes the default keyword language from `site.locale.tag`.
+   - `html.js`: in `setupPage` and `settingsTab` the domains are shown read-only with "Read from Webflow <time>" and a Refresh button; the rivals box asks for names only.
+   - Tests: the setup posts in `test/app.js` send `domains` and `rivals: 'Name, domain'` (lines near 396 and 883); the mock Webflow site has to carry the custom domain instead.
+2. Schema features out (finding 2): `getSchema`, `putSchema`, `querySchemas` and `beta()` in `webflow.js`; `proposedSchema`, `handleFixSchema`, the FAQ schema part of `handleFixFaq`, `extFaq`, the schema parts of `handleKeywordPlan` and `handleKeywordApply`, "Business details for structured data" in settings, `orgSchema`, `faqSchema`, `mergeSchema` in `fixes.js`, the panel's FAQ block in `extension/public/app.js`, and every schema finding in `audit.js`.
+3. Site health on the Pages API (finding 1): a new module that takes the page list (`listPages`) and each static page's nodes (`GET /v2/pages/:id/dom`, paged by 100) and reports title, description, Open Graph title and description, H1 count, words, images without alt, language. Text inside components: resolve with the component endpoints (scope `components:read`) or report "not determined"; never a false "No H1" or "thin". Then replace the other live reads: `discoverFor` (ideas from the home page), `handleKeywordPlan` (source text), `extSuggest` (the panel), `handleFixSuggest`; `jobs.js` `runAudit`. Delete `fetcher.js` use from the app and add the test that fails if an app module requests a customer's site.
+4. "Read from Webflow <time>" and Refresh on every view that shows Webflow data (site health, fix page, keyword plan, panel).
+5. `/beta/token/resolve`: decide (section 6).
+6. Texts: `public/docs.html`, `public/privacy.html`, `public/terms.html`, `public/index.html`, listing copy, `REVIEW.md` (it still says page writes name the primary locale: they do not, Webflow refuses a primary locale id and writes the primary locale when none is named, see commit b71d7d5), `README.md`.
+7. The report leaves for its own repository and project.
+
