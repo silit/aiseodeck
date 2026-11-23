@@ -139,7 +139,7 @@ const ai = http.createServer(async (req, res) => {
   if ((m = u.pathname.match(/^\/v1beta\/models\/([^/:]+):generateContent$/))) {
     const prompt = body.contents[0].parts[0].text;
     if (!body.tools && /CUTSHORT|NOJSON|SLOWGEN/.test(prompt)) return json(res, 200, { candidates: [{ content: { parts: [{ text: 'thinking', thought: true }, { text: '{"from": "gemini"}' }] }, finishReason: 'STOP' }] });
-    engineCalls.push({ e: 'gemini', p: prompt, key: req.headers['x-goog-api-key'] });
+    engineCalls.push({ e: 'gemini', p: prompt, key: req.headers['x-goog-api-key'], where: body.system_instruction && body.system_instruction.parts[0].text });
     if (/price|cost/i.test(prompt)) return json(res, 400, { error: { message: 'API key not valid' } });
     const a = answerFor(prompt);
     return json(res, 200, { modelVersion: m[1], candidates: [{ content: { parts: [{ text: a.text }] }, groundingMetadata: { webSearchQueries: ['antalya dental clinic reviews'], groundingChunks: a.sources.map((s) => ({ web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc', title: new URL(s).hostname.replace(/^www\./, '') } })) } }] });
@@ -475,6 +475,11 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   const res2 = Object.fromEntries([...db.get('res:' + run2.id)].map(([k, v]) => [k, JSON.parse(v)]));
   const gem = Object.values(res2).filter((x) => x.e === 'gemini');
   assert(gem.filter((x) => !x.ok && /API key/.test(x.err)).length === 3 && gem.some((x) => x.ok && x.cited), 'Gemini: a 400 is recorded as failed, grounding domains count as citations');
+  {
+    // the other chat engines take the country as a setting of their search tool; Gemini is told in a system instruction
+    const told = engineCalls.filter((c) => c.e === 'gemini');
+    assert(told.length > 0 && told.every((c) => c.where === 'The person asking is in the United Kingdom.' && !/United Kingdom/.test(c.p)), 'Gemini is told the market in a system instruction, and the question itself is not changed');
+  }
   assert(gem.filter((x) => !x.ok).every((x) => x.kind === 'account') && emails.filter((e) => /Google Gemini needs attention/.test(e.subject)).length === 1, 'a refused key is an account problem: the owner gets one email, not one per answer');
   assert(Object.values(res2).filter((x) => x.e === 'perplexity').every((x) => x.ok), 'Perplexity answers all read');
   assert(site.latest.failed === 3 && site.latest.none === 1 && site.latest.ok === 32, 'summary counts the failed answers and the missing AI Overview');

@@ -175,11 +175,15 @@ async function perplexity(prompt, opts) {
 }
 
 /* ---- Gemini: generateContent with Google Search grounding ---- */
+// The other chat engines take the asker's country as a setting of their search tool (user_location). Gemini's
+// search tool has none, so the model is told in a system instruction. The question goes out as the customer wrote it.
 async function gemini(prompt, opts) {
   const model = env('GEMINI_MODEL', 'gemini-3.8-flash');
+  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }] };
+  const where = COUNTRY_NAME[opts.country];
+  if (where) body.system_instruction = { parts: [{ text: `The person asking is in ${where}.` }] };
   const d = await post(base('GEMINI_API_BASE', 'https://generativelanguage.googleapis.com') + `/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    { 'x-goog-api-key': env('GEMINI_API_KEY') },
-    { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }] }, opts.timeoutMs);
+    { 'x-goog-api-key': env('GEMINI_API_KEY') }, body, opts.timeoutMs);
   const cand = (d.candidates && d.candidates[0]) || {};
   const gm = cand.groundingMetadata || {};
   const out = { text: ((cand.content && cand.content.parts) || []).map((p) => p.text || '').join(''), sources: [], consulted: [], queries: [], model: d.modelVersion || model };
@@ -217,6 +221,8 @@ async function claude(prompt, opts) {
 
 /* ---- Google AI Overviews and AI Mode: live Google results through DataForSEO ---- */
 // Google Ads location codes for the markets offered in setup
+// The same countries in words, for the report's own sentences and for the engine that is told in words (Gemini).
+const COUNTRY_NAME = { US: 'the United States', GB: 'the United Kingdom', IE: 'Ireland', CA: 'Canada', AU: 'Australia', DE: 'Germany', FR: 'France', NL: 'the Netherlands', ES: 'Spain', IT: 'Italy', TR: 'Turkey', AE: 'the United Arab Emirates', SA: 'Saudi Arabia', PL: 'Poland', SE: 'Sweden', IN: 'India', BR: 'Brazil', MX: 'Mexico' };
 const LOCATION = { US: 2840, GB: 2826, IE: 2372, CA: 2124, AU: 2036, DE: 2276, FR: 2250, NL: 2528, ES: 2724, IT: 2380, TR: 2792, AE: 2784, SA: 2682, PL: 2616, SE: 2752, IN: 2356, BR: 2076, MX: 2484 };
 function dfsAuth() { return 'Basic ' + Buffer.from(env('DATAFORSEO_LOGIN') + ':' + env('DATAFORSEO_PASSWORD')).toString('base64'); }
 async function dataforseo(path, task, opts) {
@@ -266,4 +272,4 @@ async function ask(engine, prompt, opts) {
   return out;
 }
 
-module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, OPT_IN, LOCATION, enabled, freeEngines, forLimits, lockedFor, ask, hostOf, EngineError };
+module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, OPT_IN, LOCATION, COUNTRY_NAME, enabled, freeEngines, forLimits, lockedFor, ask, hostOf, EngineError };
