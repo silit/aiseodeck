@@ -383,10 +383,9 @@ function topicsFrom(list, looked) {
   return (list || []).slice(0, topicCount()).map((t, i) => ({ id: 't' + i, keyword: kwLib.clean(t.keyword) || keywordFrom(t.question), question: clean(t.question, 170), volume: typeof t.volume === 'number' ? t.volume : null, looked: looked || '', edited: false }));
 }
 
-// Free checks one visitor can start in a day (VR_FREE_PER_IP sets another number). The usual number is 4.
-// It is 30 from 23 November 2026, while we run the checks for our own outreach from one address: put it
-// back to 4 when that is done. The site says "up to 4 a day" (checksPerDay in its src/data/report.js).
-const FREE_PER_IP = 30;
+// Free checks one visitor can start in a day (VR_FREE_PER_IP sets another number). The site says the
+// same number: "up to 4 a day" (checksPerDay in its src/data/report.js).
+const FREE_PER_IP = 4;
 
 // Free checks are capped per visitor and per day; a website checked in the last week shows that check again.
 async function start(input, ctx) {
@@ -977,7 +976,7 @@ async function stepReading(check, rows, deadline) {
     try { host = new URL(p.url).host; } catch (e) { p.status = 'unreachable'; return; }
     const r = await fetcher.getText(p.url, { allowedHosts: [host, 'www.' + host.replace(/^www\./, '')], timeoutMs: ms, maxBytes: 900000 });
     if (!r.ok || !r.text) { p.status = [401, 403, 429, 451, 503].includes(r.status) ? 'refused' : 'unreachable'; return; }
-    const body = String(r.text).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' ');
+    const body = auditLib.visibleHtml(r.text);
     const { out: textNorm } = analyze.normMap(auditLib.stripTags(body).slice(0, 400000));
     if (textNorm.length < 200) { p.status = 'empty'; return; }
     p.status = 'read';
