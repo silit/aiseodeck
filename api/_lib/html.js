@@ -821,8 +821,10 @@ function progressHtml(site, progress) {
   const w = total ? Math.round((done / total) * 100) : 4;
   return `<div class="notice" id="progress" aria-live="polite"><b>Checking now.</b> <span id="pdone">${done}</span> of <span id="ptotal">${total}</span> AI answers read. Keep this page open to speed it up, or come back later.<div class="progress"><i id="pbar" style="width:${w}%"></i></div></div>`;
 }
+// A value written into a page script: JSON, with "<" escaped so it can never close the script element.
+const jsValue = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 const PUMP = (siteId) => `
-(function(){var id=${JSON.stringify(siteId)};var stop=false;var shown=0;
+(function(){var id=${jsValue(siteId)};var stop=false;var shown=0;
 function show(j){var d=document.getElementById('pdone');if(j&&j.total&&d&&j.done>=shown){shown=j.done;d.textContent=j.done;document.getElementById('ptotal').textContent=j.total;document.getElementById('pbar').style.width=Math.round(j.done/j.total*100)+'%';}}
 function peek(){if(stop)return;fetch('/app/run/progress?id='+encodeURIComponent(id),{headers:{Accept:'application/json'}}).then(function(r){return r.json()}).then(show).catch(function(){}).then(function(){if(!stop)setTimeout(peek,5000);});}
 function step(){if(stop)return;fetch('/app/run/pump',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'id='+encodeURIComponent(id)}).then(function(r){return r.json()}).then(function(j){
@@ -1362,7 +1364,7 @@ function startPage(user, d) {
 // Shown for a few seconds after checkout while Polar finishes; reloads itself.
 function waitPage(user, title, text, url) {
   return layout(title + ' · AI SEO Deck', `<div class="panel wait" role="status"><span class="spin" aria-hidden="true"></span><h1>${esc(title)}</h1><p class="muted">${esc(text)}</p><a class="btn sm" href="${esc(url)}">Check now</a></div>`,
-    { user, nav: 'settings', script: `setTimeout(function(){location.replace(${JSON.stringify(url)})},2500);` });
+    { user, nav: 'settings', script: `setTimeout(function(){location.replace(${jsValue(url)})},2500);` });
 }
 
 function settingsPage(user, sites, limits, notice, opts) {
