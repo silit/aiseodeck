@@ -49,12 +49,24 @@ The Install URL is the address above and never a `webflow.com/oauth/authorize...
 | App preview description (short) | See if ChatGPT, Gemini, Claude, Grok and Google AI name your brand, keyword by keyword. |
 | App detail description | The text under "Long description" below, between the two rules. |
 | App promo video URL | Leave empty (optional). |
-| App screenshots | `[to fill: five pictures of this build at 1280 x 846, each with its alt text]` |
+| App screenshots | The five pictures under "Screenshots" below, in that order, each with its alt text. |
 | Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. `[to fill: SHA-256 of both files]` |
 | Website URL | https://aiseodeck.silitlabs.com |
 | Additional notes | The text of `REVIEW.md`, from "The app" to the end, with its `[to fill]` fields filled. |
 | App access credentials | No credentials are needed. Reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For another email, write to info@silitlabs.com and we turn it on the same day. |
 | Published testing site | https://aiseodeck-demo.webflow.io `[to confirm after the end-to-end run: this build is installed on it]` |
+
+### Screenshots (1280 x 846, in `assets/marketplace/screenshots/`)
+
+They are made from this build by `node scripts/marketplace-shots.js`, with a made-up business (Tallyhawk). Make them again if a screen changes before the submission.
+
+1. `1-ai-visibility.png`. Alt text: AI SEO Deck overview of a site: 32 percent of AI answers name the brand, how many keywords each of six AI engines names it for, and the keywords to fix next
+2. `2-every-engine.png`. Alt text: Keyword table with one column per AI engine: a yellow mark when the engine names the brand and a blue ring when it also links to the site, with monthly searches, visibility and a four-week trend
+3. `3-what-ai-said.png`. Alt text: One keyword in detail: four of six AI engines name the brand, with the answers ChatGPT gave, the rivals it named, the searches it ran and the sites it cited
+4. `4-fix-in-webflow.png`. Alt text: The fix for one page: the title and description Webflow has now next to the ones suggested by AI, and the Apply to Webflow button that saves them as unpublished edits
+5. `5-designer-panel.png`. Alt text: The AI SEO Deck panel in the Webflow Designer: the keyword of the open page on each AI engine, a title and description suggested from the page, and the message after Apply to this page
+
+A sixth picture is ready in case one is swapped: `extra-site-health.png`. Alt text: Site health: every page with its score and what to fix, read from Webflow through its API, with a Refresh from Webflow button
 
 ### Features overview (five lines)
 
@@ -142,12 +154,12 @@ Disconnecting a site in AI SEO Deck deletes what it keeps about that site and ch
 
 **Documentation and support**
 
-The AI SEO Deck guide covers setup, every screen, the panel in the Designer, what is written to Webflow and when, prices, and how to disconnect or uninstall. It is under Guide on aiseodeck.silitlabs.com, at aiseodeck.silitlabs.com/docs. Support: info@silitlabs.com, answered within one business day.
+The AI SEO Deck guide covers setup, every screen, the panel in the Designer, what is written to Webflow and when, prices, and how to disconnect or uninstall. It is under Guide on aiseodeck.silitlabs.com, at aiseodeck.silitlabs.com/docs. Support: info@silitlabs.com, answered within one business day. The business shown in the screenshots is made up.
 
 ---
 
 ## Before this text is entered
 
 - Checked at Polar on 23 November 2026: a monthly and a yearly product exist for Solo, Studio and Agency at these prices; "Trial conversion reminder" is on under Customer Notifications (Polar sends it 3 days before a 7-day trial ends); "Prevent trial abuse" is on under Subscriptions, and it counts a trial of any Silit Labs product, which is why the texts say one trial per customer across our products. Look again on the day of the submission.
-- The screenshots (3 to 5, 1280x846, with alt text) and the demo video have to show this build: Site health reading from Webflow, a fix with "Now in Webflow" next to the suggestion, the panel in the Designer, the Sites page with "Sites you authorized in Webflow".
+- The demo video has to show this build: the install approved and denied, Site health reading from Webflow, a fix with "Now in Webflow" next to the suggestion, the panel in the Designer, Disconnect and connecting again.
 - The logo: a logomark at 900x900, no text.
