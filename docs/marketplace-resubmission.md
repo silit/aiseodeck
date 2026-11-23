@@ -23,11 +23,11 @@ Before resubmitting (the notification email of the same evening):
 - The form asks for: a published `.webflow.io` testing site with the app installed and every feature available; one review ZIP (source maps, package.json and lockfile of the exact build, or, for an app that ships its source unchanged, the source files plus a short README); the Preflight receipt.
 - "Do not resubmit until all findings are addressed and the complete app is tested end to end."
 
-Did our work outside the app cause any of this? No. `public/docs.html`, `public/privacy.html` and `public/terms.html` are unchanged since the submission of 16 November (`git diff d543220 origin/main -- public`), and all five findings are about the app as submitted. The report (AI Visibility Report) is still moved out of this repository and project before resubmitting: reviewers do read the submitted website, and another developer's review that reached us by mistake faulted a website that "directs visitors to enter a URL".
+Did our work outside the app cause any of this? No. `public/docs.html`, `public/privacy.html` and `public/terms.html` are unchanged since the submission of 16 November (`git diff d543220 origin/main -- public`), and all five findings are about the app as submitted. The report (AI Visibility Report) is still moved out of this repository and project before resubmitting: reviewers do read the submitted website, and a tool there that asks visitors to type a website address and reads published sites is the opposite of what findings 1 and 3 ask of this app.
 
-## 2. What else reviewers check (learned from a review of another app that reached us by mistake)
+## 2. What else reviewers check
 
-Kept general on purpose. None of the other developer's details belong in this repository.
+A general checklist of what a review looks at beyond the findings above, in our own words.
 
 1. Reviewer access through the submitted install URL: after authorizing, no checkout and no card. The review account has the highest plan and never expires.
 2. The Webflow entry point uses the authorized site. The website does not send visitors to a "type your URL" flow. For each feature: which Webflow endpoint supplies its input, and what is not available for Webflow sites.
@@ -160,8 +160,8 @@ Goes (until Webflow offers a stable way)
 3. DECIDED: an image whose alt text is inherited from its asset counts as having one (`assets:read` is not requested). Only an image with an empty alt on the page is a finding; one marked decorative is not.
 4. DECIDED: the Open Graph finding is about the title and description only.
 5a. TO CHECK in the end-to-end run, on the real API: that `POST /beta/token/resolve` answers with `siteId` (the panel is confirmed only when it does and it is the same site); what `GET /v2/pages/:id/dom` returns for an image with no alt text and for a page it cannot serve; the real `publishedPath` of a Collection template; that Webflow sends `error=access_denied` to the callback when the user cancels; the panel's real origin.
-   - Also to check there: the "Designer Extension URI" shown in the app's settings is `https://<client id>.webflow-ext.com` (the deployed version answered every origin, so the exact address was never tested against the real Designer); the two cron jobs appear in Vercel after the deploy (`/cron/tick`, `/cron/tokens`); how production calls `/cron/tick` today. The cron routes also take the secret as `?key=`, which puts a secret into request logs: once the Vercel logs show that only the `Authorization` header is used, remove that option from `cronAuthorized`.
-5. TO CHECK at Polar before the listing is entered: a monthly and a yearly product for Solo, Studio and Agency at the prices in `docs/listing.md` (USD 19 and 190, 49 and 490, 149 and 1,490); "Prevent trial abuse" on; the customer notification that reminds before a trial ends on (the guide and the app say Polar sends it).
+   - Also to check there: the "Designer Extension URI" shown in the app's settings is `https://<client id>.webflow-ext.com` (the deployed version answered every origin, so the exact address was never tested against the real Designer); the two cron jobs appear in Vercel after the deploy (`/cron/tick`, `/cron/tokens`; Vercel calls its cron jobs "legacy" and offers Schedules, a public beta, instead: we stay on cron jobs, which work, until Schedules are out of beta).
+5. CHECKED at Polar on 23 November: a monthly and a yearly product for Solo, Studio and Agency at the prices in `docs/listing.md` (USD 19 and 190, 49 and 490, 149 and 1,490); "Prevent trial abuse" is on, and it counts a trial of any product of the organization, so the texts now say one trial per customer across the products of Silit Labs; "Trial conversion reminder" is on. Vercel was checked the same evening: the project is on Pro, production is called by Vercel Cron with the `Authorization` header only (so the `?key=` option of the cron routes was removed), and the preview of this branch answers as the tests say (`/cron/*` 401, `/ext/*` 403 to a foreign origin, `/_vr/*` 404).
 
 ## 7. Order of work
 
@@ -187,7 +187,7 @@ Done
   - Client report links exist on every plan; the agency name on them is Studio and Agency. The guide said otherwise and was corrected, not the app.
   - The panel binds events with `addEventListener` under plain names (`click`, `submit`): no handler attribute name appears in the bundle. Every link is made by one function that lets it point only to the app's own address.
 - 23 Nov, evening: `scripts/package-extension.js` checks `bundle.zip` (exactly the four files, the same bytes as the source, no source map, the manifest of the repository) and writes `extension/review.zip` from the files inside the bundle plus the README. A trial with Webflow CLI 2.16.0 gave a four-file bundle identical to the source; the CLI did not touch `webflow.json`.
-- `npm test`: `test/app.js` 359, `test/panel.js` 46.
+- `npm test`: `test/app.js` 361, `test/panel.js` 46.
 
 Still to do, in this order: step 7 (the report leaves), the deploy, then the end-to-end run of section 7, the final bundle and review ZIP, Preflight, the video and screenshots.
 

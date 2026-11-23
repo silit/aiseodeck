@@ -75,7 +75,7 @@ All prices are in US dollars (USD). Taxes may be added at checkout.
 - **Studio, USD 49 a month or USD 490 a year:** 30 keywords across 5 sites. Everything in Solo, 30 keyword checks on demand a month, your agency name on client report links. Site health for 150 pages.
 - **Agency, USD 149 a month or USD 1,490 a year:** 100 keywords across 20 sites. Everything in Studio, 100 keyword checks on demand a month. Site health for 250 pages.
 
-Every paid plan starts with a 7-day free trial, once per customer. Polar, our payment provider, takes a card at the start and charges nothing during the trial. Cancel within the 7 days and you pay nothing. Otherwise the price of the plan is charged on day 8, and then every month or every year until you cancel. The free plan needs no card and has no time limit. There are no other fees, and no other account or subscription is needed.
+Every paid plan starts with a 7-day free trial, once per customer across the products of Silit Labs. Polar, our payment provider, takes a card at the start and charges nothing during the trial. Cancel within the 7 days and you pay nothing. Otherwise the price of the plan is charged on day 8, and then every month or every year until you cancel. The free plan needs no card and has no time limit. There are no other fees, and no other account or subscription is needed.
 
 When a paid plan or a trial ends, your account moves to the free plan. Nothing is deleted in AI SEO Deck or in Webflow; Apply is off, and the keywords and sites over the free plan's limits are kept but not checked.
 
@@ -89,7 +89,6 @@ The AI SEO Deck guide covers setup, every screen, the panel in the Designer, wha
 
 ## Before this text is entered
 
-- Check at Polar that Solo, Studio and Agency each have a monthly and a yearly product at these prices. A plan that cannot be bought must not be in the listing.
-- Check at Polar, under the organization's settings for customer notifications, that the reminder before a trial ends is on. The guide and the app say that Polar sends it (Polar's documentation: a reminder 3 days before the end for trials of 3 days or more; the organization can turn it off).
+- Checked at Polar on 23 November 2026: a monthly and a yearly product exist for Solo, Studio and Agency at these prices; "Trial conversion reminder" is on under Customer Notifications (Polar sends it 3 days before a 7-day trial ends); "Prevent trial abuse" is on under Subscriptions, and it counts a trial of any Silit Labs product, which is why the texts say one trial per customer across our products. Look again on the day of the submission.
 - The screenshots (3 to 5, 1280x846, with alt text) and the demo video have to show this build: Site health reading from Webflow, a fix with "Now in Webflow" next to the suggestion, the panel in the Designer, the Sites page with "Sites you authorized in Webflow".
 - The logo: a logomark at 900x900, no text.

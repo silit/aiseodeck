@@ -118,7 +118,7 @@ The app reads, checks and writes the primary locale only, and says so next to ev
 
 ## Prices and access for review
 
-All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3 engines, no Apply. Solo: USD 19 a month or USD 190 a year. Studio: USD 49 a month or USD 490 a year. Agency: USD 149 a month or USD 1,490 a year. Paid plans start with a 7-day free trial, once per customer: Polar takes a card, charges nothing during the trial and charges the plan's price on day 8 unless the user cancels. No other fees.
+All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3 engines, no Apply. Solo: USD 19 a month or USD 190 a year. Studio: USD 49 a month or USD 490 a year. Agency: USD 149 a month or USD 1,490 a year. Paid plans start with a 7-day free trial, once per customer across the products of Silit Labs: Polar takes a card, charges nothing during the trial, emails a reminder before it ends, and charges the plan's price on day 8 unless the user cancels. No other fees.
 
 **Reviewers:** an account with an `@webflow.com` email gets the Agency plan with no checkout and no card, for as long as the account exists. After authorizing from the Install URL you land on the setup of the site.
 

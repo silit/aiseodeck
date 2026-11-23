@@ -1504,9 +1504,10 @@ async function handleReport(req, res, token) {
 function cronAuthorized(req) {
   const env = ENV();
   if (!env.cronSecret) return false;
-  // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>"; cron-job.org and manual calls use x-cron-secret
+  // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>"; a manual call may use the x-cron-secret header.
+  // The secret is never taken from the address, so it cannot end up in a request log.
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const given = req.headers['x-cron-secret'] || bearer || queryOf(req).key || '';
+  const given = String(req.headers['x-cron-secret'] || bearer || '');
   return !!given && timingEqual(given, env.cronSecret);
 }
 
