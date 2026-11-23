@@ -308,7 +308,7 @@ function answerFor(letter, engine, keyword, question) {
   /* ---- the panel in the Designer: three moments, side by side ---- */
   if (process.env.PANEL !== '0') {
     const panelDir = path.join(__dirname, '..', 'extension', 'public');
-    const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+    const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2' };
     const pctx = await browser.newContext({ viewport: { width: 320, height: 600 }, deviceScaleFactor: 2, colorScheme: 'dark' });
     await routeAll(pctx);
     await pctx.route(PANEL + '/**', (route) => {

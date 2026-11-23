@@ -11,6 +11,7 @@ const health = require('./health');
 const wf = require('./webflow');
 const email = require('./email');
 const { limitsFor, DAY } = require('./plans');
+const billing = require('./billing');
 
 const insights = require('./insights');
 const STALE_MS = 3 * 60000; // a run with no tasks left and no progress for this long is finished as it is
@@ -65,6 +66,9 @@ async function startRun(site, user, reason, opts) {
 
 /* ---------- when Webflow no longer accepts a token ---------- */
 const removedNotice = (removed) => 'AI SEO Deck no longer has access to Webflow for ' + (removed.label || 'one authorization') + ': the app was uninstalled or its access was removed in Webflow. Its ' + (removed._sites && removed._sites.length === 1 ? 'site was' : 'sites were') + ' deleted from AI SEO Deck with everything kept about them. Install the app again to start over.';
+// added when that was the account's last authorization and it has no paid plan
+const KEPT_NOTICE = ' Your account has no Webflow authorization now: it is kept for ' + store.ACCOUNT_KEEP_DAYS + ' days in case you install again, and is deleted after that.';
+const paidOrComplimentary = (user) => limitsFor(user).plan !== 'free' || billing.hasLiveSubscription(user);
 
 // Webflow answered 401 to a call made with this connection's token. One question settles what that means:
 // GET /v2/token/authorized_by with the same token (`known` skips it when that answer is already at hand).
@@ -78,8 +82,22 @@ async function accessRemoved(user, connId, known) {
   const st = known || (token ? await wf.tokenStatus(token) : 'revoked');
   if (st !== 'revoked') return null;
   const removed = await store.removeConnection(user, connId);
-  if (removed) { user.notice = removedNotice(removed); await store.saveUser(user); }
+  if (removed) { user.notice = removedNotice(removed) + (user.noAccessAt && !paidOrComplimentary(user) ? KEPT_NOTICE : ''); await store.saveUser(user); }
   return removed;
+}
+
+// What is left of an account after the app was uninstalled everywhere: the Webflow user id, name and email, and the
+// settings. With no paid plan and no complimentary access, that account is deleted ACCOUNT_KEEP_DAYS days after its
+// last authorization ended. An account that authorizes again in that time starts counting from nothing
+// (store.addConnection). Answers true when the account was deleted.
+async function leftBehind(id, now) {
+  const user = await store.getUser(id); // the record as it is at this moment
+  if (!user || (user.connections || []).length || (user.siteIds || []).length || paidOrComplimentary(user)) return false;
+  // an account that was already without an authorization when this rule arrived starts its days now
+  if (!user.noAccessAt) { user.noAccessAt = now; await store.saveUser(user); return false; }
+  if (now - user.noAccessAt < store.ACCOUNT_KEEP_MS) return false;
+  await store.deleteUser(user);
+  return true;
 }
 
 // There is no uninstall webhook, and the checks of this app ask the AI engines, not Webflow. So every stored token
@@ -116,6 +134,7 @@ async function checkConnections(now, budgetMs) {
       if (user && (await accessRemoved(user, c.id, 'revoked'))) out.removed++;
     }
     if (!whole) { cut = true; break; }
+    if (seen && !(seen.connections || []).length && (await leftBehind(id, now || Date.now()))) out.deleted = (out.deleted || 0) + 1;
     last = id;
   }
   if (cut) {
@@ -394,4 +413,4 @@ async function tick(opts) {
   return out;
 }
 
-module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, accessRemoved, checkConnections, removedNotice, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };
+module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, accessRemoved, checkConnections, leftBehind, removedNotice, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };

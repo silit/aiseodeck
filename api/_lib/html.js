@@ -1,6 +1,6 @@
 'use strict';
 // Server-rendered pages, in the same look as the home page: Montserrat and Martian Mono, dark by default with a
-// light theme. Colours carry meaning everywhere: marker yellow = the brand was named, blue = the brand's site was
+// light theme. Colors carry meaning everywhere: marker yellow = the brand was named, blue = the brand's site was
 // cited, rose = a rival took the place.
 const { PLANS, FREE, QUESTIONS } = require('./plans');
 const { LABEL, LONG, ORDER, enabled: enginesOn, freeEngines } = require('./engines');
@@ -527,12 +527,13 @@ ${foot}
 </main>${script}</body></html>`;
 }
 const noticeHtml = (n, cls) => (n ? `<div class="notice${cls ? ' ' + cls : ''}" role="status">${n}</div>` : '');
-// Webflow Localization: fixes are written to the primary language only, and the user is told so where they apply them.
+// Webflow Localization: the web app writes fixes to the primary language only, and the user is told so where they apply
+// them. (The Designer panel has its own note: it sets the values on the page as the Designer shows it.)
 function localeNote(site) {
   const l = site && site.locale;
   if (!l || !Array.isArray(l.others) || !l.others.length) return '';
   const more = l.others.length === 1 ? 'one more language' : l.others.length + ' more languages';
-  return `<p class="small muted" data-locale-note>This site has ${more} (${esc(l.others.join(', '))}). Fixes are written to the primary language${l.name ? ', ' + esc(l.name) + ',' : ''} only. The other languages keep their own text in Webflow.</p>`;
+  return `<p class="small muted" data-locale-note>This site has ${more} (${esc(l.others.join(', '))}). Fixes are written to the primary language${l.name ? ', ' + esc(l.name) + ',' : ''} only. Nothing is written to the other languages: what you localized there stays, and what they inherit from the primary language follows it, as always in Webflow.</p>`;
 }
 
 function errorPage(title, message, back, label) {
@@ -742,7 +743,7 @@ function dashboard(user, sites, limits, notice, opts) {
 <div class="go">${ready ? `<a class="btn" href="${esc(siteHref(s))}">Open</a>` : `<a class="btn mark" href="/app/setup?id=${encodeURIComponent(s.id)}">Set up</a>`}</div></div>`;
   }).join('') : (user.connections || []).length
     ? `<div class="panel empty"><h2>No site is connected</h2><p>AI SEO Deck is installed in Webflow, and no site is connected here. Connect one of the sites you authorized, or authorize another site or Workspace in Webflow.</p><div class="actions" style="justify-content:center"><a class="btn mark" href="/app?available=1">Show the sites I authorized</a><a class="btn" href="/auth">Authorize in Webflow</a></div></div>`
-    : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
+    : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p>${opts.keptUntil ? `<p class="small muted" data-kept-until>This account has no Webflow authorization left. It is kept until ${esc(longDay(opts.keptUntil))} and deleted after that, unless you connect Webflow again.</p>` : ''}<a class="btn mark" href="/auth">Connect Webflow</a></div>`;
   const av = opts.available;
   const availableBlock = !av ? '' : `<section class="panel stack" id="available" style="margin-bottom:18px"><div><h2>Sites you authorized in Webflow</h2><p class="small muted" style="margin-top:6px" data-read-from-webflow>Read from Webflow ${esc(ago(av.at, now))}. Connecting one of these needs no new authorization.${av.failed ? ' Webflow could not be read for one authorization just now; try again in a minute.' : ''}</p></div>
 ${av.sites.length ? `<ul class="plain">${av.sites.map((x) => `<li><span><b>${esc(x.name)}</b>${x.host ? `<span class="tiny muted">, ${esc(x.host)}</span>` : ''}</span><form method="post" action="/app/sites/connect"><input type="hidden" name="site" value="${esc(x.id)}"><button class="btn sm mark" type="submit">Connect</button></form></li>`).join('')}</ul>` : '<p class="small muted">Every site you authorized is connected already.</p>'}
@@ -1419,7 +1420,8 @@ ${trialNote(user)}
 ${b.subscriptionId && !trialLeft(user) ? `<p class="small">Subscription: <b>${esc(STATUS_WORDS[b.status] || b.status || '')}</b>${b.renewsAt ? ', renews ' + esc(longDay(b.renewsAt)) : ''}${b.endsAt && !b.renewsAt ? ', ends ' + esc(longDay(b.endsAt)) : ''}. <a href="/app/billing/portal">Manage billing</a></p>` : ''}
 ${opts.billing || limits.plan !== 'free' ? '' : '<p class="small muted">Paid plans open soon. Write to info@silitlabs.com if you need more now.</p>'}
 ${t && opts.billing && limits.plan === 'free' ? `<p class="small">Every paid plan starts with ${t} days free. Polar asks for a card and charges nothing until day ${t + 1}.</p>` : ''}
-<div class="plans">${planCards}</div><p class="tiny muted">Payments are handled by ${esc(opts.providerName || 'Polar')}. All prices are in US dollars (USD). Taxes may be added at checkout. Yearly: Solo US$190, Studio US$490, Agency US$1,490.</p></section>
+<div class="plans">${planCards}</div><p class="tiny muted">Payments are handled by ${esc(opts.providerName || 'Polar')}. All prices are in US dollars (USD). Taxes may be added at checkout. Yearly: Solo US$190, Studio US$490, Agency US$1,490.</p>
+${opts.accessCode && !limits.complimentary ? `<form method="post" action="/app/settings/code" class="field" id="code"><label for="accesscode">Access code</label><div class="actions"><input type="text" id="accesscode" name="code" maxlength="200" autocomplete="off" required style="max-width:320px"><button class="btn sm" type="submit">Use code</button></div><span class="hint">If Silit Labs gave you an access code, enter it here. It opens the Agency plan on this account with no card.</span></form>` : ''}</section>
 <form class="panel stack" method="post" action="/app/settings"><h2>Emails and reports</h2>
 <div class="field"><label for="reportEmail">Send reports to</label><input type="email" id="reportEmail" name="reportEmail" maxlength="254" value="${esc((user.settings && user.settings.reportEmail) || user.email || '')}"></div>
 <label class="check"><input type="checkbox" name="digest" value="1"${user.settings && user.settings.digest ? ' checked' : ''}> Email me after every scheduled check</label>

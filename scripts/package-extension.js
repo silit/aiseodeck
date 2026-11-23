@@ -4,11 +4,12 @@
 //   cd extension && npx @webflow/webflow-cli extension bundle     (writes extension/bundle.zip)
 //   node scripts/package-extension.js                             (checks it, writes extension/review.zip)
 //
-// The extension ships its source unchanged, so the review ZIP holds the four files exactly as they are inside
+// The extension ships its source unchanged, so the review ZIP holds its files exactly as they are inside
 // bundle.zip, plus extension/README.md. This script refuses to write it unless
-//   - bundle.zip holds exactly webflow.json, index.html, app.css and app.js at its root, and nothing else,
+//   - bundle.zip holds exactly webflow.json, index.html, app.css and app.js at its root and the two font files
+//     and their license in fonts/, and nothing else,
 //   - each of them is the same bytes as the file in extension/ (so what was tested is what ships),
-//   - none of them carries a source map, and the manifest is the one in the repository.
+//   - none of them carries a source map, the manifest is the one in the repository, and the bundle is under 5 MB.
 // It reads and writes ZIP files itself (stored entries and deflate), with no dependency and no other program.
 
 const fs = require('fs');
@@ -21,7 +22,11 @@ const SOURCES = {
   'webflow.json': path.join(EXT, 'webflow.json'),
   'index.html': path.join(EXT, 'public', 'index.html'),
   'app.css': path.join(EXT, 'public', 'app.css'),
-  'app.js': path.join(EXT, 'public', 'app.js')
+  'app.js': path.join(EXT, 'public', 'app.js'),
+  // Inter, the typeface of Webflow's interface, for Latin text: two font files and their license
+  'fonts/inter-latin-wght-normal.woff2': path.join(EXT, 'public', 'fonts', 'inter-latin-wght-normal.woff2'),
+  'fonts/inter-latin-ext-wght-normal.woff2': path.join(EXT, 'public', 'fonts', 'inter-latin-ext-wght-normal.woff2'),
+  'fonts/OFL.txt': path.join(EXT, 'public', 'fonts', 'OFL.txt')
 };
 const MANIFEST = { name: 'AI SEO Deck', apiVersion: '2', size: 'comfortable', publicDir: 'public' };
 
@@ -106,8 +111,11 @@ function writeZip(entries) {
 /* ---------- the checks ---------- */
 // Returns { problems, files, sums }: what is wrong with the bundle (nothing, when it may be submitted), the four
 // files as they are inside it, and their SHA-256.
+// Webflow takes a Designer Extension bundle of at most 5 MB: a larger one fails at upload, before any review.
+const MAX_BUNDLE_BYTES = 5 * 1024 * 1024;
 function checkBundle(bundleBuf, sources) {
   const problems = [];
+  if (bundleBuf.length > MAX_BUNDLE_BYTES) problems.push('bundle.zip is ' + bundleBuf.length + ' bytes, more than the 5 MB Webflow takes');
   let entries = [];
   try { entries = readZip(bundleBuf).filter((e) => !e.dir); } catch (e) { return { problems: ['bundle.zip cannot be read: ' + e.message], files: [], sums: {} }; }
   const want = Object.keys(sources).sort();
@@ -156,9 +164,9 @@ function main() {
   fs.writeFileSync(reviewPath, review);
   console.log('bundle.zip   ' + bundle.length + ' bytes   SHA-256 ' + sha256(bundle));
   console.log('review.zip   ' + review.length + ' bytes   SHA-256 ' + sha256(review));
-  for (const n of Object.keys(sums).sort()) console.log('  ' + n.padEnd(13) + sources[n].length + ' bytes   SHA-256 ' + sums[n] + '   (the same in bundle.zip, review.zip and extension/)');
+  for (const n of Object.keys(sums).sort()) console.log('  ' + n.padEnd(40) + String(sources[n].length).padStart(6) + ' bytes   SHA-256 ' + sums[n] + '   (the same in bundle.zip, review.zip and extension/)');
   console.log('  README.md    ' + readme.length + ' bytes   SHA-256 ' + sha256(readme) + '   (review.zip only)');
 }
 
 if (require.main === module) main();
-module.exports = { readZip, writeZip, checkBundle, crc32, SOURCES, MANIFEST };
+module.exports = { readZip, writeZip, checkBundle, crc32, SOURCES, MANIFEST, MAX_BUNDLE_BYTES };

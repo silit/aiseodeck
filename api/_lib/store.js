@@ -105,8 +105,13 @@ function newUser(info) {
 function addConnection(user, token, label, siteIds) {
   const conn = { id: random(8), tokenEnc: seal({ t: token }), label: label || '', authorizedAt: Date.now(), siteIds: siteIds || [] };
   user.connections.push(conn);
+  delete user.noAccessAt;
   return conn;
 }
+// How long an account is kept after its last Webflow authorization ended (the app was uninstalled), when it has no
+// paid plan: long enough to read what happened and install again. After that the account is deleted (jobs.leftBehind).
+const ACCOUNT_KEEP_DAYS = 30;
+const ACCOUNT_KEEP_MS = ACCOUNT_KEEP_DAYS * 86400000;
 function tokenOf(conn) {
   if (!conn || !conn.tokenEnc) return null;
   const o = open(conn.tokenEnc);
@@ -246,6 +251,8 @@ async function removeConnection(user, connId) {
   const gone = sites.filter((s) => s.connectionId === connId);
   for (const site of gone) await deleteSite(site);
   user.siteIds = (user.siteIds || []).filter((id) => !gone.some((s) => s.id === id));
+  // no authorization left: the day from which the account itself is kept for ACCOUNT_KEEP_DAYS more days
+  if (!user.connections.length) user.noAccessAt = Date.now();
   conn._sites = gone.map((s) => s.name);
   return conn;
 }
@@ -391,7 +398,7 @@ async function unlock(name) { return kv.del('lock:' + name); }
 
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
-  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, tokenCheckAgainSoon, tokenCheckCursor, setTokenCheckCursor, TOKEN_CHECK_EVERY, newUser, addConnection, tokenOf, tokenForSite,
+  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, tokenCheckAgainSoon, tokenCheckCursor, setTokenCheckCursor, TOKEN_CHECK_EVERY, ACCOUNT_KEEP_DAYS, ACCOUNT_KEEP_MS, newUser, addConnection, tokenOf, tokenForSite,
   primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, disconnectSites, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock

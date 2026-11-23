@@ -16,6 +16,10 @@
     busy: '',
     msg: null
   };
+  // Every read of the open page takes the next number. An answer that belongs to an earlier read (the user has
+  // moved to another page since) is dropped, so the panel never shows one page under the name of another.
+  var turn = 0;
+  var live = document.getElementById('live');
   // The SVG namespace, read from the empty <svg> element of index.html.
   var SVG_NS = document.getElementById('svgns').namespaceURI;
 
@@ -63,7 +67,8 @@
     i: 'M6.5 9.5l3-3M5.5 7.5l-1 1a2.1 2.1 0 003 3l1-1M10.5 8.5l1-1a2.1 2.1 0 00-3-3l-1 1',
     o: 'M4.5 4.5l7 7M11.5 4.5l-7 7',
     x: 'M4 8h8',
-    f: 'M8 4.5v4.2M8 11.3h.01'
+    f: 'M8 4.5v4.2M8 11.3h.01',
+    w: 'M4.5 8h.01M8 8h.01M11.5 8h.01'
   };
   var WORD = {
     n: 'names you',
@@ -120,6 +125,11 @@
   function link(url, cls, text) {
     var href = typeof url === 'string' && url.indexOf(API + '/') === 0 ? url : API + '/app';
     return h('a', { class: cls, href: href, target: '_blank', rel: 'noopener noreferrer' }, text);
+  }
+  // What a screen reader is told: one line, in a region that is always in the page. Errors are told by the
+  // message box itself (role="alert").
+  function say(text) {
+    if (live && live.textContent !== text) live.textContent = text;
   }
   function notify(type, message) {
     try {
@@ -179,7 +189,9 @@
     return info;
   }
   // Every request carries a fresh ID token from the Designer. The token is short lived and is not kept.
-  async function call(route, body) {
+  // info: the page the request is about, taken when the request starts.
+  async function call(route, body, info) {
+    info = info || S.info;
     var token;
     try {
       token = await webflow.getIdToken();
@@ -189,7 +201,7 @@
       };
     }
     var payload = Object.assign(
-      { idToken: token, siteId: S.info.siteId, pageId: S.info.pageId, path: S.info.path },
+      { idToken: token, siteId: info.siteId, pageId: info.pageId, path: info.path },
       body || {}
     );
     var res;
@@ -212,23 +224,33 @@
     return j;
   }
   async function load() {
+    var mine = ++turn;
     S.view = 'page';
     S.msg = null;
     S.meta = null;
     S.ai = null;
+    S.busy = '';
     render(h('p', { class: 'loading', text: 'Reading this page…' }));
+    say('Reading this page');
+    var info;
     try {
-      S.info = await pageInfo();
+      info = await pageInfo();
     } catch (e) {
+      if (mine !== turn) return;
       S.ctx = { error: 'The Designer did not give the page details. Switch to a page and try again.' };
       return draw();
     }
-    if (!S.info.isPage) {
+    if (mine !== turn) return;
+    S.info = info;
+    if (!info.isPage) {
       S.ctx = { error: 'Open a page in the Designer to see its fixes.' };
       return draw();
     }
-    S.ctx = await call('context');
+    var ctx = await call('context', null, info);
+    if (mine !== turn) return;
+    S.ctx = ctx;
     draw();
+    say(ctx && ctx.ok ? 'Showing ' + (info.name || info.path) : '');
   }
 
   /* ---------- screens ---------- */
@@ -236,11 +258,11 @@
     app.textContent = '';
     add(app, node);
   }
-  function top(withBack, title) {
+  function topBar(withBack, title) {
     if (withBack)
       return h(
         'header',
-        { class: 'top' },
+        { class: 'bar' },
         h(
           'button',
           {
@@ -261,7 +283,7 @@
     var c = S.ctx && S.ctx.site;
     return h(
       'header',
-      { class: 'top' },
+      { class: 'bar' },
       logo(),
       h('b', { text: 'AI SEO Deck' }),
       c && c.score != null
@@ -274,20 +296,36 @@
     );
   }
   function msgBox() {
-    return S.msg
-      ? h('div', {
-          class: 'msg ' + S.msg.kind,
-          role: S.msg.kind === 'err' ? 'alert' : 'status',
-          text: S.msg.text
-        })
-      : null;
+    if (!S.msg) return null;
+    if (S.msg.kind !== 'err') say(S.msg.text);
+    return h('div', {
+      class: 'msg ' + S.msg.kind,
+      role: S.msg.kind === 'err' ? 'alert' : null,
+      text: S.msg.text
+    });
+  }
+  // On a site with more than one language the panel cannot see which one the Designer is showing, so it says
+  // what Apply does and where the suggestion comes from.
+  function languagesNote() {
+    var l = S.ctx && S.ctx.site && S.ctx.site.languages;
+    if (!l || !l.others || !l.others.length) return null;
+    return h('div', {
+      class: 'msg info',
+      'data-languages': '',
+      text:
+        'This site has other languages (' +
+        andList(l.others) +
+        '). Suggestions are written from the ' +
+        (l.primary ? l.primary + ' page' : 'page in the primary language') +
+        '. Apply sets the values on the page as the Designer shows it now, so check which language is open before you apply.'
+    });
   }
 
   function draw() {
     var c = S.ctx || {};
     if (c.connect) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
@@ -301,7 +339,7 @@
             h(
               'div',
               { class: 'row' },
-              link(c.connectUrl, 'btn mark', 'Connect'),
+              link(c.connectUrl, 'btn primary', 'Connect'),
               h('button', { class: 'btn', type: 'button', click: load }, 'Try again')
             )
           )
@@ -310,7 +348,7 @@
     }
     if (c.error && !c.ok) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
@@ -321,7 +359,7 @@
     }
     if (!c.site.ready) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
@@ -332,7 +370,7 @@
             h('p', {
               text: 'Add your brand, rivals and keywords in AI SEO Deck. The first check runs right after.'
             }),
-            link(c.site.setupUrl, 'btn mark', 'Open the setup')
+            link(c.site.setupUrl, 'btn primary', 'Open the setup')
           )
         )
       ]);
@@ -517,7 +555,7 @@
             it.note ? h('span', { class: 'nt', text: it.note }) : null
           ),
           it.cta
-            ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', click: it.run }, it.cta)
+            ? h('button', { class: it.ok ? 'btn' : 'btn primary', type: 'button', click: it.run }, it.cta)
             : null
         );
       })
@@ -551,7 +589,7 @@
     );
     var report = c.keywords[0] ? c.keywords[0].url : c.site.url;
     render([
-      top(),
+      topBar(),
       body,
       h(
         'footer',
@@ -611,10 +649,13 @@
         type: 'button',
         disabled: !!busy || template,
         click: async function () {
+          var mine = turn;
           S.busy = 'write';
           S.msg = { kind: 'info', text: 'Writing from this page, this takes a few seconds…' };
           drawMeta();
           var r = await call('suggest', { what: 'meta', keywordId: c.keywords[0] ? c.keywords[0].id : '' });
+          // the user has moved to another page while the AI was writing: that page is on screen now
+          if (mine !== turn) return;
           S.busy = '';
           if (r.ok) {
             S.meta = { title: r.meta.title, description: r.meta.description };
@@ -628,7 +669,9 @@
                 ' It is a suggestion: nothing is changed until you press Apply.'
             };
           } else S.msg = { kind: 'err', text: r.error || 'No suggestion this time.' };
-          drawMeta();
+          // drawn in the view the user is in now: someone who went back to the page finds the suggestion in the
+          // editor when they open it again
+          draw();
         }
       },
       S.ai ? 'Write again' : 'Write with AI'
@@ -636,10 +679,14 @@
     var apply = h(
       'button',
       {
-        class: 'btn mark',
+        class: 'btn primary',
         type: 'button',
         disabled: !!busy || !c.plan.canApply || template,
         click: async function () {
+          // The page this editor was opened for. Everything below is done to that page, also when the user
+          // moves to another page in the Designer before it has finished.
+          var info = S.info,
+            mine = turn;
           var t = title.value.replace(/\s+/g, ' ').trim(),
             d = desc.value.replace(/\s+/g, ' ').trim();
           if (t.length < 5 || d.length < 20) {
@@ -651,23 +698,31 @@
           }
           S.busy = 'apply';
           drawMeta();
+          var titleSet = false;
           try {
-            await S.info.page.setTitle(t);
-            await S.info.page.setDescription(d);
+            await info.page.setTitle(t);
+            titleSet = true;
+            await info.page.setDescription(d);
           } catch (e) {
+            // what the Designer took is what the page has now
+            if (titleSet) info.title = t;
+            if (mine !== turn) return;
             S.busy = '';
             S.msg = {
               kind: 'err',
-              text: 'The Designer did not take the change. Switch to Design mode and try again.'
+              text: titleSet
+                ? 'The Designer took the title but not the description. Try again.'
+                : 'The Designer did not take the change. Switch to Design mode and try again.'
             };
-            return drawMeta();
+            return draw();
           }
           // tells the app that this keyword got a fix; the app reads the page's values from Webflow itself
-          await call('applied', { keywordId: c.keywords[0] ? c.keywords[0].id : '' });
-          S.busy = '';
+          await call('applied', { keywordId: c.keywords[0] ? c.keywords[0].id : '' }, info);
           notify('Success', 'Title and description set. Publish the site to make them live.');
+          // another page is open now: it is on screen already, and the notification above has said what was done
+          if (mine !== turn) return;
           await load();
-          if (S.ctx && S.ctx.ok && S.ctx.site.ready) {
+          if (turn === mine + 1 && S.ctx && S.ctx.ok && S.ctx.site.ready) {
             S.msg = {
               kind: 'ok',
               text: 'Title and description set on this page. Publish the site to make them live.'
@@ -687,6 +742,7 @@
         }
       },
       msgBox(),
+      languagesNote(),
       template
         ? h('div', {
             class: 'msg info',
@@ -730,28 +786,28 @@
           serpT,
           serpD
         )
-      ),
-      !c.plan.canApply
-        ? h(
-            'div',
-            { class: 'msg info' },
-            'Applying is part of the paid plans. Copy the text into Page settings, or ',
-            link(c.plan.upgradeUrl, '', 'see the plans'),
-            '.'
-          )
-        : null
+      )
     );
     render([
-      top(true, 'Title and description'),
+      topBar(true, 'Title and description'),
       body,
       h(
         'footer',
         { class: 'foot' },
         h('div', { class: 'row' }, apply, write),
-        h('span', {
-          class: 'note',
-          text: 'Apply sets the two values on this page in the Designer. Publish the site when you are ready.'
-        })
+        // why Apply is off stands right under it
+        c.plan.canApply
+          ? h('span', {
+              class: 'note',
+              text: 'Apply sets the two values on this page in the Designer. Publish the site when you are ready.'
+            })
+          : h(
+              'span',
+              { class: 'note' },
+              'Applying is part of the paid plans. Copy the text into the page settings in Webflow, or ',
+              link(c.plan.upgradeUrl, '', 'see the plans'),
+              '.'
+            )
       )
     ]);
     sync();

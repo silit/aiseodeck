@@ -163,8 +163,8 @@ const resend = http.createServer(async (req, res) => { const body = await readJS
 
 /* ---- mock Webflow ---- */
 // tokenRequests: code exchanges at /oauth/access_token. refused: calls answered 401. resolveStatus: makes the ID token
-// endpoint fail with that status. revokeCalls: calls to /oauth/revoke_authorization, which the app must never make.
-const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [], tokenRequests: [], refused: [], resolveStatus: 0, remaining: null, authStatus: 0, authDelayMs: 0, authCalls: 0 };
+// endpoint fail with that status. siteStatus: makes GET /v2/sites/:site_id fail with that status. revokeCalls: calls to /oauth/revoke_authorization, which the app must never make.
+const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [], tokenRequests: [], refused: [], resolveStatus: 0, siteStatus: 0, remaining: null, authStatus: 0, authDelayMs: 0, authCalls: 0 };
 let nodeSeq = 0;
 // a text node as GET /v2/pages/:page_id/dom returns it: the HTML of the element and its plain text
 const textNode = (html) => ({ id: 'n' + (++nodeSeq), type: 'text', text: { html, text: html.replace(/<[^>]+>/g, '') }, attributes: {} });
@@ -208,6 +208,7 @@ const webflow = http.createServer(async (req, res) => {
     return json(res, 200, { pageId: m[1], nodes: all.slice(offset, offset + limit), pagination: { limit, offset, total: all.length }, lastUpdated: f.pg.lastUpdated || null });
   }
   if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
+  if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET' && wfState.siteStatus) return json(res, wfState.siteStatus, { message: 'mock: the site is not served now' });
   if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
   if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') {

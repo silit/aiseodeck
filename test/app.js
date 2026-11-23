@@ -208,6 +208,21 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const { limitsFor } = require('../api/_lib/plans');
     assert(limitsFor({ plan: 'free', email: 'a@b.com' }).allEngines === false && limitsFor({ plan: 'free' }).keywords === 3 && limitsFor({ plan: 'solo' }).keywords === 10 && limitsFor({ plan: 'agency' }).keywords === 100 && limitsFor({ plan: 'solo' }).rechecks === 10 && limitsFor({ plan: 'studio' }).keywords === 30, 'plan limits in keywords and keyword checks');
     assert(limitsFor({ plan: 'free', email: 'reviewer@webflow.com' }).plan === 'agency', 'Webflow reviewers get Agency');
+    {
+      const pl = require('../api/_lib/plans');
+      const had = process.env.COMPLIMENTARY_CODE;
+      delete process.env.COMPLIMENTARY_CODE;
+      const none = pl.accessCode();
+      process.env.COMPLIMENTARY_CODE = 'fifteen-chars-x';
+      const short = pl.accessCode();
+      process.env.COMPLIMENTARY_CODE = '  sixteen-chars-xy  ';
+      const ok = pl.accessCode();
+      if (had === undefined) delete process.env.COMPLIMENTARY_CODE; else process.env.COMPLIMENTARY_CODE = had;
+      assert(none === '' && short === '' && ok === 'sixteen-chars-xy', 'an access code is in use only when one of at least 16 characters is set');
+      const viaCode = limitsFor({ plan: 'free', email: 'a@b.com', comp: { plan: 'agency', at: 1 } });
+      assert(viaCode.plan === 'agency' && viaCode.complimentary === true && viaCode.canApply === true && limitsFor({ plan: 'free', email: 'a@b.com', comp: { plan: 'solo' } }).plan === 'free' && limitsFor({ plan: 'free', email: 'a@b.com' }).complimentary === false,
+        'an account that entered the access code has complimentary Agency access; nothing else on an account gives it');
+    }
     const { parseFaq, parseRivals } = require('../api/index.js')._test;
     assert(parseFaq('Q: One?\nA: First answer\ncontinues\n\nQ: Two?\nA: Second').length === 2, 'FAQ text parses into pairs');
     assert(parseRivals('Bright Smile Clinic, https://www.brightsmile.com/\nX\nOther Co').length === 2, 'rivals parse; one-letter names are skipped');
@@ -257,6 +272,15 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert((panel.match(/h\(\s*'a'/g) || []).length === 1 && /var href = typeof url === 'string' && url\.indexOf\(API \+ '\/'\) === 0 \? url : API \+ '\/app';\s+return h\('a', \{ class: cls, href: href, target: '_blank', rel: 'noopener noreferrer' \}, text\);/.test(panel) && !/\.href\s*=|setAttribute\(\s*'href'/.test(panel),
       'every link of the Designer panel is made in one place, which lets it lead only to the app itself, in a new tab');
     assert(!/\son[a-z]+\s*=|javascript:|<script(?![^>]*\ssrc="app\.js")|style\s*=/i.test(panelPage) && /<script src="app\.js"><\/script>/.test(panelPage), 'the page of the panel has no inline scripts, handlers or styles');
+    // the words a scanner reads as reaching for the window around the panel, or as hidden or generated code
+    const hostWords = panel.match(/\b(top|parent|opener|frames|frameElement|self|globalThis)\b/g) || [];
+    assert(hostWords.length === 0 && (panel.match(/\bwindow\b/g) || []).length === 0, 'the Designer panel never names the window around it, not even as the name of a function or a class (found: ' + [...new Set(hostWords)].join(', ') + ')');
+    assert(!/\batob\b|\bbtoa\b|MutationObserver|\bdebugger\b|XMLHttpRequest|WebSocket|EventSource|sendBeacon|\bimport\s*\(|Worker\s*\(|serviceWorker|getUserMedia|getDisplayMedia|RTCPeerConnection|\.prototype\b|Object\.defineProperty|new Proxy/.test(panel),
+      'the Designer panel decodes nothing, watches nothing, opens no other connection, uses no camera, microphone or screen, and changes no built-in');
+    const panelCss = fs.readFileSync(pathLib.join(root, 'extension/public/app.css'), 'utf8');
+    const cssUrls = (panelCss.match(/url\s*\([^)]*\)/gi) || []).sort();
+    assert(!/@import|expression\s*\(|https?:|\/\//i.test(panelCss.replace(/\/\*[\s\S]*?\*\//g, '')) && cssUrls.join() === 'url(fonts/inter-latin-ext-wght-normal.woff2),url(fonts/inter-latin-wght-normal.woff2)' && (panelCss.match(/@font-face/g) || []).length === 2 && /<link rel="stylesheet" href="app\.css">/.test(panelPage) && (panelPage.match(/<link\b/g) || []).length === 1 && !/<iframe|<object|<embed|<form|<base\b|<meta[^>]+http-equiv/i.test(panelPage),
+      'the stylesheet and the page of the panel load nothing from elsewhere: the two font files of the panel itself, no image and no frame (the stylesheet names: ' + cssUrls.join(', ') + ')');
     const usesWebflow = [...new Set(panel.match(/\bwebflow\.[A-Za-z]+/g) || [])].sort();
     assert(usesWebflow.join() === 'webflow.getCurrentPage,webflow.getIdToken,webflow.getSiteInfo,webflow.notify,webflow.setExtensionSize,webflow.subscribe', 'the Designer API calls of the panel are the ones the review notes list (found: ' + usesWebflow.join(', ') + ')');
     // what the two documents a reviewer reads say about the panel is what the code does: the review notes and the
@@ -288,12 +312,12 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     let damaged = null;
     try { const bad = Buffer.from(pk.writeZip([{ name: 'a.txt', data: Buffer.from(hello.repeat(40)) }])); bad[40] ^= 0xff; pk.readZip(bad); } catch (e) { damaged = e; }
     assert(damaged, 'a ZIP whose content was changed is refused');
-    const src = { 'webflow.json': Buffer.from(JSON.stringify(pk.MANIFEST, null, 2) + '\n'), 'index.html': Buffer.from('<!doctype html>\n'), 'app.css': Buffer.from('body{}\n'), 'app.js': Buffer.from('var a = 1;\n') };
+    const src = { 'webflow.json': Buffer.from(JSON.stringify(pk.MANIFEST, null, 2) + '\n'), 'index.html': Buffer.from('<!doctype html>\n'), 'app.css': Buffer.from('body{}\n'), 'app.js': Buffer.from('var a = 1;\n'), 'fonts/a.woff2': Buffer.from([0x77, 0x4f, 0x46, 0x32, 0, 1, 2, 255, 254, 0]) };
     const zipOf = (o) => pk.writeZip(Object.entries(o).map(([name, data]) => ({ name, data })));
     const good = pk.checkBundle(zipOf(src), src);
     const again = pk.readZip(pk.writeZip(good.files.concat([{ name: 'README.md', data: Buffer.from('# read me\n') }])));
-    assert(good.problems.length === 0 && good.files.map((f) => f.name).join() === 'app.css,app.js,index.html,webflow.json' && good.sums['app.js'] === crypto.createHash('sha256').update(src['app.js']).digest('hex'), 'a bundle that holds the four files of the extension, byte for byte, passes');
-    assert(again.map((f) => f.name).join() === 'app.css,app.js,index.html,webflow.json,README.md' && again.every((f) => f.name === 'README.md' || f.data.equals(src[f.name])) && pk.writeZip(good.files).equals(pk.writeZip(good.files)), 'the review ZIP holds those same bytes and the README, and the same input gives the same file');
+    assert(good.problems.length === 0 && good.files.map((f) => f.name).join() === 'app.css,app.js,fonts/a.woff2,index.html,webflow.json' && good.sums['app.js'] === crypto.createHash('sha256').update(src['app.js']).digest('hex') && good.sums['fonts/a.woff2'] === crypto.createHash('sha256').update(src['fonts/a.woff2']).digest('hex'), 'a bundle that holds the files of the extension, byte for byte, passes: text files and a font file in a folder');
+    assert(again.map((f) => f.name).join() === 'app.css,app.js,fonts/a.woff2,index.html,webflow.json,README.md' && again.every((f) => f.name === 'README.md' || f.data.equals(src[f.name])) && pk.writeZip(good.files).equals(pk.writeZip(good.files)), 'the review ZIP holds those same bytes and the README, and the same input gives the same file');
     const problemsOf = (o) => pk.checkBundle(zipOf(o), src).problems.join(' | ');
     assert(/app\.js in bundle\.zip is not the same bytes/.test(problemsOf(Object.assign({}, src, { 'app.js': Buffer.from('var a = 2;\n') }))), 'a file that differs from the source by one character is refused');
     assert(/not part of the extension: app\.js\.map/.test(problemsOf(Object.assign({}, src, { 'app.js.map': Buffer.from('{}') }))) && /holds a source map/.test(problemsOf(Object.assign({}, src, { 'app.js.map': Buffer.from('{}') }))), 'a source map in the bundle is refused');
@@ -305,10 +329,23 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
       const other = Object.assign({}, src, { 'webflow.json': Buffer.from(JSON.stringify(Object.assign({}, pk.MANIFEST, { name: 'Another' }))) });
       assert(/not the manifest of the repository/.test(pk.checkBundle(zipOf(other), other).problems.join(' | ')), 'a manifest other than the one of the repository is refused');
       assert(/cannot be read/.test(pk.checkBundle(Buffer.from('this is not a zip file at all, just text'), src).problems.join(' | ')), 'a file that is not a ZIP is refused');
+      // random bytes do not compress, so this bundle is larger than Webflow's limit
+      const heavy = Object.assign({}, src, { 'app.js': crypto.randomBytes(pk.MAX_BUNDLE_BYTES + 1024) });
+      assert(pk.MAX_BUNDLE_BYTES === 5 * 1024 * 1024 && /more than the 5 MB Webflow takes/.test(pk.checkBundle(zipOf(heavy), heavy).problems.join(' | ')) && zipOf(src).length < 4096, 'a bundle over the 5 MB Webflow takes is refused; this one is a few kilobytes');
     }
     const fsx = require('fs'), px = require('path');
-    assert(JSON.stringify(JSON.parse(fsx.readFileSync(pk.SOURCES['webflow.json'], 'utf8'))) === JSON.stringify(pk.MANIFEST) && Object.values(pk.SOURCES).every((f) => fsx.existsSync(f)) && Object.keys(pk.SOURCES).sort().join() === 'app.css,app.js,index.html,webflow.json' && fsx.readdirSync(px.dirname(pk.SOURCES['app.js'])).sort().join() === 'app.css,app.js,index.html',
-      'the extension is four files: the manifest and the three files of public/, and nothing else is in that folder');
+    assert(JSON.stringify(JSON.parse(fsx.readFileSync(pk.SOURCES['webflow.json'], 'utf8'))) === JSON.stringify(pk.MANIFEST) && Object.values(pk.SOURCES).every((f) => fsx.existsSync(f)) && Object.keys(pk.SOURCES).sort().join() === 'app.css,app.js,fonts/OFL.txt,fonts/inter-latin-ext-wght-normal.woff2,fonts/inter-latin-wght-normal.woff2,index.html,webflow.json' && fsx.readdirSync(px.dirname(pk.SOURCES['app.js'])).sort().join() === 'app.css,app.js,fonts,index.html' && fsx.readdirSync(px.dirname(pk.SOURCES['fonts/OFL.txt'])).sort().join() === 'OFL.txt,inter-latin-ext-wght-normal.woff2,inter-latin-wght-normal.woff2',
+      'the extension is seven files: the manifest, the page, the stylesheet and the script, and the two font files with their license; nothing else is in its folders');
+    {
+      // the fonts are what they say: Inter, as published, under the Open Font License, and the license text names no http address
+      const sum = (n) => crypto.createHash('sha256').update(fsx.readFileSync(pk.SOURCES[n])).digest('hex');
+      const ofl = fsx.readFileSync(pk.SOURCES['fonts/OFL.txt'], 'utf8');
+      const woff2 = (n) => fsx.readFileSync(pk.SOURCES[n]).subarray(0, 4).toString('latin1') === 'wOF2';
+      assert(sum('fonts/inter-latin-wght-normal.woff2') === 'f052ee44c3728dfd23aba8a4567150bc314d23903026fbb6ad089422c2df56af' && sum('fonts/inter-latin-ext-wght-normal.woff2') === '48f540fb71166bf65a0fe187a71fad500c43143d3e2e42038f527e38c786e90f' && woff2('fonts/inter-latin-wght-normal.woff2') && woff2('fonts/inter-latin-ext-wght-normal.woff2'),
+        'the two font files are Inter as published in @fontsource-variable/inter 5.2.5, byte for byte');
+      assert(/^Inter, the typeface in the two font files of this folder\.\nCopyright 2016 The Inter Project Authors \(https:\/\/github\.com\/rsms\/inter\)\n/.test(ofl) && ofl.includes('SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007') && ofl.includes('PERMISSION & CONDITIONS') && ofl.includes('TERMINATION') && !/http:\/\//.test(ofl),
+        "their license travels with them: the font's copyright line and the full text of the SIL Open Font License 1.1");
+    }
   }
 
   const app = startApp();
@@ -359,7 +396,8 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   let r = await request(port, 'GET', '/auth?kw=' + encodeURIComponent('Veneers in Antalya'));
   const state = new URL(r.headers.location).searchParams.get('state');
   const startCookies = cookiesFrom(r);
-  assert(r.status === 302 && /scope=authorized_user%3Aread\+sites%3Aread\+pages%3Aread\+pages%3Awrite\+cms%3Aread\+cms%3Awrite/.test(r.headers.location), 'auth asks for the read, page write and CMS scopes');
+  assert(r.status === 302 && /scope=authorized_user%3Aread%20sites%3Aread%20pages%3Aread%20pages%3Awrite%20cms%3Aread%20cms%3Awrite(&|$)/.test(r.headers.location) && !r.headers.location.includes('+') && new URL(r.headers.location).searchParams.get('scope') === 'authorized_user:read sites:read pages:read pages:write cms:read cms:write',
+    "auth asks for the read, page write and CMS scopes, joined by %20 as Webflow's documentation writes them");
   assert((r.headers['set-cookie'] || []).some((c) => c.startsWith('ad_kw=veneers%20in%20antalya')), 'the keyword from the home page waits in a cookie');
   r = await request(port, 'GET', '/callback?code=good-code&state=' + state, { headers: { cookie: startCookies } });
   const cookie = cookiesFrom(r);
@@ -733,6 +771,27 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(ctx.keywords.some((k) => k.text === 'veneers in antalya' && k.answered > 0 && /\/app\/keyword\?id=siteA&k=/.test(k.url)) && ctx.engines.length >= 3, 'and the keywords that belong to the page, with each engine');
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pNew', path: 'about/' });
   assert(JSON.parse(r.body).page.path === '/about', 'a page id the audit has not read is matched by its path');
+  {
+    // languages: told to the panel from what Webflow says about the site, read again when that is a few minutes old
+    const st0 = require('../api/_lib/store');
+    assert(ctx.site.languages === null, 'the panel is told nothing about languages on a site that has one');
+    wfState.sites[0].locales = { primary: { id: 'loc_en', cmsLocaleId: 'cms_en', displayName: 'English', tag: 'en', enabled: true }, secondary: [{ id: 'loc_tr', cmsLocaleId: 'cms_tr', displayName: 'Turkish', tag: 'tr', enabled: true }, { id: 'loc_de', displayName: 'German', tag: 'de', enabled: false }] };
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    const fresh = JSON.parse(r.body).site.languages;
+    await st0.updateSite('siteA', (x) => { x.metaAt = Date.now() - 6 * 60000; });
+    const sitesAt = wfState.paths.filter((x) => /^GET \/v2\/sites\/siteA$/.test(x)).length;
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    const told = JSON.parse(r.body).site.languages;
+    assert(fresh === null && told && told.primary === 'English' && told.others.join() === 'Turkish' && wfState.paths.filter((x) => /^GET \/v2\/sites\/siteA$/.test(x)).length === sitesAt + 1,
+      'the site is read from Webflow again when its details are more than a few minutes old, and the panel is told the primary language and the other enabled ones (' + JSON.stringify(told) + ')');
+    await st0.updateSite('siteA', (x) => { x.metaAt = Date.now() - 6 * 60000; });
+    wfState.siteStatus = 500;
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    wfState.siteStatus = 0;
+    assert(r.status === 200 && JSON.parse(r.body).ok === true && JSON.parse(r.body).site.languages.others.join() === 'Turkish', 'when Webflow cannot be asked about the site just then, the panel still gets its answer, with the languages known so far');
+    delete wfState.sites[0].locales;
+    await st0.updateSite('siteA', (x) => { x.locale = null; x.metaAt = Date.now(); });
+  }
   r = await ext('suggest', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', what: 'meta' });
   const panelSug = JSON.parse(r.body);
   assert(panelSug.ok && /Lumen Dental/.test(panelSug.meta.title) && panelSug.meta.description.length > 40, 'the panel writes a title and description from the page');
@@ -780,6 +839,47 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 404, 'other sites are not reachable');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=nope', { headers: { cookie } });
   assert(r.status === 302 && decodeURIComponent(r.headers.location).includes('no longer tracked'), 'an unknown keyword goes back to the deck');
+  console.log('the access code that opens the Agency plan for a reviewing account');
+  {
+    const CODE = 'review-access-2026-AbCdEfGh';
+    const settings = async () => (await request(port, 'GET', '/app/settings', { headers: { cookie } })).body;
+    const tryCode = (code, origin) => post('/app/settings/code', cookie, { code }, origin);
+    const notice = (x) => decodeURIComponent(String(x.headers.location || '')).replace(/\+/g, ' ');
+    delete process.env.COMPLIMENTARY_CODE;
+    r = await tryCode(CODE);
+    assert(!(await settings()).includes('/app/settings/code') && r.status === 404 && !getJ('user:user_1').comp, 'with no access code set there is no code form on the Account page, and the address behind it answers "not found"');
+    process.env.COMPLIMENTARY_CODE = CODE;
+    let pageNow = await settings();
+    assert(pageNow.includes('action="/app/settings/code"') && pageNow.includes('<label for="accesscode">Access code</label>') && pageNow.includes('name="plan" value="solo"') && !pageNow.includes(CODE), 'with a code set, the Account page of an account on the free plan has the code form, next to the plans, and does not show the code');
+    r = await tryCode('review-access-2026-AbCdEfGX');
+    assert(r.status === 302 && /That access code is not valid\./.test(notice(r)) && /#plan$/.test(r.headers.location) && !getJ('user:user_1').comp, 'a wrong code changes nothing');
+    r = await tryCode(CODE, 'https://evil.test');
+    assert(r.status === 403 && !getJ('user:user_1').comp, 'a code sent from another website is refused, the right one too');
+    r = await request(port, 'POST', '/app/settings/code', { headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://app.test' }, body: form({ code: CODE }) });
+    assert(r.status === 302 && r.headers.location === '/login', 'and so is one sent without being signed in');
+    r = await tryCode('  ' + CODE + ' ');
+    const withCode = getJ('user:user_1');
+    assert(r.status === 302 && /Your account now has complimentary Agency access\./.test(notice(r)) && withCode.comp && withCode.comp.plan === 'agency' && withCode.comp.at > Date.now() - 60000 && withCode.plan === 'free' && !JSON.stringify(withCode).includes(CODE),
+      'the right code gives the account complimentary Agency access; the plan it pays for is untouched and the code itself is not kept on the account');
+    pageNow = await settings();
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    assert(pageNow.includes('Your account has complimentary Agency access.') && !pageNow.includes('/app/settings/code') && !pageNow.includes('/app/billing/checkout') && JSON.parse(r.body).plan.canApply === true && JSON.parse(r.body).plan.name === 'Agency',
+      'the Account page says so and asks for no code and no card, and Apply is open in the panel');
+    delete process.env.COMPLIMENTARY_CODE;
+    assert((await settings()).includes('Your account has complimentary Agency access.'), 'an account that has the access keeps it when the code is changed or taken away');
+    process.env.COMPLIMENTARY_CODE = CODE;
+    // five tries an hour for an account: the sixth is refused, the right code too
+    { const u = getJ('user:user_1'); delete u.comp; db.set('user:user_1', JSON.stringify(u)); }
+    const tries = [];
+    for (let i = 0; i < 3; i++) tries.push(notice(await tryCode('wrong-code-number-' + i + '-xxxxxxxx')));
+    r = await tryCode(CODE);
+    assert(tries.every((t) => /not valid/.test(t)) && /Too many tries\. Wait an hour, then try again\./.test(notice(r)) && !getJ('user:user_1').comp, 'after five tries in an hour the next one is refused, the right code too');
+    r = await tryCode(['a', 'b']);
+    assert(r.status === 302 && !getJ('user:user_1').comp, 'a code that is not a single piece of text is refused');
+    db.delete('rl:code:user_1');
+    delete process.env.COMPLIMENTARY_CODE;
+  }
+
   r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('name="plan" value="solo"') && r.body.includes('10 keywords') && r.body.includes('$19'), 'settings show upgrade buttons and keyword plans');
   assert(r.body.includes('Try free for 7 days') && r.body.includes('US$0 today, then US$19 a month or US$190 a year') && r.body.includes('All prices are in US dollars (USD)'), 'settings offer the 7 day trial on paid plans, with every price in US dollars and the yearly price named');
@@ -1171,6 +1271,60 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     seen = await jobsLib.checkConnections(Date.now(), 8000);
     assert(seen.asked === 1 && seen.removed === 1 && !db.get('site:siteA') && getJ('user:user_1').connections.length === 0 && wfState.refused.join() === 'GET /v2/token/authorized_by', 'a token Webflow refuses is forgotten at that moment, with its sites');
     wfState.revoked = false;
+  }
+
+  console.log('what is left of an account after the app was uninstalled everywhere');
+  {
+    const jobsLib = require('../api/_lib/jobs');
+    const DAYMS = 86400000;
+    const mk = async (id, extra, withConnection) => { const u = Object.assign(store.newUser({ id, email: (extra && extra.email) || id + '@example.org', firstName: 'N' }), extra || {}); const c = withConnection ? store.addConnection(u, withConnection, 'Gone', []) : null; if (extra && extra.noAccessAt) u.noAccessAt = extra.noAccessAt; await store.saveUser(u); return { u, c }; };
+    const here = (id) => !!db.get('user:' + id);
+    const clear = () => { for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k === 'conncursor' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); } };
+    assert(store.ACCOUNT_KEEP_DAYS === 30 && store.ACCOUNT_KEEP_MS === 30 * DAYMS, 'an account without an authorization is kept for 30 days');
+
+    // the uninstall that takes the last authorization of an account on the free plan
+    const a = await mk('left_a', null, 'tok_gone');
+    const t0 = Date.now();
+    wfState.revoked = true;
+    const removed = await jobsLib.accessRemoved(await store.getUser('left_a'), a.c.id);
+    wfState.revoked = false;
+    let ua = getJ('user:left_a');
+    assert(removed && ua.connections.length === 0 && ua.noAccessAt >= t0 && / Your account has no Webflow authorization now: it is kept for 30 days in case you install again, and is deleted after that\.$/.test(ua.notice), 'when the last authorization of a free account ends, the account notes the day and the notice says how long the account is kept');
+    const cookieA = 'ad_session=' + encodeURIComponent(require('../api/_lib/crypto').seal({ u: 'left_a', exp: Date.now() + 3600000 }));
+    const until = new Date(ua.noAccessAt + 30 * DAYMS).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+    r = await request(port, 'GET', '/app', { headers: { cookie: cookieA } });
+    assert(r.status === 200 && r.body.includes('data-kept-until') && r.body.includes('It is kept until ' + until + ' and deleted after that, unless you connect Webflow again.'), 'the Sites page of such an account says until when it is kept, on every visit');
+    assert((await jobsLib.leftBehind('left_a', ua.noAccessAt + 29 * DAYMS + 23 * 3600000)) === false && here('left_a'), 'it is still there on day 29');
+    assert((await jobsLib.leftBehind('left_a', ua.noAccessAt + 30 * DAYMS)) === true && !here('left_a') && !db.get('email:left_a@example.org') && !db.get('users:all').has('left_a'), 'and deleted on day 30: the account, its email entry and its place in the list of accounts');
+    r = await request(port, 'GET', '/app', { headers: { cookie: cookieA } });
+    assert(r.status === 302 && r.headers.location === '/login', 'a session of the deleted account opens nothing');
+
+    // which accounts the hourly pass deletes, and which it never does
+    const old = Date.now() - 31 * DAYMS;
+    await mk('left_b', { noAccessAt: old });
+    await mk('left_c', { noAccessAt: old, plan: 'solo', billing: { subscriptionId: 'sub_1', status: 'active' } });
+    await mk('left_d', { noAccessAt: old, email: 'reviewer@webflow.com' });
+    await mk('left_e', { noAccessAt: old, comp: { plan: 'agency', at: 1 } });
+    await mk('left_f', { noAccessAt: old, plan: 'solo', billing: { subscriptionId: 'sub_2', status: 'cancelled' } });
+    await mk('left_g', { noAccessAt: old }, 'tok_abc'); // a token Webflow accepts
+    await mk('left_h', null);
+    await mk('left_i', { noAccessAt: old, siteIds: ['siteZ'] });
+    await mk('left_j', { noAccessAt: Date.now() - 29 * DAYMS });
+    await mk('left_k', { noAccessAt: old, plan: 'free', billing: { subscriptionId: 'sub_3', status: 'on_trial' } });
+    clear();
+    const pass = await jobsLib.checkConnections(Date.now(), 20000);
+    const kept = ['left_c', 'left_d', 'left_e', 'left_f', 'left_g', 'left_h', 'left_i', 'left_j', 'left_k'].filter(here);
+    assert(pass.deleted === 1 && !here('left_b') && kept.length === 9, 'the hourly pass deletes the free account that has had no authorization for 30 days, and no other: not one with a paid plan, a plan paid until the end of its period, a trial, complimentary access, an authorization, a site, or fewer than 30 days (kept: ' + kept.join(', ') + ')');
+    assert(getJ('user:left_h').noAccessAt > Date.now() - 60000, 'an account that was already without an authorization when this rule arrived starts its 30 days at that pass');
+    { const u = store.newUser({ id: 'left_x', email: 'x@example.org' }); u.noAccessAt = old; store.addConnection(u, 'tok_new', 'Again', []); assert(u.noAccessAt === undefined && u.connections.length === 1, 'and an account that authorizes again no longer carries the day its access ended'); }
+    // the account is read again at the moment of deciding: one that got an authorization since the pass saw it stays
+    assert(getJ('user:left_g').connections.length === 1 && getJ('user:left_g').noAccessAt === old && (await jobsLib.leftBehind('left_g', Date.now())) === false && here('left_g') && (await jobsLib.leftBehind('no_such_account', Date.now())) === false, 'an account that has an authorization is never deleted by this rule, whatever day it carries');
+    clear();
+    const again = await jobsLib.checkConnections(Date.now(), 20000);
+    assert(!again.deleted && kept.every(here), 'the next pass deletes nothing more');
+    for (const id of ['left_c', 'left_d', 'left_e', 'left_f', 'left_g', 'left_h', 'left_i', 'left_j', 'left_k']) { db.delete('user:' + id); db.get('users:all').delete(id); }
+    for (const k of [...db.keys()]) if (/^email:(left_|reviewer@webflow\.com)/.test(k)) db.delete(k);
+    clear();
   }
 
   console.log('an account made by the version before this one');

@@ -20,8 +20,8 @@ const kwLib = require('./_lib/keywords');
 const alerts = require('./_lib/alerts');
 const analyze = require('./_lib/analyze');
 const insights = require('./_lib/insights');
-const { limitsFor, QUESTIONS, PLANS } = require('./_lib/plans');
-const { seal, open, random, timingEqual } = require('./_lib/crypto');
+const { limitsFor, QUESTIONS, PLANS, accessCode } = require('./_lib/plans');
+const { seal, open, random, timingEqual, sha256 } = require('./_lib/crypto');
 const crypto = require('crypto');
 const net = require('net');
 
@@ -421,7 +421,9 @@ async function handleApp(req, res, user) {
   if (added > 0) notice = `${added} site${added === 1 ? '' : 's'} connected. Set one up to start checking.`;
   if (kw && !notice) notice = `Open a site to track "${html.esc(kw)}".`;
   if (user.notice) { notice = html.esc(user.notice); delete user.notice; await store.saveUser(user); }
-  send(res, 200, html.dashboard(user, sites, user._limits, notice, { available, enginesOn: engines.enabled(), trialDays: user._limits.plan === 'free' && billing.trialEligible(user) ? billing.trialDays() : 0 }));
+  // an account with no Webflow authorization left and no paid plan is kept for a while and then deleted (jobs.leftBehind)
+  const keptUntil = user.noAccessAt && !(user.connections || []).length && user._limits.plan === 'free' && !billing.hasLiveSubscription(user) ? user.noAccessAt + store.ACCOUNT_KEEP_MS : 0;
+  send(res, 200, html.dashboard(user, sites, user._limits, notice, { available, keptUntil, enginesOn: engines.enabled(), trialDays: user._limits.plan === 'free' && billing.trialEligible(user) ? billing.trialDays() : 0 }));
 }
 
 // Where someone goes once the plan question is settled: the setup of their one new site, or the sites list.
@@ -1001,15 +1003,25 @@ async function markFixed(site, keywordId) {
   await store.updateSite(site.id, (s) => { const x = (s.keywords || []).find((y) => y.id === String(keywordId)); if (x) x.fixedAt = Date.now(); });
 }
 
+// On a site with Webflow Localization: the name of the primary language and the names of the others. The panel
+// cannot see which language the Designer is showing, so it tells the user what Apply does on such a site.
+const languagesOf = (site) => {
+  const l = site && site.locale;
+  return l && Array.isArray(l.others) && l.others.length ? { primary: String(l.name || ''), others: l.others.slice(0, 6).map(String) } : null;
+};
+
 async function extContext(a, b) {
-  const { site, owner } = a;
+  const { owner } = a;
+  let { site } = a;
+  // the languages come from Webflow, so the site is read again unless it was read in the last minutes
+  if (!site.metaAt || Date.now() - site.metaAt > META_FRESH_MS) site = (await refreshFromWebflow(owner, site)).site || site;
   const audit = await store.getAudit(site.id);
   const row = extRow(audit, b);
   const path = row ? row.path : extPath(b);
   const link = (p) => appBase() + p;
   return {
     ok: true,
-    site: { name: site.project.brand || site.name, score: site.latest ? site.latest.score : null, keywords: (site.keywords || []).length, ready: !!site.project.ready, url: link(siteUrl(site)), setupUrl: link('/app/setup?id=' + encodeURIComponent(site.id)), healthUrl: link(siteUrl(site, 'tab=audit')), keywordsUrl: link(siteUrl(site, 'tab=keywords')) },
+    site: { name: site.project.brand || site.name, score: site.latest ? site.latest.score : null, keywords: (site.keywords || []).length, ready: !!site.project.ready, url: link(siteUrl(site)), setupUrl: link('/app/setup?id=' + encodeURIComponent(site.id)), healthUrl: link(siteUrl(site, 'tab=audit')), keywordsUrl: link(siteUrl(site, 'tab=keywords')), languages: languagesOf(site) },
     plan: { name: owner._limits.name, canApply: !!owner._limits.canApply, upgradeUrl: link('/app/settings#plan') },
     rules: health.LIMITS,
     // The title and description of the open page are not sent: the panel shows the ones the Designer has now.
@@ -1367,8 +1379,23 @@ async function handleSettingsPage(req, res, user) {
   const canBuy = await billing.canCheckout(user);
   send(res, 200, html.settingsPage(user, sites, user._limits, notice, {
     billing: canBuy, offers: canBuy ? await billing.offers() : [], providerName: 'Polar', usage: store.usageOf(user),
-    live: billing.hasLiveSubscription(user), trialDays: billing.trialEligible(user) ? billing.trialDays() : 0
+    live: billing.hasLiveSubscription(user), trialDays: billing.trialEligible(user) ? billing.trialDays() : 0,
+    accessCode: !!accessCode()
   }));
+}
+// The access code form of the Account page. A right code gives this account complimentary Agency access; nothing
+// else on the account changes. Five tries an hour for an account, and the answer for a wrong code is always the same.
+async function handleAccessCode(req, res, user) {
+  const b = await readBody(req);
+  const want = accessCode();
+  const back = (t) => redirect(res, '/app/settings?' + noticeQuery(user, t) + '#plan');
+  if (!want) return send(res, 404, html.errorPage('Not found', 'There is nothing at this address.', '/app/settings'));
+  if (!(await store.rateOk('code:' + user.id, 5, 3600))) return back('Too many tries. Wait an hour, then try again.');
+  const given = typeof b.code === 'string' ? b.code.trim() : '';
+  if (!given || given.length > 200 || !timingEqual(sha256(given), sha256(want))) return back('That access code is not valid.');
+  user.comp = { plan: 'agency', at: Date.now() };
+  await store.saveUser(user);
+  back('Your account now has complimentary Agency access.');
 }
 async function handleSettingsSave(req, res, user) {
   const b = await readBody(req);
@@ -1571,6 +1598,7 @@ module.exports = async function handler(req, res) {
       if (r === 'POST /app/fix/refresh') return await handleFixRefresh(req, res, user);
       if (r === 'GET /app/settings') return await handleSettingsPage(req, res, user);
       if (r === 'POST /app/settings') return await handleSettingsSave(req, res, user);
+      if (r === 'POST /app/settings/code') return await handleAccessCode(req, res, user);
       if (r === 'GET /app/start') return await handleStart(req, res, user);
       if (r === 'POST /app/billing/checkout') return await handleCheckout(req, res, user);
       if (r === 'GET /app/billing/return') return await handleBillingReturn(req, res, user);

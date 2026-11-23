@@ -66,10 +66,12 @@ async function request(token, method, path, body, attempt, opts) {
 }
 const call = (token, method, path, body) => request(token, method, '/v2' + path, body);
 
+// The scopes are joined by a space written as %20, as Webflow's OAuth documentation writes them. URLSearchParams
+// writes a space as "+", and every "+" it writes is a space (a plus sign in a value becomes %2B).
 function authorizeUrl({ clientId, redirectUri, state }) {
   return AUTH_BASE() + '/oauth/authorize?' + new URLSearchParams({
     response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: SCOPES.join(' '), state
-  }).toString();
+  }).toString().replace(/\+/g, '%20');
 }
 
 // One token request per authorization code (codes are single use and are never retried or logged).
