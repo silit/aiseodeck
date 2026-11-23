@@ -55,7 +55,7 @@ Rapor ürünü 22 Kasım 2026'da satışa açıldı; 23 Kasım 2026'da adresi si
 - Polar'da tek seferlik "AI Visibility Report" ürünü var, fiyat $29. Ürün adı aynen böyle kaldıkça `POLAR_REPORT_PRODUCT_ID` gerekmez. Ürün arşivlenirse sayfa çalışmaya devam eder, satın alma yerine "yakında" der ve e-posta toplar.
 - AI SEO Deck webhook'unda `order.paid` ve `order.refunded` işaretli (adres aynı). Rapora ait olmayan siparişler yok sayılır.
 - Kendi denemelerin için istersen Vercel'e `VR_UNLOCK_KEY` ekle (12+ karakter): `/check/{id}?key=...` raporu ödemesiz açar.
-- Ücretsiz kontrol aynı ağdan günde 30 kez yapılabilir (`VR_FREE_PER_IP`). Normali 4: 23 Kasım 2026'da kendi ulaşım kontrollerimiz için geçici olarak yükseltildi (`FREE_PER_IP`, `api/_lib/vr/core.js`), iş bitince 4'e dönecek.
+- Ücretsiz kontrol aynı ağdan günde 4 kez yapılabilir (`VR_FREE_PER_IP`; koddaki varsayılan `FREE_PER_IP`, `api/_lib/vr/core.js`).
 - Search Console'da `https://aiseodeck.silitlabs.com/` mülkü info@silitlabs.com hesabında, site haritası gönderildi. Doğrulama dosyası `public/google735e5a9a85f8a95e.html`, silme. Raporun sayfaları artık `https://silitlabs.com/` mülkünde izlenir (silitlabs.com site haritasında).
 
 İade yok (sayfalarda ve şartlarda yazıyor). Bir rapor kurulamadıysa: aynı site için yeni kontrol başlat, `https://silitlabs.com/check/{id}?key=...` ile aç, bağlantıyı müşteriye gönder. Polar satıştan sonraki 60 gün içinde itirazı önlemek için kendi kararıyla iade edebilir; o zaman `order.refunded` gelir ve rapor kendiliğinden kapanır.

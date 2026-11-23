@@ -13,6 +13,34 @@ function decode(s) {
   });
 }
 const stripTags = (h) => decode(String(h || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+
+// The HTML without what is never page text: comments, and scripts, styles, noscript, SVG and templates
+// with all they hold. They are taken out in the order a browser meets them, so what starts first wins:
+// a "<!--" inside a script is not a comment, and a "<script" inside a comment is not a script. One that
+// is never closed runs to the end of the page, as it does in a browser.
+const HIDDEN_END = {};
+for (const tag of ['script', 'style', 'noscript', 'svg', 'template']) HIDDEN_END[tag] = new RegExp('</' + tag + '\\s*>', 'gi');
+function visibleHtml(html) {
+  html = String(html || '');
+  const start = /<!--|<(script|style|noscript|svg|template)\b/gi;
+  let out = '', at = 0, m;
+  while ((m = start.exec(html))) {
+    let end;
+    if (m[1]) {
+      const close = HIDDEN_END[m[1].toLowerCase()];
+      close.lastIndex = start.lastIndex;
+      const c = close.exec(html);
+      end = c ? c.index + c[0].length : html.length;
+    } else {
+      const c = html.indexOf('-->', m.index + 4);
+      end = c < 0 ? html.length : c + 3;
+    }
+    out += html.slice(at, m.index) + ' ';
+    at = end;
+    start.lastIndex = end;
+  }
+  return out + html.slice(at);
+}
 function attrs(tag) {
   const out = {};
   const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*("([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
@@ -61,9 +89,10 @@ function readPage(html) {
     const raw = m[1].replace(/^\s*<!--|-->\s*$/g, '').replace(/^\s*\/\/<!\[CDATA\[|\/\/\]\]>\s*$/g, '').trim();
     try { const j = JSON.parse(raw); out.schema.push(j); schemaTypes(j, out.schemaTypes); } catch (e) { out.schemaErrors++; }
   }
-  // Body text and headings (scripts, styles and SVG removed)
-  const bodyHtml = (html.match(/<body\b[\s\S]*<\/body>/i) || [html])[0]
-    .replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' ');
+  // Body text and headings. Scripts, styles and comments go first, and only then is the body looked for:
+  // a "<body" written inside a stylesheet or a script in the head is not where the body starts.
+  const seen = visibleHtml(html);
+  const bodyHtml = (seen.match(/<body\b[\s\S]*<\/body>/i) || [seen])[0];
   const hRe = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
   const marks = [];
   while ((m = hRe.exec(bodyHtml))) {
@@ -298,4 +327,4 @@ async function auditSite(site, pages, opts) {
   };
 }
 
-module.exports = { readPage, checkPage, robotsBlocks, sitemapLocs, auditSite, PAGE_RULES, BOTS, decode, stripTags };
+module.exports = { readPage, checkPage, robotsBlocks, sitemapLocs, auditSite, PAGE_RULES, BOTS, decode, stripTags, visibleHtml };
