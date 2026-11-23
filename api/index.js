@@ -802,11 +802,22 @@ function andList(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', 
 // token, which only a token of this app can resolve, so no cookie or session of ours crosses over.
 const appBase = () => ENV().appUrl || 'https://aiseodeck.silitlabs.com';
 
-function extHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+// Webflow serves the panel from the extension's own address, https://<client id>.webflow-ext.com, and that is
+// the only origin whose pages may call /ext/* and read the answers. EXT_ORIGINS names others (comma separated),
+// for a second registration of the app. Any other origin, or none, is refused before anything is read or done.
+function extOrigins() {
+  const own = ENV().clientId ? ['https://' + ENV().clientId + '.webflow-ext.com'] : [];
+  return own.concat(String(process.env.EXT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean));
+}
+function extHeaders(req, res) {
+  const origin = String(req.headers.origin || '');
+  res.setHeader('Vary', 'Origin');
+  if (!origin || !extOrigins().includes(origin)) return false;
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Max-Age', '600');
+  return true;
 }
 async function extAuth(b) {
   const siteId = String(b.siteId || '');
@@ -933,7 +944,11 @@ async function extApplied(a, b) {
 }
 
 async function handleExt(req, res, path, method) {
-  extHeaders(res);
+  if (!extHeaders(req, res)) {
+    // one line, so that a changed panel address shows up in the logs instead of as a silent failure
+    console.log('[aiseodeck] panel: refused origin ' + String(req.headers.origin || '(none)').slice(0, 120));
+    return json(res, 403, { error: 'This address may not call the panel.' });
+  }
   if (method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
   if (method !== 'POST') return json(res, 405, { error: 'Use POST.' });
   try {

@@ -8,6 +8,8 @@ const AUTH_BASE = () => (process.env.WEBFLOW_AUTH_BASE || 'https://webflow.com')
 const SCOPES = ['authorized_user:read', 'sites:read', 'pages:read', 'pages:write', 'cms:read', 'cms:write'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = () => parseInt(process.env.WEBFLOW_RETRY_BASE_MS || '', 10) || 2000;
 
 // path starts with /v2/ or /beta/
 async function request(token, method, path, body, attempt) {
@@ -18,8 +20,10 @@ async function request(token, method, path, body, attempt) {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20000)
   });
-  if (res.status === 429 && attempt < 2) {
-    const wait = parseInt(res.headers.get('retry-after') || '0', 10) * 1000 || (attempt + 1) * 3000;
+  // Rate limited: wait as long as Webflow says, or twice as long as the time before (2, 4, 8 seconds), and give
+  // up after three more tries.
+  if (res.status === 429 && attempt < MAX_RETRIES) {
+    const wait = parseInt(res.headers.get('retry-after') || '0', 10) * 1000 || RETRY_BASE_MS() * Math.pow(2, attempt);
     await sleep(Math.min(wait, 10000));
     return request(token, method, path, body, attempt + 1);
   }

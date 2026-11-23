@@ -337,6 +337,23 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(trickyRead.text === 'Teeth in a day We place implants in one day. Clinics across the UK.' && trickyRead.words === 14 && trickyRead.title === 'Implant clinic' && trickyRead.h1[0] === 'Teeth in a day', 'a "<body" written in a stylesheet or a script in the head is not where the page text starts');
     assert(audit.visibleHtml('<p>a</p><style>p{}') === '<p>a</p> ' && audit.visibleHtml('<p>a</p><!-- open') === '<p>a</p> ' && audit.visibleHtml('<p>a</p><SCRIPT>x</SCRIPT ><p>b</p>') === '<p>a</p> <p>b</p>', 'a script, style or comment that is never closed runs to the end of the page, and tag names match in any case');
     assert(audit.visibleHtml('<p>a</p><script>var c = "<!--";</script><p>b</p><!-- <style> --><p>c</p>') === '<p>a</p> <p>b</p> <p>c</p>', 'what starts first wins: a comment mark inside a script and a style tag inside a comment hide nothing more');
+    {
+      // Webflow's rate limit: wait and try again, three more times at most
+      const wfLib = require('../api/_lib/webflow');
+      const realFetch = global.fetch;
+      let calls = 0;
+      process.env.WEBFLOW_RETRY_BASE_MS = '1';
+      global.fetch = async () => { calls++; return new Response(JSON.stringify(calls < 4 ? { message: 'slow down' } : { sites: [] }), { status: calls < 4 ? 429 : 200 }); };
+      const sitesAfterWait = await wfLib.listSites('tok');
+      assert(Array.isArray(sitesAfterWait) && calls === 4, 'a rate-limited Webflow call is tried again after a wait');
+      calls = 0;
+      global.fetch = async () => { calls++; return new Response(JSON.stringify({ message: 'slow down' }), { status: 429 }); };
+      let gaveUp = null;
+      try { await wfLib.listSites('tok'); } catch (e) { gaveUp = e; }
+      assert(gaveUp && gaveUp.status === 429 && calls === 4, 'and after three more tries it gives up');
+      global.fetch = realFetch;
+      delete process.env.WEBFLOW_RETRY_BASE_MS;
+    }
     const fx = require('../api/_lib/fixes');
     const merged = fx.mergeSchema({ '@context': 'https://schema.org', '@type': 'Dentist', name: 'Old' }, [fx.orgSchema({ type: 'Dentist', name: 'New', url: 'https://x.com/' }), fx.faqSchema([{ q: 'Q1?', a: 'A1' }, { q: 'Q2?', a: 'A2' }])]);
     assert(merged['@graph'].length === 2 && merged['@graph'][0].name === 'New' && merged['@graph'][1]['@type'] === 'FAQPage', 'merge replaces the old organization node and adds FAQ');
@@ -581,9 +598,16 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(!r.body.includes('data-locale-note'), 'no note on a site with one language');
 
   console.log('the panel inside the Webflow Designer');
-  const ext = (route, body) => request(port, route === 'OPTIONS' ? 'OPTIONS' : 'POST', '/ext/' + (route === 'OPTIONS' ? 'context' : route), { headers: { 'content-type': 'application/json', origin: 'https://abc123.webflow-ext.com' }, body: route === 'OPTIONS' ? undefined : JSON.stringify(body) });
+  const PANEL = 'https://cid.webflow-ext.com';
+  const ext = (route, body, origin) => request(port, route === 'OPTIONS' ? 'OPTIONS' : 'POST', '/ext/' + (route === 'OPTIONS' ? 'context' : route), { headers: Object.assign({ 'content-type': 'application/json' }, origin === null ? {} : { origin: origin || PANEL }), body: route === 'OPTIONS' ? undefined : JSON.stringify(body) });
   r = await ext('OPTIONS');
-  assert(r.status === 204 && r.headers['access-control-allow-origin'] === '*' && /POST/.test(r.headers['access-control-allow-methods']), 'the panel can call the app from its own address');
+  assert(r.status === 204 && r.headers['access-control-allow-origin'] === PANEL && /Origin/.test(r.headers.vary || '') && /POST/.test(r.headers['access-control-allow-methods']), 'the panel can call the app from its own address, and only that address is named');
+  r = await ext('OPTIONS', null, 'https://evil.example');
+  assert(r.status === 403 && !r.headers['access-control-allow-origin'], 'another origin gets no permission to call the panel routes');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' }, 'https://abc123.webflow-ext.com');
+  assert(r.status === 403 && !r.headers['access-control-allow-origin'] && !/keyword|engines/.test(r.body), 'the panel of another app is refused, with a valid ID token too');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' }, null);
+  assert(r.status === 403, 'a request that names no origin is refused');
   r = await ext('context', { siteId: 'siteA', idToken: 'bad-token', pageId: 'p2', path: '/about' });
   assert(r.status === 401 && /session/.test(JSON.parse(r.body).error), 'an ID token Webflow does not know is refused');
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:otherSite', pageId: 'p2', path: '/about' });
