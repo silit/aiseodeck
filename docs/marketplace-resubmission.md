@@ -197,12 +197,24 @@ Done
 - 24 Nov, 00:40: the report's own repository is ready and tested (170 tests): the report, the modules it uses, an entry point that answers the report's addresses and its cron job only, a webhook that takes report orders only, and its setup notes. It waits for its GitHub repository; until then it is kept on the branch `report-standalone` of this repository (delete that branch once the code is in `silit/ai-visibility-report`).
 - 24 Nov: the five screenshots of this build and a spare are in `assets/marketplace/screenshots/`, made by `scripts/marketplace-shots.js`; `docs/listing.md` follows the submission form field by field.
 
+- 24 Nov, night: the build was read against the toolkit's pre-submission quality gate, item by item, and against the Marketplace Guidelines and the design guidelines as published that day. The record, with the evidence for each item, is `docs/quality-gate.md`. What it changed:
+  - The panel's look follows Webflow's design guidelines: Webflow's CSS variables for apps (default dark theme as the fallback, so the panel follows Appearance where the Designer provides the variables), Inter at 11.5px and 13px in two weights, 4px corners. Inter ships inside the panel: two font files for Latin text and their license in `extension/public/fonts/` (from `@fontsource-variable/inter` 5.2.5, unchanged). The bundle is seven files now; Webflow CLI 2.16.0 packs the folder as `fonts/...`.
+  - `test/panel.js` measures the contrast of every text and icon on screen in Webflow's dark and light themes.
+  - Moving between pages in the Designer: a late answer for the page before is dropped, an Apply finishes on the page it was pressed for, and a half-taken change (title yes, description no) is said as it is.
+  - The function `top` of the panel was renamed; a test keeps the names of the window around the panel out of the script (Preflight blocks access to the top document).
+  - Languages: the server writes the primary locale; the panel sets values through the Designer, which names no locale, and says so on a site with more than one language (`/ext/context` now tells it the site's languages).
+  - Reviewers: besides `@webflow.com`, an access code (`COMPLIMENTARY_CODE`, entered on the Account page) opens the Agency plan.
+  - An account with no authorization left and no paid plan is deleted 30 days after its last authorization ended (`jobs.leftBehind`, in the hourly token pass).
+  - The authorize address joins scopes with `%20`. The packaging script refuses a bundle over 5 MB. The first submission's video captions moved to `assets/marketplace/previous/`. A 512 x 512 copy of the logo is in `assets/marketplace/`.
+  - Measured: a quiet tick costs 7 database commands (about 2,000 a day); the hourly token pass about 2 per account.
+- `npm test`: `test/app.js` 409, `test/panel.js` 63.
+
 Where it stands, and who does what next
 1. Owner: sign in to GitHub and Webflow in the Chrome used for Silit Labs (both sessions ended). Say yes or no to Claude creating the private repository, the Vercel project and the Redis connection there.
 2. Owner: enter the environment values of the new Vercel project (the AI keys, DataForSEO, Resend, the Polar token, two new secrets) and add the report's webhook at Polar. They are listed in the README of the report's repository.
 3. Claude: point the three rewrites of silitlabs.com at the new project, check the report live (landing page, sample, a free check, an old check link).
-4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded in the app's settings and the Install URL there is set to `/auth`.
-5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a.
+4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded in the app's settings and the Install URL there is set to `/auth`. Owner: add `COMPLIMENTARY_CODE` in Vercel before that deploy (a long random value; the same value goes into the form's access field).
+5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a and the list "For the sitting" at the end of `docs/quality-gate.md` (the panel's fonts and colors in the real Designer among them).
 6. Claude: final `bundle.zip` and `review.zip` with their checksums, the scene list and captions of the demo video, the `[to fill]` fields.
 7. Owner: App Review Preflight on the final files, the new demo video, two-factor authentication on the Workspace admin, the form. Claude does not submit.
 

@@ -53,7 +53,7 @@ The Install URL is the address above and never a `webflow.com/oauth/authorize...
 | Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. `[to fill: SHA-256 of both files]` |
 | Website URL | https://aiseodeck.silitlabs.com |
 | Additional notes | The text of `REVIEW.md`, from "The app" to the end, with its `[to fill]` fields filled. |
-| App access credentials | No credentials are needed. Reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For another email, write to info@silitlabs.com and we turn it on the same day. |
+| App access credentials | No sign-in credentials are needed: reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan (the highest) automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For a reviewing account on another address: Account, Plan, Access code, and enter `[to fill: the access code, the value of COMPLIMENTARY_CODE in Vercel]`. It opens the same Agency access on that account and it stays. |
 | Published testing site | https://aiseodeck-demo.webflow.io `[to confirm after the end-to-end run: this build is installed on it]` |
 
 ### Screenshots (1280 x 846, in `assets/marketplace/screenshots/`)
@@ -133,7 +133,7 @@ Your brand name as people say it, other names it goes by (optional), the country
 
 **Languages**
 
-On a site with Webflow Localization, AI SEO Deck reads and writes the primary language only. The other languages keep their own text.
+On a site with Webflow Localization, AI SEO Deck reads and checks the primary language, and the web app writes titles, descriptions and CMS drafts to that language only. In the Designer panel, Apply sets the values on the page as the Designer shows it, and the panel says so on a site with more than one language.
 
 **Prices**
 
@@ -155,6 +155,8 @@ Disconnecting a site in AI SEO Deck deletes what it keeps about that site and ch
 **Documentation and support**
 
 The AI SEO Deck guide covers setup, every screen, the panel in the Designer, what is written to Webflow and when, prices, and how to disconnect or uninstall. It is under Guide on aiseodeck.silitlabs.com, at aiseodeck.silitlabs.com/docs. Support: info@silitlabs.com, answered within one business day. The business shown in the screenshots is made up.
+
+AI SEO Deck is made by Silit Labs. It is not affiliated with or endorsed by Webflow, OpenAI, Google, Anthropic or xAI.
 
 ---
 

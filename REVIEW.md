@@ -6,7 +6,7 @@ Status: **NOT READY TO RESUBMIT.** Still open, in order: the AI Visibility Repor
 
 ## The app
 
-- **Type:** Hybrid. A Data Client (OAuth, server side) and a Designer Extension (the panel in `extension/`, three static files with no build step).
+- **Type:** Hybrid. A Data Client (OAuth, server side) and a Designer Extension (the panel in `extension/`: a page, a stylesheet, a script and two font files, with no build step).
 - **No code on customer sites.** The app registers and injects no script, uses no Custom Code API and adds no element to a site.
 - **Install URL:** `https://aiseodeck.silitlabs.com/auth`
 - **Redirect URI:** `https://aiseodeck.silitlabs.com/callback`
@@ -54,11 +54,13 @@ The Install URL asks for exactly these six scopes, the ones configured for the a
 
 Tests in `node test/app.js`, section "the install address and the OAuth state": two requests carry different states; no state, a changed state, a repeated state, a state from another browser, a used state, an expired state and a denied request are each refused with no code exchange.
 
-## Tokens
+## Tokens: the three attestations
 
-- The access token is encrypted at rest (AES-256-GCM) in the server-side database.
-- It is used on the server only. It never reaches the browser or the Designer panel, and it is never logged.
-- It is deleted when Webflow no longer accepts it (the app was uninstalled or its access removed), and when the user deletes the account.
+Silit Labs attests, for the Webflow OAuth access token of AI SEO Deck:
+
+1. **Encrypted at rest.** The token is stored encrypted with AES-256-GCM in the server-side database, and decrypted only on the server at the moment of a call to Webflow.
+2. **Stored server-side only.** It never reaches the browser or the Designer panel, is never part of a response or an address, and is never logged.
+3. **Deleted on uninstall or revocation.** It is deleted when Webflow no longer accepts it (the app was uninstalled or its access removed), and when the user deletes the account.
 
 ## Disconnect, uninstall and delete
 
@@ -67,6 +69,7 @@ Tests in `node test/app.js`, section "the install address and the OAuth state": 
 - **Uninstall.** There is no uninstall webhook, so the app learns of it from a 401. One call to `GET /v2/token/authorized_by` settles it: refused there too, the app stops asking Webflow anything with that token, forgets the token and deletes the sites of that authorization with everything kept about them. This happens at the next thing the user does, before the next scheduled check, and at the latest within a day: an hourly job (`/cron/tokens`) asks about every stored token once every 20 hours. When Webflow does not say whether a token works (no answer, a 5xx, a 429), nothing is removed and that token is asked about again an hour later.
 - **A 401 is never retried.** A 429 is: the app waits as long as `Retry-After` says, never less, at most three more times, and stops instead of retrying when the wait is longer than ten seconds. Site health stops short of the limit Webflow reports in `X-RateLimit-Remaining` and reads the rest when the user asks.
 - **What stays in Webflow** after any of these: the titles and descriptions the user applied, and the CMS draft items. The app adds nothing else to a site. The guide says how to change or delete them.
+- **What is left of an account** after its last authorization ended is the Webflow user id, name, email and settings. With no paid plan, that account is deleted 30 days later; the Sites page shows the date. Accounts of the review team are not deleted this way.
 - **Delete account** deletes the account, its sites, answers, Site health results and tokens, and cancels a paid plan.
 - **When a plan or a trial ends**, the account moves to the free plan. Nothing is deleted in the app or in Webflow; Apply is off.
 
@@ -81,32 +84,36 @@ Nothing is written on a schedule or on page load. Nothing is published or delete
 
 ## Localization
 
-The app reads, checks and writes the primary locale only, and says so next to every Apply button on a site with more than one language.
+The server reads, checks and writes the primary locale only, and the web app says so next to every Apply button on a site with more than one language. Suggestions are written from the pages of the primary locale.
 
 | Operation | Locale |
 | --- | --- |
-| Read pages and their content | No `localeId`: Webflow answers with the primary locale. |
+| Read pages and their content (Data API) | No `localeId`: Webflow answers with the primary locale. |
 | `PUT /v2/pages/{page_id}` | No `localeId`: Webflow writes the primary locale. Webflow refuses a primary locale id on this endpoint ("The provided locale must be a secondary locale"), so none is sent. |
 | `POST /v2/collections/{collection_id}/items` | No `cmsLocaleId`: the draft is created in the primary locale. |
-| Secondary locales | Never read and never written. |
+| Secondary locales (Data API) | Never read and never written by the server. |
+| `page.setTitle`, `page.setDescription` in the Designer panel | The Designer API takes no locale and has no call that tells which locale the Designer is showing. The panel sets the two values on the page as the Designer shows it, the same as typing them into the page settings. On a site with more than one language the editor says this above the fields before anything is applied, names the language the suggestion was written from, and asks the user to check which language is open. The values the page has now stand next to the fields, so nothing is overwritten unseen. |
 
 ## The panel in the Designer
 
-- Files: `extension/public/index.html`, `app.css`, `app.js`, and `extension/webflow.json`. Plain HTML, CSS and JavaScript written by hand, shipped as they are: no framework, no dependency, no bundler, no minifier, so there are no source maps. The review ZIP holds these files byte for byte and a README.
+- Files: `extension/webflow.json`, and in `extension/public/` the page `index.html`, `app.css`, `app.js` and the folder `fonts/`. Plain HTML, CSS and JavaScript written by hand, shipped as they are: no framework, no code dependency, no bundler, no minifier, so there are no source maps. `fonts/` holds Inter, the typeface of Webflow's interface: two `.woff2` files for Latin text and the text of their license (SIL Open Font License 1.1), shipped with the panel as the design guidelines describe, so no font comes from another host. The review ZIP holds all of these files byte for byte and a README.
 - Designer API calls: `webflow.getSiteInfo`, `webflow.getCurrentPage`, the page getters (`getName`, `isHomepage`, `getPublishPath`, `getSlug`, `getTitle`, `getDescription`, `getCollectionId`), `page.setTitle`, `page.setDescription`, `webflow.getIdToken`, `webflow.setExtensionSize`, `webflow.subscribe('currentpage')`, `webflow.notify`.
 - `setTitle` and `setDescription` run only in the click handler of **Apply to this page**. Nothing changes on load or when the page changes.
 - It calls one server, `https://aiseodeck.silitlabs.com/ext/` (`context`, `suggest`, `applied`), with POST. Each request carries a fresh ID token from `webflow.getIdToken()`, the site id, the page id and the page path, and no other credential. The token is asked for every request and never kept.
 - The server resolves the ID token with `POST /beta/token/resolve`, using the stored token of the site named in the request, and answers only when Webflow says the token belongs to that same site. A site id sent by the panel is never trusted on its own.
 - A caller that cannot be confirmed gets one and the same answer whatever the reason: the site is not connected, the token is unknown, the token belongs to another site, or Webflow gave no answer. The answers do not tell which sites use the app.
 - CORS: `/ext/*` names one allowed origin, the extension's own (`https://<client id>.webflow-ext.com`), and answers 403 to any other origin or to none. CORS is not what authorizes a call; the ID token is. No other route sends CORS headers.
-- The panel has no inline handlers or styles, no `eval`, no HTML built from strings, no timers, no keyboard shortcuts, no `message` handler, no browser storage, no cookies and no iframe. Events are bound with `addEventListener`. Links to the app are ordinary links that open in a new tab when clicked; one function makes them all and lets them point only to the app's own address. The only address in its files is the app's own, over HTTPS.
+- The panel has no inline handlers or styles, no `eval`, no HTML built from strings, no timers, no keyboard shortcuts, no `message` handler, no browser storage, no cookies and no iframe. It leaves no global variable and does not name the window around it. Events are bound with `addEventListener`. Links to the app are ordinary links that open in a new tab when clicked; one function makes them all and lets them point only to the app's own address. The only address in its files is the app's own, over HTTPS.
+- **Moving between pages.** The panel follows the page that is open. An answer that arrives for a page the user has left is dropped, and an Apply finishes on the page it was pressed for, also when another page is opened before the Designer has taken the change.
+- **Design.** Colors, type and shadows are Webflow's CSS variables for apps (`--background1`, `--text1`, `--actionPrimaryBackground` and the others of the design guidelines), each read with the value of the default dark theme as its fallback, so the panel follows the user's Appearance setting wherever the Designer provides the variables. Text is Inter at 11.5px and 13px in two weights, corners are 4px, labels are in sentence case, and the main actions fill the width. The stylesheet names two files, the panel's own fonts, and loads no image.
+- **Accessibility.** Every control is a native button, link or field with a visible focus ring and a name; every mark has a shape and a text label, so no state is told by color alone; messages reach screen readers through a status line and `role="alert"`. Text has a contrast of at least 4.5 to 1 and icons at least 3 to 1 in Webflow's dark and light themes: `node test/panel.js` measures every text and icon on screen in both.
 
 ## The backend
 
 - Every `/app/*` route needs a signed-in session and checks that the site belongs to that account; a site of another account answers the same "not found" as a site that does not exist. Forms are refused from other origins.
 - `/cron/*` needs a secret. The billing webhook checks its signature. `/r/{token}` is the client report link the user creates on purpose: public to whoever has the link, marked noindex, replaceable.
 - The app requests only fixed addresses: Webflow's API, the AI providers, DataForSEO, Resend, Polar and its database. No address comes from user input.
-- The app has no third-party dependencies (`package.json` lists none).
+- The app has no third-party code dependencies (`package.json` lists none). The one third-party part of the panel is the Inter typeface, named above.
 - Log lines pass through one function that takes out email addresses and anything long enough to be a token.
 
 ## What goes to other services
@@ -120,7 +127,7 @@ The app reads, checks and writes the primary locale only, and says so next to ev
 
 All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3 engines, no Apply. Solo: USD 19 a month or USD 190 a year. Studio: USD 49 a month or USD 490 a year. Agency: USD 149 a month or USD 1,490 a year. Paid plans start with a 7-day free trial, once per customer across the products of Silit Labs: Polar takes a card, charges nothing during the trial, emails a reminder before it ends, and charges the plan's price on day 8 unless the user cancels. No other fees.
 
-**Reviewers:** an account with an `@webflow.com` email gets the Agency plan with no checkout and no card, for as long as the account exists. After authorizing from the Install URL you land on the setup of the site.
+**Reviewers:** an account with an `@webflow.com` email gets the Agency plan, the highest one, with no checkout and no card, for as long as the account exists. If the reviewing account is on another address, open **Account**, and under **Plan** enter the access code given with this submission in the field **Access code**: it opens the same Agency access on that account, and it stays. Neither kind of account expires or is deleted. After authorizing from the Install URL you land on the setup of the site.
 
 ## How to test
 
@@ -129,7 +136,7 @@ All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3
 3. Keywords: open a keyword to read each engine's answer.
 4. Site health: **Read my pages from Webflow**. Open a page with **Fix**: "Now in Webflow" on the left, **Write a suggestion with AI**, then **Apply to Webflow**. Check the page settings in Webflow: the change is there, unpublished.
 5. Keyword page, **Write the fixes**, tick the CMS box, **Apply to Webflow**: draft items appear in the collection.
-6. In the Designer: Apps, AI SEO Deck. The panel shows the open page. **Fix**, **Write with AI**, **Apply to this page**.
+6. In the Designer: Apps, AI SEO Deck. The panel shows the open page and follows when another page is opened. **Fix**, **Write with AI**, **Apply to this page**.
 7. Site Settings, **Disconnect this site**; then Sites, **Add a site**, **Connect**: no Webflow screen appears.
 8. Remove the app in Webflow. Open the app again and press anything that reads Webflow: the Sites page says access was removed and the site is gone.
 

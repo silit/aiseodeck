@@ -18,6 +18,9 @@ These came out of the review of 23 November 2026. `REVIEW.md` holds the notes fo
 - A 401 from Webflow is never retried. It is settled with one call to `GET /v2/token/authorized_by`; refused there too, the token is forgotten and the sites of that authorization are deleted. Every stored token is asked about once every 20 hours (`/cron/tokens`), so an uninstall is noticed within a day.
 - Nothing is written to Webflow on a schedule. The user sees the current value next to the new one and presses Apply. The app never publishes a site.
 - The panel answers only its own origin, confirms every call with a fresh Webflow ID token, and gives every caller it cannot confirm the same answer.
+- The panel is styled with Webflow's CSS variables for apps (default dark theme as the fallback), drops an answer that arrives for a page the user has left, and finishes an Apply on the page it was pressed for.
+- The server writes to the primary locale only. The panel sets the title and description on the page as the Designer shows it, and says so on a site with more than one language.
+- An account with no Webflow authorization left and no paid plan is deleted 30 days after its last authorization ended.
 - Logs pass through `api/_lib/log.js`, which takes out email addresses and anything long enough to be a token.
 
 ## How it works
@@ -34,7 +37,7 @@ These came out of the review of 23 November 2026. `REVIEW.md` holds the notes fo
 - `api/_lib/store.js`, `kv.js` and `crypto.js`: the records in Upstash Redis. Access tokens are encrypted with AES-256-GCM.
 - `api/_lib/billing.js`, `polar.js` and `api/billing-webhook.mjs`: Polar subscriptions. Only Polar products named "AI SEO Deck ..." (or with metadata `app=aiseodeck`) are used. Free trial: every checkout of an account that never had a trial or a subscription gets `trial_interval: day`, `trial_interval_count: TRIAL_DAYS` (default 7, 0 turns it off); the others get `allow_trial: false`.
 - `api/_lib/html.js`: every page of the app. `public/`: the home page, the guide (`docs.html`), the privacy policy and the terms.
-- `extension/`: the Designer panel (`webflow.json` and `public/` with `index.html`, `app.css`, `app.js`; no framework, no build step).
+- `extension/`: the Designer panel (`webflow.json` and `public/` with `index.html`, `app.css`, `app.js` and `fonts/`, which holds Inter for Latin text under the Open Font License; no framework, no build step).
 
 ## Tests
 
@@ -52,7 +55,7 @@ These came out of the review of 23 November 2026. `REVIEW.md` holds the notes fo
 | Studio | USD 49 a month, USD 490 a year | 5 | 30 | as Solo with 30 checks on demand, agency name on client report links, Site health for 150 pages |
 | Agency | USD 149 a month, USD 1,490 a year | 20 | 100 | as Studio with 100 checks on demand, Site health for 250 pages |
 
-Keywords are a pool shared by all sites of an account. New keywords get a first check right away, up to the plan's number of keywords in new keywords a month. An account with an `@webflow.com` email gets the Agency plan with no checkout (the review team).
+Keywords are a pool shared by all sites of an account. New keywords get a first check right away, up to the plan's number of keywords in new keywords a month. An account with an `@webflow.com` email gets the Agency plan with no checkout (the review team). So does an account that enters the access code (`COMPLIMENTARY_CODE`) on its Account page, for a reviewing account on another address.
 
 Every paid plan starts with a 7-day free trial (card taken by Polar, charged on day 8 unless cancelled; one trial per account, and Polar's "Prevent trial abuse" also blocks a second trial with the same email or card). A Solo trial costs at most about $4 in AI calls.
 
@@ -83,14 +86,15 @@ Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (w
    - Settings > Subscriptions > "Prevent trial abuse" açık (14 Kasım 2026'da açıldı). Ürünlere deneme süresi girmeye gerek yok, deneme her checkout'ta koddan veriliyor.
 7. **Zamanlayıcı**: Vercel Pro'da `vercel.json` içindeki iki cron işi kendiliğinden çalışır ve `CRON_SECRET` değerini `Authorization: Bearer` olarak gönderir: `/cron/tick` her 5 dakikada (kontroller), `/cron/tokens` saatte bir (Webflow'da kaldırılan uygulamayı fark etmek için). Hobby planda bunların yerine cron-job.org kullan: aynı iki adres, header `x-cron-secret: <CRON_SECRET>`.
 8. Vercel ortam değişkenlerini girip yeniden deploy et (listesi `.env.example` dosyasında).
+9. **İnceleme ekibi için erişim kodu** (isteğe bağlı ama önerilir): Vercel'de `COMPLIMENTARY_CODE` adıyla uzun ve rastgele bir değer gir (en az 16 karakter, bir şifre üreticisinden). `@webflow.com` adresli hesaplar Agency planını zaten kendiliğinden alır; bu kod, inceleyen hesabın adresi farklıysa aynı erişimi açar (Account > Plan > Access code). Aynı değeri başvuru formundaki "App access credentials" alanına yaz. Değeri bana gönderme.
 
 Not: Vercel Hobby ticari kullanıma kapalı; ücretli plan satmaya başlamadan önce Pro'ya geçmek gerekir.
 
 ## Designer'daki panel (Designer Extension)
 
-`extension/` klasöründe: `webflow.json` ve `public/` (index.html, app.js, app.css; framework yok, derleme adımı yok). Panel açık sayfayı, o sayfanın kelimesini, her AI motorunu ve düzeltilecekleri gösterir. Başlık ve açıklamayı, kullanıcı "Apply to this page" düğmesine basınca, Designer API ile sayfaya yazar; başka hiçbir şey yazmaz. Sunucuda üç adresi çağırır: `/ext/context`, `/ext/suggest`, `/ext/applied`. Kimlik: her çağrı için `webflow.getIdToken()` ile alınan ID token, sunucuda sitenin kayıtlı tokenı ile `POST /beta/token/resolve` üzerinden çözülür.
+`extension/` klasöründe: `webflow.json` ve `public/` (index.html, app.js, app.css ve Inter yazı tipinin durduğu `fonts/` klasörü; framework yok, derleme adımı yok). Panel Webflow'un uygulamalar için yayımladığı renk ve yazı değişkenlerini kullanır, yani Designer'ın kendi görünümüne uyar. Panel açık sayfayı, o sayfanın kelimesini, her AI motorunu ve düzeltilecekleri gösterir. Başlık ve açıklamayı, kullanıcı "Apply to this page" düğmesine basınca, Designer API ile sayfaya yazar; başka hiçbir şey yazmaz. Sunucuda üç adresi çağırır: `/ext/context`, `/ext/suggest`, `/ext/applied`. Kimlik: her çağrı için `webflow.getIdToken()` ile alınan ID token, sunucuda sitenin kayıtlı tokenı ile `POST /beta/token/resolve` üzerinden çözülür.
 
-Paketlemek: `cd extension && npx @webflow/webflow-cli extension bundle` (bundle.zip, git'e girmez). Review ZIP'i: `node scripts/package-extension.js` (bundle.zip içindeki dört dosyanın kaynakla bayt bayt aynı olduğunu doğrular, README ile birlikte `extension/review.zip` dosyasını yazar ve SHA-256 değerlerini basar). Yüklemek: Workspace settings > Apps & Integrations > Develop > AI SEO Deck > Publish extension version (workspace admin ve iki adımlı doğrulama açık olmalı; uygulamada Designer Extension yapı taşı açık olmalı). Denemek: Designer > Apps > AI SEO Deck > Launch App.
+Paketlemek: `cd extension && npx @webflow/webflow-cli extension bundle` (bundle.zip, git'e girmez). Review ZIP'i: `node scripts/package-extension.js` (bundle.zip içindeki yedi dosyanın kaynakla bayt bayt aynı olduğunu doğrular, README ile birlikte `extension/review.zip` dosyasını yazar ve SHA-256 değerlerini basar). Yüklemek: Workspace settings > Apps & Integrations > Develop > AI SEO Deck > Publish extension version (workspace admin ve iki adımlı doğrulama açık olmalı; uygulamada Designer Extension yapı taşı açık olmalı). Denemek: Designer > Apps > AI SEO Deck > Launch App.
 
 ## Environment variables
 

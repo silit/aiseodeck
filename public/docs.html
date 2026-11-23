@@ -120,7 +120,8 @@ mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 <li><b>Fix this page:</b> the title and description findings, made from the values the Designer has at that moment, and the headings, text and image findings from the last Site health read, with the time of that read.</li>
 <li><b>Title and description:</b> an editor that shows what the page has now next to the fields. <b>Write with AI</b> reads the page from Webflow and fills the fields with a suggestion, labelled <b>Suggested by AI</b> until you edit it. <b>Apply to this page</b> sets the two values on the open page through the Designer. Nothing is published.</li>
 </ul>
-<p>The panel changes nothing until you press Apply, uses no keyboard shortcuts and stores nothing in your browser. To know who is using it, it sends our server a short-lived Webflow ID token with the id of the site and of the page, and nothing else that identifies you. A site that is not connected yet gets a <b>Connect</b> button that opens your Sites page. On the free plan the panel shows everything and writes suggestions, and Apply is off.</p>
+<p>The panel changes nothing until you press Apply, uses no keyboard shortcuts and stores nothing in your browser. When you move to another page in the Designer, the panel follows; an Apply you pressed finishes on the page you pressed it for. To know who is using it, it sends our server a short-lived Webflow ID token with the id of the site and of the page, and nothing else that identifies you. A site that is not connected yet gets a <b>Connect</b> button that opens your Sites page. On the free plan the panel shows everything and writes suggestions, and Apply is off.</p>
+<p>The panel is built with Webflow's own colors and type for apps, works with the keyboard alone and names every control and every mark for screen readers.</p>
 
 <h2 id="writes">9. What is written to Webflow, and when</h2>
 <div class="tw"><table><tr><th>What</th><th>When</th><th>How it arrives</th></tr>
@@ -129,7 +130,9 @@ mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 <p>Nothing else is written. Nothing is written on a schedule, and nothing is deleted from Webflow by AI SEO Deck. After an Apply the app tells you to publish your site in Webflow.</p>
 
 <h2 id="languages">10. Sites with several languages</h2>
-<p>On a site with Webflow Localization, AI SEO Deck reads, checks and writes the primary language only. Titles, descriptions and CMS drafts go to the primary locale, and the other languages keep their own text. The app says so next to every Apply button on such a site.</p>
+<p>On a site with Webflow Localization, AI SEO Deck reads and checks the primary language only, and suggestions are written from the pages in that language.</p>
+<p><b>In the web app</b>, titles, descriptions and CMS drafts are written to the primary locale, and the app says so next to every Apply button on such a site. Nothing is written to the other languages: what you localized there stays, and what a language inherits from the primary one follows it, as always in Webflow.</p>
+<p><b>In the Designer panel</b>, <b>Apply to this page</b> sets the title and description on the page as the Designer shows it at that moment, the same as typing them into the page settings there. The panel cannot see which language the Designer is showing. So on a site with more than one language the editor says this before you apply, names the language the suggestion was written from, and asks you to check which language is open.</p>
 
 <h2 id="reports">11. Reports</h2>
 <p>After every scheduled check you get an email with your visibility and your keywords; you can turn it off on your Account page. On every plan you can create a read-only report link for a client, in the Settings of the site. On the Studio and Agency plans the report shows your agency name. Anyone who has the link can open it, it is marked not to be indexed by search engines, and you can replace it at any time, which ends the old link.</p>
@@ -142,6 +145,7 @@ mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 <tr><td><b>Studio</b></td><td>USD 49 a month, or USD 490 a year</td><td>30 keywords on 5 sites. Everything in Solo, 30 keyword checks on demand a month, client report links with your agency name. Site health for 150 pages.</td></tr>
 <tr><td><b>Agency</b></td><td>USD 149 a month, or USD 1,490 a year</td><td>100 keywords on 20 sites. Everything in Studio, 100 keyword checks on demand a month. Site health for 250 pages.</td></tr></table></div>
 <p><b>The free plan</b> needs no card and has no time limit.</p>
+<p><b>Access codes.</b> If Silit Labs gave you an access code, enter it on your Account page, under Plan. It opens the Agency plan on that account with no card.</p>
 <p><b>The free trial.</b> Every paid plan starts with 7 days free, once per customer. The trial is one per customer across the products of Silit Labs: if you already had a free trial of another of our products, Polar's checkout says so and shows the price of the plan before you pay. Polar, our payment provider, takes a card at the start and charges nothing during the trial, and everything in the plan is open right away. If you cancel in those 7 days from your Account page, under Manage billing, nothing is charged and your account moves to the free plan when the trial ends. If you do not cancel, the price of the plan is charged on day 8 and then every month or every year, until you cancel. Polar emails you a reminder before the trial ends.</p>
 <p><b>When a paid plan or a trial ends.</b> Your account moves to the free plan. Nothing is deleted, in AI SEO Deck or in Webflow: your sites, keywords and past answers stay, the keywords and sites beyond the free plan's limits wait and are not checked, and what you applied to Webflow stays as it is. Apply is off until you choose a paid plan again.</p>
 
@@ -156,6 +160,7 @@ mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 <li>in the Designer: the Apps panel, AI SEO Deck, then <b>Remove app</b>.</li>
 </ul>
 <p>After that, Webflow refuses AI SEO Deck's access token. AI SEO Deck notices at its next contact with Webflow, at the latest within a day, asks Webflow nothing more, and deletes the token and the sites of that authorization with everything kept about them. Your Sites page says what happened. To start again, install the app again.</p>
+<p>If that was your last authorization and you have no paid plan, what is left is your account itself: your Webflow user id, name, email and settings. It is kept for 30 days in case you install again, and is deleted after that. Your Sites page shows the date. To delete it sooner, use Delete account.</p>
 <h3>What stays in Webflow, and how to remove it</h3>
 <p>AI SEO Deck adds no code and no element to your site, so there is nothing to clean up on your pages. What you applied stays, because it is your content:</p>
 <ul>
