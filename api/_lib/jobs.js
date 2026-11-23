@@ -62,6 +62,50 @@ async function startRun(site, user, reason, opts) {
   return { run };
 }
 
+/* ---------- when Webflow no longer accepts a token ---------- */
+const removedNotice = (removed) => 'AI SEO Deck no longer has access to Webflow for ' + (removed.label || 'one authorization') + ': the app was uninstalled or its access was removed in Webflow. Its ' + (removed._sites && removed._sites.length === 1 ? 'site was' : 'sites were') + ' deleted from AI SEO Deck with everything kept about them. Install the app again to start over.';
+
+// Webflow answered 401 to a call made with this connection's token. One question settles what that means:
+// GET /v2/token/authorized_by with the same token (`known` skips it when that answer is already at hand).
+// Refused there too: the app was uninstalled or its access was removed. From that moment nothing more is asked of
+// Webflow with that token: it is forgotten with the connection, and the connection's sites are deleted with all
+// that is kept about them. Accepted there: the token works and the 401 was about something else.
+async function accessRemoved(user, connId, known) {
+  const conn = (user.connections || []).find((c) => c.id === connId);
+  if (!conn) return null;
+  const token = store.tokenOf(conn);
+  const st = known || (token ? await wf.tokenStatus(token) : 'revoked');
+  if (st !== 'revoked') return null;
+  const removed = await store.removeConnection(user, connId);
+  if (removed) { user.notice = removedNotice(removed); await store.saveUser(user); }
+  return removed;
+}
+
+// There is no uninstall webhook, and the checks of this app ask the AI engines, not Webflow. So once a day every
+// stored token is asked whether Webflow still accepts it (GET /v2/token/authorized_by): that is how an uninstall
+// is noticed for a site nobody opens. It runs at most once an hour and stops after `budgetMs`.
+async function checkConnections(now, budgetMs) {
+  if (!(await store.lock('conncheck', 3600))) return { asked: 0, removed: 0 };
+  const started = Date.now();
+  const out = { asked: 0, removed: 0 };
+  for (const id of await store.allUserIds()) {
+    if (Date.now() - started > (budgetMs || 8000)) break;
+    const seen = await store.getUser(id);
+    for (const c of (seen && seen.connections) || []) {
+      if (Date.now() - started > (budgetMs || 8000)) break;
+      if (!(await store.dueForTokenCheck(c.id))) continue;
+      const token = store.tokenOf(c);
+      const st = token ? await wf.tokenStatus(token) : 'revoked';
+      out.asked++;
+      if (st !== 'revoked') continue;
+      // the record as it is now: it may have changed while Webflow was asked
+      const user = await store.getUser(id);
+      if (user && (await accessRemoved(user, c.id, 'revoked'))) out.removed++;
+    }
+  }
+  return out;
+}
+
 async function scheduleDue(now, max) {
   const ids = await store.allSiteIds();
   const sites = await store.getSites(ids);
@@ -76,13 +120,7 @@ async function scheduleDue(now, max) {
     // Our checks do not touch Webflow, so an uninstalled app would never be noticed: ask Webflow first.
     const token = store.tokenForSite(user, site);
     const st = token ? await wf.tokenStatus(token) : 'revoked';
-    if (st === 'revoked') {
-      const removed = await store.confirmRevoked(user, site.connectionId, now);
-      if (removed) { user.notice = 'Webflow access for ' + (removed.label || 'one connection') + ' was removed (the app was uninstalled or access was revoked), so its sites were deleted from AI SEO Deck. Connect again to bring them back.'; await store.saveUser(user); }
-      else await store.updateSite(site.id, (s) => { s.sched.nextRunAt = now + 15 * 60000; });
-      continue;
-    }
-    if (st === 'ok' && store.clearRevoked(user, site.connectionId)) await store.saveUser(user);
+    if (st === 'revoked') { await accessRemoved(user, site.connectionId, 'revoked'); continue; }
     const r = await startRun(site, user, site.sched.firstRunDone ? 'scheduled' : 'first');
     if (r.run) started++;
     else await store.updateSite(site.id, (s) => { s.sched.nextRunAt = now + DAY; s.sched.note = r.error; }); // try again tomorrow
@@ -319,10 +357,15 @@ async function tick(opts) {
       out.worked += (r.ok || 0) + (r.failed || 0);
     }
     for (const id of await store.activeRunIds()) if (await maybeFinish(id, Date.now())) out.finished++;
+    // with time left, the daily look at the stored Webflow tokens
+    if (!out.budget && Date.now() < deadline - 12000) {
+      const c = await checkConnections(now, 8000);
+      if (c.asked) out.tokens = c;
+    }
   } finally {
     await store.unlock('tick');
   }
   return out;
 }
 
-module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };
+module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, accessRemoved, checkConnections, removedNotice, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };

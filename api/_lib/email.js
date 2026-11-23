@@ -15,7 +15,8 @@ function sender(as) {
 async function send({ to, subject, html, text, as }) {
   const from = sender(as);
   if (!process.env.RESEND_API_KEY) {
-    console.log('[email skipped]', to, subject);
+    // no address and no subject in the log: an address is personal data
+    console.log('[aiseodeck] an email was not sent: no mail provider is set up');
     return { skipped: true };
   }
   const base = (process.env.RESEND_API_BASE || 'https://api.resend.com').replace(/\/+$/, '');

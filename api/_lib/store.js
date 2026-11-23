@@ -4,6 +4,8 @@
 //   users:all             set of user ids
 //   email:{address}       user id for an email (sign in by email link)
 //   login:{sha256}        one-time sign in link, 15 minutes
+//   oauth:{sha256}        one authorization request to Webflow (its state value): 10 minutes, read once
+//   connchk:{connId}      set for 24 hours each time a connection's token is checked with Webflow
 //   site:{id}             site record: project settings, keywords, latest summary per keyword, schedule, site summary
 //   sites:all             set of tracked site ids (the scheduler walks this)
 //   run:{id}              one check run (keyword questions x engines) with a snapshot of the project
@@ -16,7 +18,7 @@
 //   report:{token}        siteId for public report links
 //   calls:{day}           engine calls made that day (cost guard)
 const kv = require('./kv');
-const { seal, open, random, sha256 } = require('./crypto');
+const { seal, open, random, sha256, timingEqual } = require('./crypto');
 const { limitsFor, QUESTIONS } = require('./plans');
 
 const HISTORY_KEEP = 52;
@@ -59,6 +61,25 @@ async function rateOk(key, max, windowSec) {
 }
 async function allUserIds() { return kv.smembers('users:all'); }
 
+/* ---------- authorization requests to Webflow (the OAuth state) ---------- */
+const OAUTH_STATE_TTL = 600; // seconds
+// Remembers one authorization request: its state value (kept as a hash) and the browser that started it (the hash
+// of that browser's sign-in cookie). The record expires on its own after ten minutes.
+async function saveOauthState(state, browser) {
+  return kv.setNX('oauth:' + sha256(state), { b: sha256(browser), at: Date.now() }, OAUTH_STATE_TTL);
+}
+// Reads and deletes the record in one operation (GETDEL), so a state value works once. True only when the state
+// was issued here, less than ten minutes ago, to the browser that presents it now.
+async function takeOauthState(state, browser) {
+  if (typeof state !== 'string' || !/^[A-Za-z0-9_-]{20,128}$/.test(state)) return false;
+  const rec = await kv.getDelJSON('oauth:' + sha256(state));
+  if (!rec || !rec.b || !rec.at || !browser) return false;
+  if (Date.now() - rec.at > OAUTH_STATE_TTL * 1000) return false;
+  return timingEqual(rec.b, sha256(String(browser)));
+}
+// True once in 24 hours for a connection: the moment to ask Webflow whether its token still works.
+async function dueForTokenCheck(connId) { return kv.setNX('connchk:' + connId, { at: Date.now() }, 86400); }
+
 function newUser(info) {
   return {
     id: info.id,
@@ -71,8 +92,9 @@ function newUser(info) {
     siteIds: []
   };
 }
-function addConnection(user, token, label) {
-  const conn = { id: random(8), tokenEnc: seal({ t: token }), label: label || '', authorizedAt: Date.now() };
+// siteIds: the sites this authorization covered when Webflow was last asked (GET /v2/sites).
+function addConnection(user, token, label, siteIds) {
+  const conn = { id: random(8), tokenEnc: seal({ t: token }), label: label || '', authorizedAt: Date.now(), siteIds: siteIds || [] };
   user.connections.push(conn);
   return conn;
 }
@@ -202,7 +224,8 @@ async function enforceLimit(user) {
   return changed;
 }
 
-// Removes a Webflow connection and every site that came with it.
+// Removes a Webflow connection (its token is forgotten) and every site that came with it. This is what happens
+// when Webflow no longer accepts the token: the app was uninstalled or its access was removed there.
 async function removeConnection(user, connId) {
   const conn = (user.connections || []).find((c) => c.id === connId);
   if (!conn) return null;
@@ -214,24 +237,17 @@ async function removeConnection(user, connId) {
   conn._sites = gone.map((s) => s.name);
   return conn;
 }
-// Webflow answered 401: delete only after a second 401 at least REVOKE_CONFIRM_MS later.
-async function confirmRevoked(user, connId, now) {
-  now = now || Date.now();
+// The in-app Disconnect: the sites of one Webflow authorization leave AI SEO Deck and what is kept about them is
+// deleted. The authorization itself stays as it is in Webflow and here, so the sites can be connected again
+// without asking Webflow for a new authorization. Access to Webflow ends when the app is uninstalled in Webflow.
+async function disconnectSites(user, connId) {
   const conn = (user.connections || []).find((c) => c.id === connId);
   if (!conn) return null;
-  const raw = process.env.REVOKE_CONFIRM_MS;
-  const wait = raw != null && raw !== '' && !isNaN(parseInt(raw, 10)) ? parseInt(raw, 10) : 600000;
-  if (!conn.revokedSince) {
-    conn.revokedSince = now;
-    if (wait > 0) { await saveUser(user); return null; }
-  }
-  if (now - conn.revokedSince < wait) return null;
-  return removeConnection(user, connId);
-}
-function clearRevoked(user, connId) {
-  const conn = (user.connections || []).find((c) => c.id === connId);
-  if (conn && conn.revokedSince) { delete conn.revokedSince; return true; }
-  return false;
+  const sites = await getSites(user.siteIds || []);
+  const gone = sites.filter((x) => x.connectionId === connId);
+  for (const site of gone) await deleteSite(site);
+  user.siteIds = (user.siteIds || []).filter((id) => !gone.some((x) => x.id === id));
+  return { label: conn.label || '', sites: gone.map((x) => x.name) };
 }
 
 // Keywords used by all of a user's sites (the plan's keyword limit is a shared pool)
@@ -350,8 +366,8 @@ async function unlock(name) { return kv.del('lock:' + name); }
 
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
-  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, newUser, addConnection, tokenOf, tokenForSite,
-  primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
+  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, newUser, addConnection, tokenOf, tokenForSite,
+  primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, disconnectSites, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock
 };

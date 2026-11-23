@@ -1,5 +1,8 @@
-// AI SEO Deck inside the Webflow Designer: the page that is open, its keyword, what to fix, and the fixes applied
-// to the page in place. Talks to the app with a Webflow ID token; nothing else identifies the user.
+// AI SEO Deck inside the Webflow Designer: the page that is open, its keyword, what to fix, and a title and
+// description set on the page in place when the user presses Apply.
+// The title and description shown as "now" are the ones the Designer has at this moment (Designer API). The
+// headings, text and image findings come from Site health, which reads the page through the Webflow Data API.
+// Talks to the app with a Webflow ID token; nothing else identifies the user.
 (function () {
   'use strict';
   var API = 'https://aiseodeck.silitlabs.com';
@@ -8,12 +11,13 @@
     view: 'page',
     info: null,
     ctx: null,
-    meta: null,
+    meta: null, // what is in the two fields of the editor
+    ai: null, // the last title and description the AI wrote, to label them as a suggestion
     busy: '',
-    msg: null,
-    token: null,
-    tokenAt: 0
+    msg: null
   };
+  // The SVG namespace, read from the empty <svg> element of index.html.
+  var SVG_NS = document.getElementById('svgns').namespaceURI;
 
   /* ---------- small helpers ---------- */
   function h(tag, attrs) {
@@ -41,11 +45,11 @@
     el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
   }
   function svg(d, cls) {
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var s = document.createElementNS(SVG_NS, 'svg');
     s.setAttribute('viewBox', '0 0 16 16');
     s.setAttribute('aria-hidden', 'true');
     if (cls) s.setAttribute('class', cls);
-    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    var p = document.createElementNS(SVG_NS, 'path');
     p.setAttribute('d', d);
     s.appendChild(p);
     return s;
@@ -73,7 +77,7 @@
     return m;
   }
   function logo() {
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var s = document.createElementNS(SVG_NS, 'svg');
     s.setAttribute('viewBox', '0 0 32 32');
     s.setAttribute('width', '20');
     s.setAttribute('height', '20');
@@ -86,7 +90,7 @@
       ['circle', { cx: 21, cy: 21, r: 4, fill: '#E8C300', stroke: '#2F5BFF', 'stroke-width': 2.4 }]
     ];
     parts.forEach(function (part) {
-      var el = document.createElementNS('http://www.w3.org/2000/svg', part[0]);
+      var el = document.createElementNS(SVG_NS, part[0]);
       Object.keys(part[1]).forEach(function (k) {
         el.setAttribute(k, String(part[1][k]));
       });
@@ -121,12 +125,6 @@
   }
 
   /* ---------- Webflow and the app ---------- */
-  async function idToken() {
-    if (S.token && Date.now() - S.tokenAt < 10 * 60000) return S.token; // valid for 15 minutes
-    S.token = await webflow.getIdToken();
-    S.tokenAt = Date.now();
-    return S.token;
-  }
   async function pageInfo() {
     var site = await webflow.getSiteInfo();
     var page = await webflow.getCurrentPage();
@@ -175,9 +173,18 @@
     }
     return info;
   }
+  // Every request carries a fresh ID token from the Designer. The token is short lived and is not kept.
   async function call(route, body) {
+    var token;
+    try {
+      token = await webflow.getIdToken();
+    } catch (e) {
+      return {
+        error: 'The Designer did not confirm who is using this panel. Close the app and open it again.'
+      };
+    }
     var payload = Object.assign(
-      { idToken: await idToken(), siteId: S.info.siteId, pageId: S.info.pageId, path: S.info.path },
+      { idToken: token, siteId: S.info.siteId, pageId: S.info.pageId, path: S.info.path },
       body || {}
     );
     var res;
@@ -197,13 +204,13 @@
       j = {};
     }
     if (!res.ok && !j.error) j.error = 'AI SEO Deck could not answer. Try again in a minute.';
-    if (res.status === 401) S.token = null;
     return j;
   }
   async function load() {
     S.view = 'page';
     S.msg = null;
     S.meta = null;
+    S.ai = null;
     render(h('p', { class: 'loading', text: 'Reading this page…' }));
     try {
       S.info = await pageInfo();
@@ -284,13 +291,13 @@
             { class: 'card' },
             h('h2', { text: 'Connect this site to AI SEO Deck' }),
             h('p', {
-              text: 'AI SEO Deck has not read this site yet. Connect it once and choose your keywords, then come back here.'
+              text: 'AI SEO Deck has nothing to show for this site here. If the site is not connected yet, connect it and choose your keywords, then come back. If it is connected, press Try again.'
             }),
             h(
               'div',
               { class: 'row' },
               link(c.connectUrl, 'btn mark', 'Connect'),
-              h('button', { class: 'btn', type: 'button', onclick: load }, 'I have connected it')
+              h('button', { class: 'btn', type: 'button', onclick: load }, 'Try again')
             )
           )
         )
@@ -363,7 +370,7 @@
       { class: 'card', 'aria-label': 'Keyword ' + k.text },
       h(
         'div',
-        { style: 'display:grid;gap:3px' },
+        { class: 'kwhead' },
         h('span', { class: 'k', text: 'Keyword for this page' }),
         h('h2', { text: k.text })
       ),
@@ -372,66 +379,78 @@
     );
   }
 
+  // What the title and description of the open page need, from the values the Designer has now.
+  function metaState() {
+    var r = S.ctx && S.ctx.rules;
+    var t = (S.info.title || '').trim(),
+      d = (S.info.description || '').trim();
+    var out = { title: '', description: '', titleLength: t.length, descriptionLength: d.length };
+    if (!t) out.title = 'missing';
+    else if (r && (t.length < r.title.min || t.length > r.title.max)) out.title = 'length';
+    if (!d) out.description = 'missing';
+    else if (r && (d.length < r.description.min || d.length > r.description.max)) out.description = 'length';
+    return out;
+  }
+  function aim(kind) {
+    var r = S.ctx && S.ctx.rules;
+    return r ? 'Aim for ' + r[kind].aimMin + ' to ' + r[kind].aimMax + ' characters' : '';
+  }
+  function isTemplate() {
+    return !!(S.info.template || (S.ctx.page && S.ctx.page.template));
+  }
+  function openEditor() {
+    S.view = 'meta';
+    S.msg = null;
+    draw();
+  }
   function fixItems() {
     var p = S.ctx.page,
-      items = [],
-      codes = p.issues.map(function (x) {
-        return x.code;
-      });
-    var has = function (c) {
-      return codes.indexOf(c) > -1;
-    };
-    if (p.template)
+      items = [];
+    if (isTemplate()) {
       items.push({
-        ok: false,
-        title: 'CMS template page',
-        note: 'Titles and descriptions of collection pages come from the template settings in Webflow.'
+        info: true,
+        title: 'Collection template',
+        note: 'The title and description of collection pages come from the template settings in Webflow.'
       });
-    if (!p.template && (has('title_missing') || has('title_length')))
-      items.push({
-        title: has('title_missing') ? 'No page title' : 'Title length',
-        note:
-          (S.info.title ? S.info.title.length + ' characters. ' : '') + 'Aim for 50 to 60, with the keyword.',
-        cta: 'Fix',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
-      });
-    if (!p.template && (has('desc_missing') || has('desc_length')))
-      items.push({
-        title: has('desc_missing') ? 'No meta description' : 'Description length',
-        note: 'Aim for 120 to 155 characters.',
-        cta: 'Write',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
-      });
-    p.issues.forEach(function (x) {
-      if (
-        ['title_missing', 'title_length', 'desc_missing', 'desc_length'].indexOf(x.code) > -1
-      )
-        return;
+    } else {
+      var m = metaState();
+      if (m.title)
+        items.push({
+          title: m.title === 'missing' ? 'No SEO title' : 'Title length',
+          note:
+            (m.title === 'missing'
+              ? 'Webflow shows the page name instead. '
+              : m.titleLength + ' characters now. ') +
+            aim('title') +
+            (aim('title') ? ', with the keyword.' : ''),
+          cta: m.title === 'missing' ? 'Write' : 'Fix',
+          run: openEditor
+        });
+      if (m.description)
+        items.push({
+          title: m.description === 'missing' ? 'No meta description' : 'Description length',
+          note:
+            (m.description === 'missing' ? '' : m.descriptionLength + ' characters now. ') +
+            aim('description') +
+            (aim('description') ? '.' : ''),
+          cta: m.description === 'missing' ? 'Write' : 'Fix',
+          run: openEditor
+        });
+      if (!m.title && !m.description)
+        items.push({ ok: true, title: 'Title and description are fine', cta: 'Edit', run: openEditor });
+    }
+    // the findings Site health made when it read this page from Webflow
+    (p.issues || []).forEach(function (x) {
+      if (['title_missing', 'title_length', 'desc_missing', 'desc_length'].indexOf(x.code) > -1) return;
       items.push({ title: x.label, note: x.text });
     });
-    if (
-      p.audited &&
-      !p.template &&
-      !has('title_missing') &&
-      !has('title_length') &&
-      !has('desc_missing') &&
-      !has('desc_length')
-    )
+    (p.unknown || []).forEach(function (x) {
       items.push({
-        ok: true,
-        title: 'Title and description are fine',
-        cta: 'Edit',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
+        info: true,
+        title: x.label + ': not determined',
+        note: x.text
       });
+    });
     return items;
   }
 
@@ -467,90 +486,64 @@
           link(c.site.keywordsUrl, 'btn', 'Add a keyword')
         )
       );
-    if (!p.audited) {
-      add(
-        body,
-        h(
-          'section',
-          { class: 'card' },
-          h('h2', { text: 'Read your pages from Webflow' }),
-          h('p', {
-            text: 'Site health reads the pages of this site through Webflow and lists the fixes for each one. You can still write a title and description now.'
-          }),
+    var items = fixItems();
+    var todo = items.filter(function (x) {
+      return !x.ok && !x.info;
+    }).length;
+    var list = h(
+      'ul',
+      { class: 'fixes' },
+      items.map(function (it) {
+        var kind = it.ok ? 'good' : it.info ? 'info' : 'warn';
+        var ic = h('span', { class: 'ic ' + kind }, svg(it.ok ? 'M5 8.3l2 2 4-4.3' : 'M8 4.8v3.6M8 11h.01'));
+        var circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('cx', '8');
+        circle.setAttribute('cy', '8');
+        circle.setAttribute('r', '6.5');
+        ic.firstChild.insertBefore(circle, ic.firstChild.firstChild);
+        return h(
+          'li',
+          null,
+          ic,
           h(
-            'div',
-            { class: 'row' },
-            h(
-              'button',
-              {
-                class: 'btn mark',
-                type: 'button',
-                onclick: function () {
-                  S.view = 'meta';
-                  draw();
-                }
-              },
-              'Title and description'
-            ),
-            link(c.site.healthUrl, 'btn', 'Open Site health')
-          )
-        )
-      );
-    } else {
-      var items = fixItems();
-      var todo = items.filter(function (x) {
-        return !x.ok;
-      }).length;
-      var list = h(
-        'ul',
-        { class: 'fixes' },
-        items.map(function (it) {
-          var ic = h('span', { class: 'ic' }, svg(it.ok ? 'M5 8.3l2 2 4-4.3' : 'M8 4.8v3.6M8 11h.01'));
-          ic.firstChild.style.stroke = it.ok ? 'var(--good)' : 'var(--warn)';
-          var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          circle.setAttribute('cx', '8');
-          circle.setAttribute('cy', '8');
-          circle.setAttribute('r', '6.5');
-          ic.firstChild.insertBefore(circle, ic.firstChild.firstChild);
-          return h(
-            'li',
-            null,
-            ic,
-            h(
-              'span',
-              { class: 'tx' },
-              h('b', { text: it.title }),
-              it.note ? h('span', { class: 'nt', text: it.note }) : null
-            ),
-            it.href
-              ? link(it.href, it.ok ? 'btn' : 'btn mark', it.cta)
-              : it.cta
-                ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', onclick: it.run }, it.cta)
-                : null
-          );
-        })
-      );
-      add(
-        body,
-        h(
-          'section',
-          { class: 'sec', 'aria-labelledby': 'fixh' },
-          h(
-            'div',
-            { class: 'hd' },
-            h('h2', { id: 'fixh', text: 'Fix this page' }),
-            h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })
+            'span',
+            { class: 'tx' },
+            h('b', { text: it.title }),
+            it.note ? h('span', { class: 'nt', text: it.note }) : null
           ),
-          list,
-          h(
-            'p',
-            { class: 'note' },
-            'Site health read this page from Webflow ' + ago(p.readAt || p.auditAt) + '. ',
-            link(c.site.healthUrl, '', 'Refresh in Site health')
-          )
+          it.cta
+            ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', onclick: it.run }, it.cta)
+            : null
+        );
+      })
+    );
+    add(
+      body,
+      h(
+        'section',
+        { class: 'sec', 'aria-labelledby': 'fixh' },
+        h(
+          'div',
+          { class: 'hd' },
+          h('h2', { id: 'fixh', text: 'Fix this page' }),
+          h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })
+        ),
+        list,
+        h(
+          'p',
+          { class: 'note' },
+          'Title and description: as the Designer has them now. ',
+          p.audited
+            ? 'Headings, text and images: read from Webflow by Site health ' +
+                ago(p.readAt || p.auditAt) +
+                '. '
+            : 'Headings, text and images are checked by Site health, which has not read this page yet. ',
+          link(c.site.healthUrl, '', p.audited ? 'Refresh in Site health' : 'Open Site health'),
+          ' ',
+          h('button', { class: 'linkbtn', type: 'button', onclick: load }, 'Read this page again')
         )
-      );
-    }
+      )
+    );
     var report = c.keywords[0] ? c.keywords[0].url : c.site.url;
     render([
       top(),
@@ -569,24 +562,37 @@
     ]);
   }
 
-  function counter(n, lo, hi, max) {
-    return h('span', { class: 'count' + (n >= lo && n <= hi ? ' ok' : ''), text: n + ' of ' + max });
+  // How long a field is, and whether that is inside the length to aim for.
+  function counter(n, kind) {
+    var r = S.ctx && S.ctx.rules;
+    if (!r) return h('span', { class: 'count ok', text: plural(n, 'character') });
+    var ok = n >= r[kind].aimMin && n <= r[kind].aimMax;
+    return h('span', {
+      class: 'count' + (ok ? ' ok' : ''),
+      text: plural(n, 'character') + ', aim for ' + r[kind].aimMin + ' to ' + r[kind].aimMax
+    });
   }
 
   function drawMeta() {
     var c = S.ctx;
+    var template = isTemplate();
     var m = S.meta || { title: S.info.title || '', description: S.info.description || '' };
     var title = h('input', { type: 'text', id: 'mt', maxlength: '90', value: m.title });
     var desc = h('textarea', { id: 'md', maxlength: '200', rows: '4' });
     desc.value = m.description;
     var tCount = h('span'),
       dCount = h('span');
+    var tTag = h('span', { class: 'tag', text: 'Suggested by AI' }),
+      dTag = h('span', { class: 'tag', text: 'Suggested by AI' });
     var serpT = h('span', { class: 't' }),
       serpD = h('span', { class: 'd' });
     function sync() {
       S.meta = { title: title.value, description: desc.value };
-      tCount.replaceWith((tCount = counter(title.value.length, 30, 60, 60)));
-      dCount.replaceWith((dCount = counter(desc.value.length, 70, 160, 160)));
+      tCount.replaceWith((tCount = counter(title.value.length, 'title')));
+      dCount.replaceWith((dCount = counter(desc.value.length, 'description')));
+      // the label stays only while the field holds exactly what the AI wrote
+      tTag.hidden = !(S.ai && S.ai.title === title.value);
+      dTag.hidden = !(S.ai && S.ai.description === desc.value);
       serpT.textContent = title.value || S.info.name || 'Page title';
       serpD.textContent = desc.value || 'The description shows here.';
     }
@@ -598,7 +604,7 @@
       {
         class: 'btn',
         type: 'button',
-        disabled: !!busy,
+        disabled: !!busy || template,
         onclick: async function () {
           S.busy = 'write';
           S.msg = { kind: 'info', text: 'Writing from this page, this takes a few seconds…' };
@@ -606,27 +612,28 @@
           var r = await call('suggest', { what: 'meta', keywordId: c.keywords[0] ? c.keywords[0].id : '' });
           S.busy = '';
           if (r.ok) {
-            S.meta = r.meta;
+            S.meta = { title: r.meta.title, description: r.meta.description };
+            S.ai = { title: r.meta.title, description: r.meta.description };
             S.msg = {
               kind: 'ok',
-              text: r.keyword
-                ? 'Written from this page for the keyword ' +
-                  r.keyword +
-                  '. Change anything before you apply.'
-                : 'Written from this page. Change anything before you apply.'
+              text:
+                (r.keyword
+                  ? 'Written by AI for the keyword ' + r.keyword + ', from the text of this page in Webflow.'
+                  : 'Written by AI from the text of this page in Webflow.') +
+                ' It is a suggestion: nothing is changed until you press Apply.'
             };
           } else S.msg = { kind: 'err', text: r.error || 'No suggestion this time.' };
           drawMeta();
         }
       },
-      S.meta && S.meta.title && S.meta.title !== S.info.title ? 'Write again' : 'Write with AI'
+      S.ai ? 'Write again' : 'Write with AI'
     );
     var apply = h(
       'button',
       {
         class: 'btn mark',
         type: 'button',
-        disabled: !!busy || !c.plan.canApply || c.page.template,
+        disabled: !!busy || !c.plan.canApply || template,
         onclick: async function () {
           var t = title.value.replace(/\s+/g, ' ').trim(),
             d = desc.value.replace(/\s+/g, ' ').trim();
@@ -650,21 +657,18 @@
             };
             return drawMeta();
           }
-          S.info.title = t;
-          S.info.description = d;
-          await call('applied', {
-            title: t,
-            description: d,
-            keywordId: c.keywords[0] ? c.keywords[0].id : ''
-          });
+          // tells the app that this keyword got a fix; the app reads the page's values from Webflow itself
+          await call('applied', { keywordId: c.keywords[0] ? c.keywords[0].id : '' });
           S.busy = '';
           notify('Success', 'Title and description set. Publish the site to make them live.');
           await load();
-          S.msg = {
-            kind: 'ok',
-            text: 'Title and description set on this page. Publish the site to make them live.'
-          };
-          drawPage();
+          if (S.ctx && S.ctx.ok && S.ctx.site.ready) {
+            S.msg = {
+              kind: 'ok',
+              text: 'Title and description set on this page. Publish the site to make them live.'
+            };
+            drawPage();
+          }
         }
       },
       busy === 'apply' ? 'Applying…' : 'Apply to this page'
@@ -678,28 +682,37 @@
         }
       },
       msgBox(),
-      c.page.template
+      template
         ? h('div', {
             class: 'msg info',
-            text: 'This is a CMS template page. Its title and description usually come from collection fields; change them in the template settings.'
+            text: 'This is a Collection template. Its title and description usually come from collection fields; change them in the template settings in Webflow.'
           })
         : null,
       h(
         'div',
-        { class: 'field' },
-        h('div', { class: 'lh' }, h('label', { for: 'mt', text: 'Title' }), tCount),
-        title
+        { class: 'now', 'aria-label': 'On this page now' },
+        h('span', { class: 'k', text: 'On this page now, in the Designer' }),
+        h('span', { class: 'v', text: (S.info.title || '').trim() || '(no SEO title)' }),
+        h('span', { class: 'v sub', text: (S.info.description || '').trim() || '(no meta description)' })
       ),
       h(
         'div',
         { class: 'field' },
-        h('div', { class: 'lh' }, h('label', { for: 'md', text: 'Description' }), dCount),
-        desc
+        h('div', { class: 'lh' }, h('label', { for: 'mt', text: 'New title' }), tTag),
+        title,
+        tCount
       ),
       h(
         'div',
         { class: 'field' },
-        h('span', { style: 'font-size:12px;font-weight:600', text: 'How it can show in search' }),
+        h('div', { class: 'lh' }, h('label', { for: 'md', text: 'New description' }), dTag),
+        desc,
+        dCount
+      ),
+      h(
+        'div',
+        { class: 'field' },
+        h('span', { class: 'flabel', text: 'How the new values can show in search' }),
         h(
           'div',
           { class: 'serp' },
@@ -718,7 +731,11 @@
             'div',
             { class: 'msg info' },
             'Applying is part of the paid plans. Copy the text into Page settings, or ',
-            h('a', { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener' }, 'upgrade'),
+            h(
+              'a',
+              { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener noreferrer' },
+              'see the plans'
+            ),
             '.'
           )
         : null
@@ -732,7 +749,7 @@
         h('div', { class: 'row' }, apply, write),
         h('span', {
           class: 'note',
-          text: 'The change shows in the Designer at once. Publish the site when you are ready.'
+          text: 'Apply sets the two values on this page in the Designer. Publish the site when you are ready.'
         })
       )
     ]);

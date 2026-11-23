@@ -535,8 +535,14 @@ function localeNote(site) {
   return `<p class="small muted" data-locale-note>This site has ${more} (${esc(l.others.join(', '))}). Fixes are written to the primary language${l.name ? ', ' + esc(l.name) + ',' : ''} only. The other languages keep their own text in Webflow.</p>`;
 }
 
-function errorPage(title, message, back) {
-  return layout(title, `<div class="panel stack" role="alert" style="max-width:640px"><h1>${esc(title)}</h1><p class="muted">${esc(message)}</p><div class="actions"><a class="btn" href="${esc(back || '/app')}">Go back</a></div></div>`);
+function errorPage(title, message, back, label) {
+  return layout(title, `<div class="panel stack" role="alert" style="max-width:640px"><h1>${esc(title)}</h1><p class="muted">${esc(message)}</p><div class="actions"><a class="btn" href="${esc(back || '/app')}">${esc(label || 'Go back')}</a></div></div>`);
+}
+// How access to Webflow ends: in Webflow, not here. The words are the ones Webflow uses on those screens.
+const UNINSTALL_HOW = 'To remove AI SEO Deck\'s access to Webflow, remove the app in Webflow. If you authorized single sites: Site settings, Apps & integrations, then Revoke next to AI SEO Deck. If you authorized a whole Workspace: Workspace settings, Apps & integrations, then Uninstall app. In the Designer, the Apps panel has the same under Remove app.';
+// A plain page that says something was done, with one way on.
+function donePage(title, paragraphs, href, label) {
+  return layout(title, `<div class="panel stack" style="max-width:640px"><h1>${esc(title)}</h1>${[].concat(paragraphs).map((p) => `<p class="muted">${esc(p)}</p>`).join('')}<div class="actions"><a class="btn" href="${esc(href || '/')}">${esc(label || 'Go to the home page')}</a></div></div>`);
 }
 function loginPage(q) {
   const msg = q.sent ? noticeHtml('If that email belongs to an AI SEO Deck account, a sign in link is on its way. It works once and expires in 15 minutes.', 'good')
@@ -734,12 +740,18 @@ function dashboard(user, sites, limits, notice, opts) {
 <p class="small muted">${esc(hostOf(s.url))}${s.audit && s.audit.score != null ? `, site health ${s.audit.score}/100` : ''}</p><p class="small">${line}</p>${bars ? `<div class="engs">${bars}</div>` : ''}</div>
 <div class="num">${l ? `<b>${l.score}%</b><span class="tiny muted">visible in AI answers</span>` : ''}</div>
 <div class="go">${ready ? `<a class="btn" href="${esc(siteHref(s))}">Open</a>` : `<a class="btn mark" href="/app/setup?id=${encodeURIComponent(s.id)}">Set up</a>`}</div></div>`;
-  }).join('') : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
+  }).join('') : (user.connections || []).length
+    ? `<div class="panel empty"><h2>No site is connected</h2><p>AI SEO Deck is installed in Webflow, and no site is connected here. Connect one of the sites you authorized, or authorize another site or Workspace in Webflow.</p><div class="actions" style="justify-content:center"><a class="btn mark" href="/app?available=1">Show the sites I authorized</a><a class="btn" href="/auth">Authorize in Webflow</a></div></div>`
+    : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
+  const av = opts.available;
+  const availableBlock = !av ? '' : `<section class="panel stack" id="available" style="margin-bottom:18px"><div><h2>Sites you authorized in Webflow</h2><p class="small muted" style="margin-top:6px" data-read-from-webflow>Read from Webflow ${esc(ago(av.at, now))}. Connecting one of these needs no new authorization.${av.failed ? ' Webflow could not be read for one authorization just now; try again in a minute.' : ''}</p></div>
+${av.sites.length ? `<ul class="plain">${av.sites.map((x) => `<li><span><b>${esc(x.name)}</b>${x.host ? `<span class="tiny muted">, ${esc(x.host)}</span>` : ''}</span><form method="post" action="/app/sites/connect"><input type="hidden" name="site" value="${esc(x.id)}"><button class="btn sm mark" type="submit">Connect</button></form></li>`).join('')}</ul>` : '<p class="small muted">Every site you authorized is connected already.</p>'}
+<div class="actions"><a class="btn sm" href="/app?available=1">Refresh from Webflow</a><a class="btn sm" href="/auth">Authorize another site or Workspace in Webflow</a></div></section>`;
   const engineNote = opts.enginesOn && !opts.enginesOn.length ? noticeHtml('No AI engine is connected on the server yet, so checks cannot run. If you run this app, add an engine API key.', 'warn') : '';
   return layout('Sites · AI SEO Deck', `${noticeHtml(notice)}${engineNote}
 <div class="head"><div><h1>Your sites</h1><p class="meta"><span>${esc(limits.name)} plan</span><span>${used} of ${plural(limits.keywords, 'keyword')} in use</span><span>${limits.plan === 'free' ? 'Checked every month on ' + freeEnginesText() : 'Checked every week on every AI engine'}</span></p></div>
-<div class="actions"><a class="btn" href="/auth">Add Webflow sites</a>${limits.plan !== 'free' ? '' : opts.trialDays ? `<a class="btn mark" href="/app/start?plan=solo&amp;interval=monthly">Try Solo free for ${opts.trialDays} days</a>` : '<a class="btn mark" href="/app/settings#plan">Upgrade</a>'}</div></div>
-<div class="sites">${list}</div>`, { user, nav: 'sites' });
+<div class="actions"><a class="btn" href="${(user.connections || []).length ? '/app?available=1' : '/auth'}">Add a site</a>${limits.plan !== 'free' ? '' : opts.trialDays ? `<a class="btn mark" href="/app/start?plan=solo&amp;interval=monthly">Try Solo free for ${opts.trialDays} days</a>` : '<a class="btn mark" href="/app/settings#plan">Upgrade</a>'}</div></div>
+${availableBlock}<div class="sites">${list}</div>`, { user, nav: 'sites' });
 }
 
 /* ---------- setup ---------- */
@@ -1041,6 +1053,11 @@ function issueLabel(k) {
   return { title_missing: 'No title', title_length: 'Title length', desc_missing: 'No description', desc_length: 'Description length', h1_missing: 'No H1', h1_multiple: 'Several H1', og_missing: 'Social preview', thin: 'Thin content', alt_missing: 'Alt text' }[k] || k;
 }
 
+// Why a finding could not be told for a page: its text is partly inside components, or the page is too long.
+const partialWhy = (p) => (p && p.truncated && !p.components
+  ? 'This page is too long to be read in full, so this could not be told.'
+  : 'Part of the text of this page is inside components, which this read does not open, so this could not be told.');
+
 function auditHtml(site, audit) {
   const id = encodeURIComponent(site.id);
   const readForm = (label, cls, resume) => `<form method="post" action="/app/site/audit"><input type="hidden" name="id" value="${esc(site.id)}">${resume ? '<input type="hidden" name="resume" value="1">' : ''}<button class="btn ${cls}" type="submit">${label}</button></form>`;
@@ -1048,7 +1065,7 @@ function auditHtml(site, audit) {
 ${readForm('Read my pages from Webflow', 'primary')}<p class="tiny muted">Takes up to a minute. Nothing is changed in Webflow.</p></div>`;
   const rows = (audit.pages || []).map((p) => {
     const issues = (p.issues || []).map((k) => `<span class="pill ${PAGE_RULES[k] && PAGE_RULES[k].w >= 10 ? 'bad' : 'warn'}" title="${esc(PAGE_RULES[k] ? PAGE_RULES[k].text : k)}">${esc(issueLabel(k))}</span>`).join(' ');
-    const unknown = (p.unknown || []).length ? ` <span class="pill na" title="Part of this page's text is inside components, which this read does not open, so this could not be told.">${esc(p.unknown.map(issueLabel).join(', '))}: not determined</span>` : '';
+    const unknown = (p.unknown || []).length ? ` <span class="pill na" title="${esc(partialWhy(p))}">${esc(p.unknown.map(issueLabel).join(', '))}: not determined</span>` : '';
     const state = p.state === 'pending' ? ' <span class="pill na">Text not read yet</span>' : p.state === 'unreadable' ? ' <span class="pill na" title="Webflow returned no content for this page.">Text not available</span>' : '';
     return `<tr><td>${p.template ? `<span>${esc(p.name || p.path)}</span>` : `<a href="${esc(audit.origin + p.path)}" target="_blank" rel="noopener">${esc(p.path)}</a>`}<div class="tiny muted">${esc((p.template ? 'Collection template' : p.title || p.name || '').slice(0, 70))}</div></td>
 <td><span class="score ${scoreClass(p.score)}">${p.score == null ? '-' : p.score}</span></td><td>${issues || (p.state === 'pending' ? '' : '<span class="pill good">All good</span>')}${unknown}${state}</td>
@@ -1082,8 +1099,9 @@ ${webflowDomains(site)}
 <h3 style="margin-top:8px">Client report link</h3><p class="small muted">A read-only page with the visibility, the trend and the keyword deck. Anyone with the link can open it.</p>
 ${site.settings.reportToken ? `<pre class="copy">${esc((process.env.APP_URL || '').replace(/\/+$/, '') + '/r/' + site.settings.reportToken)}</pre>` : ''}
 <form method="post" action="/app/site/report" class="actions"><input type="hidden" name="id" value="${id}">${site.settings.reportToken ? '<button class="btn sm" name="action" value="rotate" type="submit">Replace the link</button>' : '<button class="btn sm" type="submit">Create a report link</button>'}</form>
-<h3 style="margin-top:8px">Remove this site</h3><p class="small muted">Deletes its keywords, answers and Site health results from AI SEO Deck. Nothing changes in Webflow.</p>
-<form method="post" action="/app/site/remove"><input type="hidden" name="id" value="${id}"><label class="check"><input type="checkbox" name="sure" value="1" required> I want to remove ${esc(site.name)}</label><button class="btn sm danger" type="submit" style="margin-top:10px">Remove site</button></form></div>
+<h3 style="margin-top:8px">Disconnect this site</h3><p class="small muted">Deletes its keywords, answers and Site health results from AI SEO Deck. Nothing changes in Webflow: the app stays installed there, and you can connect this site again from your Sites page without authorizing again. Titles, descriptions and CMS drafts already applied to Webflow stay in Webflow.</p>
+<p class="small muted">${esc(UNINSTALL_HOW)}</p>
+<form method="post" action="/app/site/remove"><input type="hidden" name="id" value="${id}"><label class="check"><input type="checkbox" name="sure" value="1" required> Disconnect ${esc(site.name)} and delete what is kept about it</label><button class="btn sm danger" type="submit" style="margin-top:10px">Disconnect site</button></form></div>
 </div>`;
 }
 
@@ -1278,7 +1296,7 @@ function fixPage(user, site, row, d) {
   const applyBtn = (label) => `<button class="btn primary" type="submit"${d.limits.canApply ? '' : ' disabled'}>${label}</button>`;
   const faqPairs = draft.faq && draft.faq.length ? draft.faq : [];
   const found = (row.faq || []).length;
-  const partial = (row.unknown || []).length ? '<p class="small muted">Part of this page\'s text is inside components, which this read does not open. What depends on that text is shown as not determined.</p>' : '';
+  const partial = (row.unknown || []).length ? `<p class="small muted">${esc(row.unknown.map(issueLabel).join(', '))}: not determined. ${esc(partialWhy(row))}</p>` : '';
   return layout('Fix ' + row.path + ' · AI SEO Deck', `${noticeHtml(d.notice)}
 <a class="back" href="${esc(siteHref(site, 'tab=audit'))}">${BACK_ICON} Site health</a>
 <div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div>
@@ -1377,7 +1395,10 @@ function settingsPage(user, sites, limits, notice, opts) {
     return `<div class="plan${current ? ' current' : ''}"><b>${esc(p.name)}${current ? ' <span class="pill good">Your plan</span>' : ''}</b><span class="price">${price}<span class="small muted" style="font-weight:500">${k === 'free' ? '' : ' a month'}</span></span>
 <span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? `Checked monthly on ${freeEnginesText()}. Site health and suggestions; apply by copying.` : `Checked weekly on all ${allEnginesCount()} AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
   }).join('');
-  const conns = (user.connections || []).map((c) => `<li><span>${esc(c.label || 'Webflow')}<span class="tiny muted">, connected ${ago(c.authorizedAt)}</span></span><form method="post" action="/app/connection/remove"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn sm ghost" type="submit">Disconnect</button></form></li>`).join('');
+  const conns = (user.connections || []).map((c) => {
+    const n = sites.filter((x) => x.connectionId === c.id).length;
+    return `<li><span>${esc(c.label || 'Webflow')}<span class="tiny muted">, authorized ${ago(c.authorizedAt)}, ${plural(n, 'site')} connected</span></span>${n ? `<form method="post" action="/app/connection/remove" class="actions"><input type="hidden" name="id" value="${esc(c.id)}"><label class="check small"><input type="checkbox" name="sure" value="1" required> Delete what is kept about ${n === 1 ? 'this site' : 'these sites'}</label><button class="btn sm ghost" type="submit">Disconnect</button></form>` : '<a class="btn sm ghost" href="/app?available=1">Connect a site</a>'}</li>`;
+  }).join('');
   return layout('Account · AI SEO Deck', `${noticeHtml(notice)}
 <div class="head"><div><h1>Account</h1><p class="meta"><span>${esc(user.email)}</span></p></div></div>
 <div class="stack">
@@ -1394,8 +1415,11 @@ ${t && opts.billing && limits.plan === 'free' ? `<p class="small">Every paid pla
 <label class="check"><input type="checkbox" name="digest" value="1"${user.settings && user.settings.digest ? ' checked' : ''}> Email me after every scheduled check</label>
 <div class="field"><label for="agency">Agency name on client report links</label><input type="text" id="agency" name="agency" maxlength="80" value="${esc((user.settings && user.settings.brand) || '')}"${limits.whiteLabel ? '' : ' disabled'}><span class="hint">${limits.whiteLabel ? 'Replaces the AI SEO Deck name on report pages.' : 'Available on Studio and Agency.'}</span></div>
 <div class="actions"><button class="btn primary" type="submit">Save</button></div></form>
-<section class="panel stack"><h2>Webflow connections</h2><ul class="plain">${conns || '<li class="muted">None.</li>'}</ul><div class="actions"><a class="btn" href="/auth">Connect more sites</a></div></section>
-<section class="panel stack"><h2>Delete account</h2><p class="small muted">Cancels a paid plan at the end of its period, revokes Webflow access and deletes everything we stored. Changes already applied to your Webflow sites stay.</p>
+<section class="panel stack" id="webflow"><h2>Webflow authorizations</h2><ul class="plain">${conns || '<li class="muted">None.</li>'}</ul>
+<p class="small muted">Disconnect removes the sites of an authorization from AI SEO Deck and deletes what is kept about them. The app stays installed in Webflow, so you can connect the sites again from your Sites page without authorizing again.</p>
+<p class="small muted">${esc(UNINSTALL_HOW)} After that, AI SEO Deck stops at the next contact with Webflow, at the latest within a day, and deletes those sites and what is kept about them.</p>
+<div class="actions"><a class="btn" href="/app?available=1">Connect a site</a><a class="btn" href="/auth">Authorize another site or Workspace</a></div></section>
+<section class="panel stack"><h2>Delete account</h2><p class="small muted">Cancels a paid plan at the end of its period and deletes everything we stored: your sites, keywords, answers, Site health results and the Webflow access tokens. Changes already applied to your Webflow sites stay. The app stays listed in Webflow until you remove it there.</p>
 <form method="post" action="/app/delete"><label class="check"><input type="checkbox" name="sure" value="1" required> Delete my account and all its data</label><button class="btn danger sm" type="submit" style="margin-top:10px">Delete account</button></form></section>
 </div>`, { user, nav: 'settings' });
 }
@@ -1410,4 +1434,5 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
   { plain: true, brandName: brandName || '', footer: brandName ? `<span>Prepared by ${esc(brandName)}</span>` : '<span>Made with AI SEO Deck</span><a href="/">aiseodeck.silitlabs.com</a>' });
 }
 
-module.exports = { issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, COUNTRIES, LANGS };
+module.exports = {
+  partialWhy, UNINSTALL_HOW, donePage, issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, COUNTRIES, LANGS };

@@ -276,9 +276,16 @@ ul.fixes li .ic svg {
   width: 16px;
   height: 16px;
   fill: none;
+  stroke: var(--warn);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+ul.fixes li .ic.good svg {
+  stroke: var(--good);
+}
+ul.fixes li .ic.info svg {
+  stroke: var(--muted);
 }
 ul.fixes li .tx {
   flex: 1;
@@ -370,8 +377,9 @@ ul.fixes li span.nt {
 }
 .field .lh {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 0;
 }
 .field label {
   font-size: 12px;
@@ -453,20 +461,65 @@ textarea:focus {
   background: var(--panel);
   color: #c9ccd8;
 }
-.qa {
+.kwhead {
   display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 9px;
-  background: var(--panel);
+  gap: 3px;
 }
-.qa .rm {
-  justify-self: end;
+.flabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+/* what the page has now, apart from what is being written */
+.now {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px dashed var(--line2);
+}
+.now .k {
   font-size: 11.5px;
-  min-height: 26px;
+  color: var(--muted);
+}
+.now .v {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.now .v.sub {
+  font-weight: 400;
+  color: #c9ccd8;
+}
+.tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(169, 189, 255, 0.16);
+  color: var(--cite);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tag[hidden] {
+  display: none;
+}
+.linkbtn {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .muted {
   color: var(--muted);
+}
+/* the empty svg element the script reads the SVG namespace from */
+.svgns {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 .sr {
   position: absolute;

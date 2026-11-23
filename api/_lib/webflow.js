@@ -48,11 +48,10 @@ function authorizeUrl({ clientId, redirectUri, state }) {
 }
 
 // One token request per authorization code (codes are single use and are never retried or logged).
-// Webflow wants redirect_uri here only when the authorization link had one: our own /auth link
-// sends it, the Marketplace install link does not.
+// Every authorization starts at the app's own /auth address, which names the redirect address, so the same
+// address is named here, as Webflow requires.
 async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
-  const body = { client_id: clientId, client_secret: clientSecret, code, grant_type: 'authorization_code' };
-  if (redirectUri) body.redirect_uri = redirectUri;
+  const body = { client_id: clientId, client_secret: clientSecret, code, grant_type: 'authorization_code', redirect_uri: redirectUri };
   const res = await fetch(API_BASE() + '/oauth/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -67,20 +66,8 @@ async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
   return data.access_token;
 }
 
-// Revokes an access token at Webflow (disconnect and account deletion). Best effort.
-async function revokeToken({ clientId, clientSecret, token }) {
-  if (!clientId || !clientSecret || !token) return false;
-  try {
-    const res = await fetch(API_BASE() + '/oauth/revoke_authorization', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, access_token: token })
-    });
-    const data = await res.json().catch(() => ({}));
-    return !!(res.ok && data && data.didRevoke !== false);
-  } catch (e) { return false; }
-}
-
+// The app never revokes its own authorization at Webflow (POST /oauth/revoke_authorization is not called anywhere):
+// access to Webflow ends when the user uninstalls the app in Webflow. The app notices by a 401 and stops.
 const isRevoked = (e) => !!e && e.status === 401;
 const authorizedBy = (token) => call(token, 'GET', '/token/authorized_by');
 // Who opened the panel inside the Designer: an ID token from webflow.getIdToken(), which only a token of this app
@@ -154,6 +141,6 @@ const getCollection = (token, collectionId) => call(token, 'GET', `/collections/
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
-  SCOPES, call, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
+  SCOPES, call, authorizeUrl, exchangeCode, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
   listPages, getPage, pageDom, updatePageSeo, listCollections, getCollection, createDraftItem
 };

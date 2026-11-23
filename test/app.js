@@ -6,63 +6,7 @@ const crypto = require('crypto');
 
 let passed = 0, failed = 0;
 function assert(c, m) { if (c) { passed++; console.log('  ok   ' + m); } else { failed++; console.log('  FAIL ' + m); } }
-function listen(server) { return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server.address().port))); }
-function readRaw(req) { return new Promise((resolve) => { const ch = []; req.on('data', (c) => ch.push(c)); req.on('end', () => resolve(Buffer.concat(ch).toString())); }); }
-async function readJSON(req) { const raw = await readRaw(req); try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); }
-
-/* ---- mock Redis (Upstash REST subset) ---- */
-const db = new Map();
-const ttl = new Map();
-function alive(k) { if (ttl.has(k) && ttl.get(k) < Date.now()) { db.delete(k); ttl.delete(k); } return db.has(k); }
-function exec(cmd) {
-  const [c, ...a] = cmd;
-  switch (c.toUpperCase()) {
-    case 'GET': return alive(a[0]) ? db.get(a[0]) : null;
-    case 'GETDEL': { const v = alive(a[0]) ? db.get(a[0]) : null; db.delete(a[0]); ttl.delete(a[0]); return v; }
-    case 'MGET': return a.map((k) => (alive(k) ? db.get(k) : null));
-    case 'SET': {
-      const nx = a.includes('NX'); const xx = a.includes('XX'); const exI = a.indexOf('EX');
-      if (nx && alive(a[0])) return null;
-      if (xx && !alive(a[0])) return null;
-      db.set(a[0], a[1]);
-      if (exI > -1) ttl.set(a[0], Date.now() + parseInt(a[exI + 1], 10) * 1000); else ttl.delete(a[0]);
-      return 'OK';
-    }
-    case 'DEL': { let n = 0; for (const k of a) { if (db.delete(k)) n++; ttl.delete(k); } return n; }
-    case 'SADD': { const s = alive(a[0]) ? db.get(a[0]) : new Set(); let n = 0; for (const m of a.slice(1)) if (!s.has(m)) { s.add(m); n++; } db.set(a[0], s); return n; }
-    case 'SREM': { const s = alive(a[0]) ? db.get(a[0]) : new Set(); let n = 0; for (const m of a.slice(1)) if (s.delete(m)) n++; db.set(a[0], s); return n; }
-    case 'SMEMBERS': return alive(a[0]) ? [...db.get(a[0])] : [];
-    case 'SCARD': return alive(a[0]) ? db.get(a[0]).size : 0;
-    case 'LPUSH': { const l = alive(a[0]) ? db.get(a[0]) : []; l.unshift(...a.slice(1).reverse()); db.set(a[0], l); return l.length; }
-    case 'RPUSH': { const l = alive(a[0]) ? db.get(a[0]) : []; l.push(...a.slice(1)); db.set(a[0], l); return l.length; }
-    case 'LPOP': {
-      if (!alive(a[0])) return null;
-      const l = db.get(a[0]);
-      if (a[1] === undefined) { const v = l.shift(); if (!l.length) db.delete(a[0]); return v === undefined ? null : v; }
-      const out = l.splice(0, parseInt(a[1], 10));
-      if (!l.length) db.delete(a[0]);
-      return out.length ? out : null;
-    }
-    case 'LLEN': return alive(a[0]) ? db.get(a[0]).length : 0;
-    case 'LTRIM': { const l = alive(a[0]) ? db.get(a[0]) : []; db.set(a[0], l.slice(parseInt(a[1], 10), parseInt(a[2], 10) + 1)); return 'OK'; }
-    case 'LRANGE': { const l = alive(a[0]) ? db.get(a[0]) : []; const end = parseInt(a[2], 10); return l.slice(parseInt(a[1], 10), end === -1 ? undefined : end + 1); }
-    case 'INCR': { const v = (alive(a[0]) ? parseInt(db.get(a[0]), 10) : 0) + 1; db.set(a[0], String(v)); return v; }
-    case 'INCRBY': { const v = (alive(a[0]) ? parseInt(db.get(a[0]), 10) : 0) + parseInt(a[1], 10); db.set(a[0], String(v)); return v; }
-    case 'EXPIRE': ttl.set(a[0], Date.now() + parseInt(a[1], 10) * 1000); return 1;
-    case 'HSET': { const h = alive(a[0]) ? db.get(a[0]) : new Map(); let n = 0; for (let i = 1; i + 1 < a.length; i += 2) { if (!h.has(a[i])) n++; h.set(a[i], a[i + 1]); } db.set(a[0], h); return n; }
-    case 'HGETALL': { if (!alive(a[0])) return []; const out = []; for (const [k, v] of db.get(a[0])) out.push(k, v); return out; }
-    case 'HLEN': return alive(a[0]) ? db.get(a[0]).size : 0;
-    case 'HINCRBY': { const h = alive(a[0]) ? db.get(a[0]) : new Map(); const v = (parseInt(h.get(a[1]) || '0', 10)) + parseInt(a[2], 10); h.set(a[1], String(v)); db.set(a[0], h); return v; }
-    default: throw new Error('mock redis: unsupported ' + c);
-  }
-}
-const redis = http.createServer(async (req, res) => {
-  const body = await readJSON(req);
-  const u = new URL(req.url, 'http://x');
-  if (u.pathname === '/pipeline') return json(res, 200, body.map((cmd) => { try { return { result: exec(cmd) }; } catch (e) { return { error: e.message }; } }));
-  try { json(res, 200, { result: exec(body) }); } catch (e) { json(res, 400, { error: e.message }); }
-});
+const { listen, db, ttl, redis, engineCalls, flags, ai, emails, resend, wfState, textNode, imageNode, webflow, polarState, polar } = require('./mocks');
 
 /* ---- the customer's published website ---- */
 // The app must never request it. This server counts what it gets, and the run ends by checking that it got nothing.
@@ -79,181 +23,6 @@ const requestedHosts = new Set();
     return realFetch(input, init);
   };
 }
-
-/* ---- mock AI engines and text generation ---- */
-const engineCalls = [];
-let perplexityFailOnce = true;
-let sonarGone = false;
-function answerFor(prompt) {
-  if (/veneer/i.test(prompt)) return { text: 'For veneers in Antalya, patients often choose Lumen Dental, then Bright Smile Clinic. Lumen Dental uses digital smile design.', sources: ['https://www.lumendental.com/veneers', 'https://www.trustpilot.com/review/lumendental.com'] };
-  if (/implant/i.test(prompt)) return { text: 'Bright Smile Clinic is a popular choice for implants in Antalya.', sources: ['https://brightsmile.com/implants', 'https://www.whatclinic.com/x'] };
-  return { text: 'Prices vary by clinic and material. Compare several clinics and read reviews.', sources: ['https://www.whatclinic.com/prices'] };
-}
-const ai = http.createServer(async (req, res) => {
-  const u = new URL(req.url, 'http://x');
-  const body = await readJSON(req);
-  if (u.pathname === '/v1/responses' || u.pathname === '/xai/v1/responses') {
-    const isGrok = u.pathname.startsWith('/xai/');
-    if (!body.tools) {
-      // text generation (suggestions)
-      const ins = String(body.instructions || '') + ' ' + String(body.input || '');
-      engineCalls.push({ e: 'gen', ins: ins.slice(0, 80) });
-      if (/CUTSHORT/.test(ins)) { engineCalls.push({ e: 'gen-max', max: body.max_output_tokens }); return json(res, 200, { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output: [{ type: 'reasoning', summary: [] }] }); }
-      if (/NOJSON/.test(ins)) return json(res, 200, { output_text: 'I could not find enough facts on the page.' });
-      if (/SLOWGEN/.test(ins)) { await new Promise((r) => setTimeout(r, 1500)); return json(res, 200, { output_text: '{"from": "openai"}' }); }
-      if (/List \d+ search keywords/.test(ins)) return json(res, 200, { output_text: '{"keywords": ["Veneers in Antalya", "dental implants antalya", "veneers cost turkey", "Lumen Dental reviews"]}' });
-      if (/For each keyword write/.test(ins)) {
-        const kws = String(body.input).split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2));
-        return json(res, 200, { output_text: JSON.stringify({ items: kws.map((k) => ({ keyword: k, questions: ['Which clinic is best for ' + k + '?', 'How much does ' + k + ' cost?'] })) }) });
-      }
-      if (/draft a web page/.test(ins)) return json(res, 200, { output_text: '{"title": "Dental implants in Antalya | Lumen Dental", "slug": "Dental Implants Antalya", "intro": "Lumen Dental places implants with a fully digital workflow.", "faq": [{"q": "How long do implants take?", "a": "Ask the clinic for your own plan."}, {"q": "Do UK patients come for implants?", "a": "Yes, many patients come from the UK."}]}' });
-      if (/meta description/.test(ins)) return json(res, 200, { output: [{ type: 'message', content: [{ type: 'output_text', text: '```json\n{"title": "Veneers and smile design in Antalya | Lumen Dental", "description": "Digital smile design, veneers and implants in Antalya for patients from the UK and Ireland, planned with a fully digital workflow."}\n```' }] }] });
-      if (/FAQ answers/.test(ins)) return json(res, 200, { output_text: '{"faq": [{"q": "How long do veneers last?", "a": "Veneers usually last 10 to 15 years with good care."}, {"q": "Do UK visitors need a visa?", "a": "Most UK visitors do not need a visa for a short stay."}]}' });
-      if (/Excerpts from AI answers/.test(ins)) return json(res, 200, { output_text: '{"sentiment": ["positive", "neutral", "positive"], "descriptors": ["digital smile design", "popular for veneers"], "check": ["Lumen Dental uses digital smile design."]}' });
-      return json(res, 200, { output_text: '{}' });
-    }
-    engineCalls.push({ e: isGrok ? 'grok' : 'openai', p: body.input, model: body.model, country: body.tools[0].user_location && body.tools[0].user_location.country, auth: req.headers.authorization });
-    const a = answerFor(body.input);
-    return json(res, 200, { model: body.model, output: [
-      { type: 'web_search_call', id: 'ws1', status: 'completed', action: { type: 'search', query: 'antalya dental clinic reviews', sources: a.sources.map((s) => ({ type: 'url', url: s })) } },
-      { type: 'message', content: [{ type: 'output_text', text: a.text, annotations: a.sources.map((s) => ({ type: 'url_citation', url: s, title: 'T', start_index: 0, end_index: 1 })) }] }] });
-  }
-  if (u.pathname === '/v1/agent') {
-    engineCalls.push({ e: 'perplexity-agent', p: body.input, effort: body.effort, country: body.tools && body.tools[0] && body.tools[0].user_location && body.tools[0].user_location.country });
-    const a = answerFor(body.input);
-    const results = a.sources.map((s, i) => ({ id: i + 1, title: 'T' + (i + 1), url: s, snippet: 'x', date: null, source: 'web' }));
-    results.push({ id: results.length + 1, title: 'Uncited', url: 'https://uncited.example/page', snippet: 'y', date: null, source: 'web' });
-    const cites = a.sources.map((s, i) => '[' + (i + 1) + ']').join('');
-    return json(res, 200, { id: 'r1', object: 'response', model: 'perplexity/sonar', status: 'completed', output: [
-      { type: 'search_results', queries: ['veneers antalya clinics', 'antalya dental reviews'], results },
-      { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: a.text + ' ' + cites, annotations: [] }] }],
-      usage: { input_tokens: 900, output_tokens: 200, total_tokens: 1100, cost: { currency: 'USD', total_cost: 0.004, tool_calls_cost: 0.0025 } } });
-  }
-  if (u.pathname === '/v1/sonar') {
-    if (sonarGone) return json(res, 410, { error: { message: 'Sonar chat completions moved to the Agent API' } });
-    engineCalls.push({ e: 'perplexity', p: body.messages[0].content });
-    if (perplexityFailOnce) { perplexityFailOnce = false; return json(res, 429, { error: { message: 'rate limited' } }); }
-    const a = answerFor(body.messages[0].content);
-    return json(res, 200, { model: 'sonar', choices: [{ message: { role: 'assistant', content: a.text } }], citations: a.sources, search_results: a.sources.map((s) => ({ title: 'T', url: s })) });
-  }
-  let m;
-  if ((m = u.pathname.match(/^\/v1beta\/models\/([^/:]+):generateContent$/))) {
-    const prompt = body.contents[0].parts[0].text;
-    if (!body.tools && /CUTSHORT|NOJSON|SLOWGEN/.test(prompt)) return json(res, 200, { candidates: [{ content: { parts: [{ text: 'thinking', thought: true }, { text: '{"from": "gemini"}' }] }, finishReason: 'STOP' }] });
-    engineCalls.push({ e: 'gemini', p: prompt, key: req.headers['x-goog-api-key'], where: body.system_instruction && body.system_instruction.parts[0].text });
-    if (/price|cost/i.test(prompt)) return json(res, 400, { error: { message: 'API key not valid' } });
-    const a = answerFor(prompt);
-    return json(res, 200, { modelVersion: m[1], candidates: [{ content: { parts: [{ text: a.text }] }, groundingMetadata: { webSearchQueries: ['antalya dental clinic reviews'], groundingChunks: a.sources.map((s) => ({ web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc', title: new URL(s).hostname.replace(/^www\./, '') } })) } }] });
-  }
-  if (u.pathname === '/v1/messages') {
-    engineCalls.push({ e: 'claude', p: body.messages[0].content, model: body.model, tool: body.tools[0].type, key: req.headers['x-api-key'] });
-    const a = answerFor(body.messages[0].content);
-    return json(res, 200, { model: body.model, content: [
-      { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'veneers antalya clinics' } },
-      { type: 'web_search_tool_result', tool_use_id: 's1', content: a.sources.map((s) => ({ type: 'web_search_result', url: s, title: 'T' })) },
-      { type: 'text', text: a.text, citations: a.sources.map((s) => ({ type: 'web_search_result_location', url: s, title: 'T', cited_text: 'x' })) }] });
-  }
-  if (u.pathname.startsWith('/v3/dataforseo_labs/google/')) {
-    const task = body[0];
-    const kind = u.pathname.split('/')[4];
-    engineCalls.push({ e: 'labs', kind, task });
-    if (req.headers.authorization !== 'Basic ' + Buffer.from('dl:dp').toString('base64')) return json(res, 200, { status_code: 20000, tasks: [{ status_code: 40100, status_message: 'You are not authorized' }] });
-    let items = [];
-    if (kind === 'keyword_overview') items = task.keywords.map((k) => ({ keyword: k, keyword_info: { search_volume: k.length * 100 }, search_intent_info: { main_intent: 'commercial' } }));
-    if (kind === 'ranked_keywords') items = [{ keyword_data: { keyword: 'Smile Makeover Antalya', keyword_info: { search_volume: 880 } }, ranked_serp_element: { serp_item: { type: 'ai_overview_reference', url: 'https://lumendental.com/smile' } } }];
-    if (kind === 'related_keywords') items = [{ keyword_data: { keyword: task.keyword + ' price', keyword_info: { search_volume: 300 } } }, { keyword_data: { keyword: 'best ' + task.keyword, keyword_info: { search_volume: 500 } } }];
-    return json(res, 200, { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.012, result: [{ items_count: items.length, items }] }] });
-  }
-  if (u.pathname === '/v3/serp/google/organic/live/advanced' || u.pathname === '/v3/serp/google/ai_mode/live/advanced') {
-    const mode = u.pathname.includes('ai_mode') ? 'aimode' : 'aio';
-    const task = body[0];
-    engineCalls.push({ e: mode, p: task.keyword, loc: task.location_code, lang: task.language_code, auth: req.headers.authorization });
-    if (req.headers.authorization !== 'Basic ' + Buffer.from('dl:dp').toString('base64')) return json(res, 200, { status_code: 20000, tasks: [{ status_code: 40100, status_message: 'You are not authorized' }] });
-    const a = answerFor(task.keyword);
-    const overview = { type: 'ai_overview', markdown: mode === 'aio' && /veneer/i.test(task.keyword) ? 'Lumen Dental and Bright Smile Clinic are popular for veneers in Antalya [1](https://lumendental.com/veneers).' : a.text, items: [], references: a.sources.map((s) => ({ type: 'ai_overview_reference', domain: new URL(s).hostname.replace(/^www\./, ''), url: s, title: 'T' })) };
-    const items = mode === 'aio' && /implant/i.test(task.keyword) ? [{ type: 'organic', url: 'https://x.com' }] : [overview, { type: 'organic', url: 'https://x.com' }];
-    return json(res, 200, { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.0024, result: [{ keyword: task.keyword, items }] }] });
-  }
-  json(res, 404, { error: { message: 'mock ai: no route ' + u.pathname } });
-});
-
-/* ---- mock Resend ---- */
-const emails = [];
-const resend = http.createServer(async (req, res) => { const body = await readJSON(req); emails.push(body); json(res, 200, { id: 'em_' + emails.length }); });
-
-/* ---- mock Webflow ---- */
-const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [] };
-let nodeSeq = 0;
-// a text node as GET /v2/pages/:page_id/dom returns it: the HTML of the element and its plain text
-const textNode = (html) => ({ id: 'n' + (++nodeSeq), type: 'text', text: { html, text: html.replace(/<[^>]+>/g, '') }, attributes: {} });
-const imageNode = (alt) => ({ id: 'n' + (++nodeSeq), type: 'image', image: { alt, assetId: 'asset' + nodeSeq }, attributes: {} });
-const findPage = (id) => { for (const [sid, list] of Object.entries(wfState.pages)) { const pg = list.find((x) => x.id === id); if (pg) return { sid, pg }; } return null; };
-const webflow = http.createServer(async (req, res) => {
-  const body = await readJSON(req);
-  const u = new URL(req.url, 'http://x');
-  if (u.pathname === '/oauth/access_token') {
-    if (body.code !== 'good-code' || body.client_id !== 'cid' || body.client_secret !== 'sec') return json(res, 400, { error: 'invalid_grant' });
-    if (body.redirect_uri !== 'https://app.test/callback') return json(res, 400, { error: 'invalid_grant', error_description: 'redirect_uri mismatch' });
-    return json(res, 200, { access_token: 'tok_abc', token_type: 'bearer' });
-  }
-  if (u.pathname === '/oauth/revoke_authorization') { wfState.revokeCalls.push(body); return json(res, 200, { didRevoke: true }); }
-  if (wfState.revoked || (req.headers.authorization || '') !== 'Bearer tok_abc') return json(res, 401, { message: 'Request not authorized' });
-  const p = u.pathname;
-  wfState.paths.push(req.method + ' ' + p);
-  let m;
-  if (p === '/v2/token/authorized_by') return json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' });
-  if (p === '/beta/token/resolve' && req.method === 'POST') { const t = String((body && body.idToken) || ''); return t.startsWith('idt:') ? json(res, 200, { id: t.split(':')[2] || 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L', siteId: t.split(':')[1] }) : json(res, 401, { message: 'Invalid ID token' }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'GET') { const f = findPage(m[1]); return f ? json(res, 200, Object.assign({ siteId: f.sid }, f.pg)) : json(res, 404, { message: 'mock: no page' }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)\/dom$/)) && req.method === 'GET') {
-    // like Webflow: at most 100 nodes a call, with the total in the pagination
-    wfState.domCalls.push(m[1]);
-    if (wfState.domFail[m[1]]) return json(res, wfState.domFail[m[1]], { message: 'mock: the content of this page is not served now' });
-    const f = findPage(m[1]);
-    if (!f) return json(res, 404, { message: 'mock: no page' });
-    const all = wfState.dom[m[1]] || [];
-    const limit = Math.min(100, parseInt(u.searchParams.get('limit') || '100', 10));
-    const offset = parseInt(u.searchParams.get('offset') || '0', 10);
-    return json(res, 200, { pageId: m[1], nodes: all.slice(offset, offset + limit), pagination: { limit, offset, total: all.length }, lastUpdated: f.pg.lastUpdated || null });
-  }
-  if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
-  if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
-  if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'PUT') {
-    // like Webflow: a primary locale id is refused, only a secondary one may be named
-    const lid = u.searchParams.get('localeId');
-    const site0 = wfState.sites[0] || {};
-    if (lid && site0.locales && site0.locales.primary && site0.locales.primary.id === lid) return json(res, 400, { code: 'bad_request', message: 'Bad Request: Request is malformed: The provided locale must be a secondary locale.' });
-    const f = findPage(m[1]);
-    if (!f) return json(res, 404, { message: 'mock: no page' });
-    // like Webflow: the page keeps what was sent, and the answer is the page as it is now
-    if (body && body.seo) f.pg.seo = Object.assign({}, f.pg.seo, body.seo);
-    if (body && body.openGraph) f.pg.openGraph = Object.assign({}, f.pg.openGraph, body.openGraph);
-    wfState.pageUpdates.push({ id: m[1], body, localeId: lid });
-    return json(res, 200, Object.assign({ siteId: f.sid }, f.pg));
-  }
-  if ((m = p.match(/^\/v2\/sites\/(\w+)\/collections$/))) return json(res, 200, { collections: [{ id: 'colFaq', displayName: 'FAQs', slug: 'faqs' }] });
-  if (p === '/v2/collections/colFaq') return json(res, 200, { id: 'colFaq', displayName: 'FAQs', fields: [{ slug: 'name', type: 'PlainText', displayName: 'Name' }, { slug: 'slug', type: 'PlainText', displayName: 'Slug' }, { slug: 'answer', type: 'RichText', displayName: 'Answer' }] });
-  if (p === '/v2/collections/colFaq/items' && req.method === 'POST') { wfState.items.push(body); return json(res, 202, { id: 'it' + wfState.items.length }); }
-  json(res, 404, { message: 'mock: no route ' + p });
-});
-
-/* ---- mock Polar ---- */
-const polarState = { checkouts: [], checkout: null, subs: {} };
-const polar = http.createServer(async (req, res) => {
-  const u = new URL(req.url, 'http://x');
-  const body = await readJSON(req);
-  let pm;
-  if (req.method === 'GET' && (pm = u.pathname.match(/^\/v1\/checkouts\/([\w-]+)$/))) return polarState.checkout && polarState.checkout.id === pm[1] ? json(res, 200, polarState.checkout) : json(res, 404, { detail: 'not found' });
-  if (req.method === 'GET' && (pm = u.pathname.match(/^\/v1\/subscriptions\/([\w-]+)$/))) return polarState.subs[pm[1]] ? json(res, 200, polarState.subs[pm[1]]) : json(res, 404, { detail: 'not found' });
-  if (u.pathname === '/v1/products/') return json(res, 200, { items: [
-    { id: 'p_other', name: 'Flowdeck Solo Monthly', recurring_interval: 'month', metadata: {} },
-    { id: 'p_solo_m', name: 'AI SEO Deck Solo', recurring_interval: 'month', metadata: { app: 'aiseodeck', plan: 'solo' } },
-    { id: 'p_solo_y', name: 'AI SEO Deck Solo Yearly', recurring_interval: 'year', metadata: { app: 'aiseodeck', plan: 'solo' } },
-    { id: 'p_studio_m', name: 'AI SEO Deck Studio', recurring_interval: 'month', metadata: {} }
-  ], pagination: { max_page: 1 } });
-  if (u.pathname === '/v1/checkouts/') { polarState.checkouts.push(body); return json(res, 201, { url: 'https://polar.test/checkout/1' }); }
-  json(res, 404, { detail: 'no route' });
-});
 
 /* ---- app under test ---- */
 function startApp() {
@@ -290,7 +59,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   const polarPort = await listen(polar);
   Object.assign(process.env, {
     WEBFLOW_CLIENT_ID: 'cid', WEBFLOW_CLIENT_SECRET: 'sec', SESSION_SECRET: 'test-session-secret-which-is-long', APP_URL: 'https://app.test', CRON_SECRET: 'cronkey',
-    SITE_URL_SCHEME: 'http', ALLOW_PRIVATE_FETCH: '1', REVOKE_CONFIRM_MS: '0',
+    SITE_URL_SCHEME: 'http',
     KV_REST_API_URL: 'http://127.0.0.1:' + redisPort, KV_REST_API_TOKEN: 't',
     WEBFLOW_API_BASE: 'http://127.0.0.1:' + wfPort, WEBFLOW_AUTH_BASE: 'http://127.0.0.1:' + wfPort,
     RESEND_API_KEY: 'rk', RESEND_API_BASE: 'http://127.0.0.1:' + resendPort, EMAIL_FROM: 'AI SEO Deck <t@test>',
@@ -455,7 +224,8 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const htmlSrc = code.find((c) => c.f === 'api/_lib/html.js').s;
     assert((htmlSrc.match(/\bfetch\s*\(/g) || []).length === 3 && (htmlSrc.match(/\bfetch\s*\(\s*'\/app\//g) || []).length === 3, "the scripts in the app's own pages call the app itself and nothing else");
     const wfSrc = code.find((c) => c.f === 'api/_lib/webflow.js').s;
-    assert((wfSrc.match(/\bfetch\s*\(/g) || []).length === 3 && (wfSrc.match(/\bfetch\s*\(\s*API_BASE\(\) \+/g) || []).length === 3, "every call of the Webflow client goes to Webflow's API address");
+    const wfLibEarly = require('../api/_lib/webflow');
+    assert((wfSrc.match(/\bfetch\s*\(/g) || []).length === 2 && (wfSrc.match(/\bfetch\s*\(\s*API_BASE\(\) \+/g) || []).length === 2 && !/revoke_authorization'/.test(wfSrc) && !wfLibEarly.revokeToken, "every call of the Webflow client goes to Webflow's API address, and none of them revokes the authorization");
     const betaPaths = code.flatMap((c) => (c.s.match(/\/beta\/[A-Za-z0-9_\/:{}$.-]*/g) || []).map((x) => c.f + ' ' + x));
     assert([...new Set(betaPaths)].join() === 'api/_lib/webflow.js /beta/token/resolve', 'no feature uses a beta endpoint of Webflow: the one beta path in the code resolves the ID token of the Designer panel (found: ' + betaPaths.join(', ') + ')');
     assert(!code.some((c) => /schema-markup|jsonLdSchema|ld\+json|robots\.txt|sitemap\.xml/i.test(c.s) && c.f !== 'api/_lib/html.js' && c.f !== 'api/_lib/health.js'), 'nothing in the app reads or writes schema markup, robots.txt or a sitemap');
@@ -479,14 +249,59 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   const post = (path, cookie, body, origin) => request(port, 'POST', path, { headers: { cookie, 'content-type': 'application/x-www-form-urlencoded', origin: origin || 'https://app.test' }, body: typeof body === 'string' ? body : form(body) });
   const pump = async (cookie) => { for (let i = 0; i < 10; i++) { const x = await post('/app/run/pump', cookie, 'id=siteA'); const j = JSON.parse(x.body); if (j.finished || j.idle) break; } };
 
+  console.log('the install address and the OAuth state');
+  {
+    const sha = (v) => crypto.createHash('sha256').update(v).digest('hex');
+    // every authorization starts at /auth, which mints a state of its own each time
+    const a1 = await request(port, 'GET', '/auth');
+    const a2 = await request(port, 'GET', '/auth');
+    const u1 = new URL(a1.headers.location);
+    const s1 = u1.searchParams.get('state'), s2 = new URL(a2.headers.location).searchParams.get('state');
+    assert(a1.status === 302 && u1.origin === 'http://127.0.0.1:' + wfPort && u1.pathname === '/oauth/authorize' && u1.searchParams.get('client_id') === 'cid' && u1.searchParams.get('response_type') === 'code' && u1.searchParams.get('redirect_uri') === 'https://app.test/callback', 'the install address of the app sends the browser to the Webflow authorization screen');
+    assert(s1 && s2 && s1 !== s2 && s1.length >= 40, 'two requests carry two different state values');
+    const b1 = cookiesFrom(a1), b2 = cookiesFrom(a2);
+    assert(/^ad_oauth=[A-Za-z0-9_-]{24,}$/.test(b1) && b1 !== b2 && (a1.headers['set-cookie'] || []).every((c) => /HttpOnly/.test(c) && /Secure/.test(c) && /SameSite=Lax/.test(c)), 'the browser that starts gets a value of its own, in a cookie that scripts cannot read');
+    assert(db.has('oauth:' + sha(s1)) && db.has('oauth:' + sha(s2)) && ![...db.keys()].some((k) => k.includes(s1)) && JSON.parse(db.get('oauth:' + sha(s1))).b === sha(b1.split('=')[1]) && ttl.get('oauth:' + sha(s1)) - Date.now() <= 600000 && ttl.get('oauth:' + sha(s1)) - Date.now() > 590000, 'the state is kept on the server as a hash, tied to that browser, and expires on its own after ten minutes');
+    const before = wfState.tokenRequests.length;
+    let x = await request(port, 'GET', '/callback?code=good-code', { headers: { cookie: b1 } });
+    assert(x.status === 400 && x.body.includes('This sign in cannot be completed') && x.body.includes('href="/auth"') && wfState.tokenRequests.length === before, 'a callback with no state is refused before the code is used (this is what the Install button of the developer Workspace sends)');
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s1.slice(0, -2) + (s1.endsWith('AA') ? 'BB' : 'AA'), { headers: { cookie: b1 } });
+    assert(x.status === 400 && wfState.tokenRequests.length === before, 'a changed state is refused');
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s1 + '&state=' + s1, { headers: { cookie: b1 } });
+    assert(x.status === 400 && wfState.tokenRequests.length === before, 'a state given twice in one address is refused');
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s2, { headers: { cookie: 'ad_oauth=' + 'z'.repeat(32) } });
+    assert(x.status === 400 && wfState.tokenRequests.length === before, 'a state completed in another browser is refused');
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s2, { headers: { cookie: b2 } });
+    assert(x.status === 400 && wfState.tokenRequests.length === before && !db.has('oauth:' + sha(s2)), 'and that attempt used it up: it works for nobody afterwards');
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s2);
+    assert(x.status === 400 && wfState.tokenRequests.length === before, 'a callback from a browser that never started is refused');
+    const a3 = await request(port, 'GET', '/auth');
+    const s3 = new URL(a3.headers.location).searchParams.get('state');
+    const old = JSON.parse(db.get('oauth:' + sha(s3))); old.at = Date.now() - 11 * 60000; db.set('oauth:' + sha(s3), JSON.stringify(old));
+    x = await request(port, 'GET', '/callback?code=good-code&state=' + s3, { headers: { cookie: cookiesFrom(a3) } });
+    assert(x.status === 400 && wfState.tokenRequests.length === before, 'a state older than ten minutes is refused');
+    const a4 = await request(port, 'GET', '/auth');
+    const s4 = new URL(a4.headers.location).searchParams.get('state');
+    x = await request(port, 'GET', '/callback?error=access_denied&state=' + s4, { headers: { cookie: cookiesFrom(a4) } });
+    assert(x.status === 400 && x.body.includes('You cancelled on the Webflow screen') && x.body.includes('nothing was stored') && wfState.tokenRequests.length === before && !db.has('oauth:' + sha(s4)) && !db.has('user:user_1') && !(x.headers['set-cookie'] || []).some((c) => c.startsWith('ad_session=')), 'a denied request ends on a page that says nothing was stored: no account, no session, no code exchange');
+    x = await request(port, 'GET', '/callback?state=' + s1, { headers: { cookie: b1 } });
+    assert(x.status === 400 && x.body.includes('Missing code') && wfState.tokenRequests.length === before && !db.has('oauth:' + sha(s1)), 'a callback with a good state and no code does nothing, and the state is used up');
+  }
+
   console.log('connect from a keyword on the home page, then set up');
   let r = await request(port, 'GET', '/auth?kw=' + encodeURIComponent('Veneers in Antalya'));
   const state = new URL(r.headers.location).searchParams.get('state');
+  const startCookies = cookiesFrom(r);
   assert(r.status === 302 && /scope=authorized_user%3Aread\+sites%3Aread\+pages%3Aread\+pages%3Awrite\+cms%3Aread\+cms%3Awrite/.test(r.headers.location), 'auth asks for the read, page write and CMS scopes');
   assert((r.headers['set-cookie'] || []).some((c) => c.startsWith('ad_kw=veneers%20in%20antalya')), 'the keyword from the home page waits in a cookie');
-  r = await request(port, 'GET', '/callback?code=good-code&state=' + state, { headers: { cookie: cookiesFrom(r) } });
+  r = await request(port, 'GET', '/callback?code=good-code&state=' + state, { headers: { cookie: startCookies } });
   const cookie = cookiesFrom(r);
   assert(r.status === 302 && r.headers.location === '/app/setup?id=siteA&kw=veneers%20in%20antalya', 'one new site goes straight to setup, with the keyword');
+  assert(wfState.tokenRequests.length === 1 && wfState.tokenRequests[0].redirect_uri === 'https://app.test/callback' && getJ('user:user_1').connections.length === 1 && getJ('user:user_1').connections[0].siteIds.join() === 'siteA' && !JSON.stringify(getJ('user:user_1')).includes('tok_abc'), 'the code is exchanged once, with the redirect address of the app, and the token is kept encrypted');
+  {
+    const again = await request(port, 'GET', '/callback?code=good-code&state=' + state, { headers: { cookie: startCookies } });
+    assert(again.status === 400 && again.body.includes('This sign in cannot be completed') && wfState.tokenRequests.length === 1, 'a state that was used once does not work a second time, in the same browser either');
+  }
   r = await request(port, 'GET', '/app/setup?id=siteA&kw=veneers%20in%20antalya', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('Set up Lumen Dental') && r.body.includes('value="en" selected') && r.body.includes('>veneers in antalya</textarea>'), 'setup page shows the site and holds the keyword');
   assert(!/name="domains"/.test(r.body) && r.body.includes('Your website, read from Webflow') && r.body.includes('lumendental.com, lumen-dental.webflow.io') && r.body.includes('Read from Webflow just now') && /<button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow<\/button>/.test(r.body), 'setup asks for no website address: the addresses come from Webflow, with the time they were read and a refresh');
@@ -797,12 +612,30 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 403 && !r.headers['access-control-allow-origin'] && !/keyword|engines/.test(r.body), 'the panel of another app is refused, with a valid ID token too');
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' }, null);
   assert(r.status === 403, 'a request that names no origin is refused');
-  r = await ext('context', { siteId: 'siteA', idToken: 'bad-token', pageId: 'p2', path: '/about' });
-  assert(r.status === 401 && /session/.test(JSON.parse(r.body).error), 'an ID token Webflow does not know is refused');
-  r = await ext('context', { siteId: 'siteA', idToken: 'idt:otherSite', pageId: 'p2', path: '/about' });
-  assert(r.status === 403, 'an ID token made on another site is refused');
-  r = await ext('context', { siteId: 'siteNotHere', idToken: 'idt:siteNotHere', pageId: 'x1', path: '/' });
-  assert(r.status === 200 && JSON.parse(r.body).connect === true && /\/auth$/.test(JSON.parse(r.body).connectUrl), 'a site not connected yet gets a link to connect it');
+  {
+    // a caller that cannot be confirmed gets one and the same answer, whatever the reason
+    const refusedOnes = [];
+    refusedOnes.push(await ext('context', { siteId: 'siteA', idToken: 'bad-token', pageId: 'p2', path: '/about' }));
+    refusedOnes.push(await ext('context', { siteId: 'siteA', idToken: 'idt:otherSite', pageId: 'p2', path: '/about' }));
+    refusedOnes.push(await ext('context', { siteId: 'siteNotHere', idToken: 'idt:siteNotHere', pageId: 'x1', path: '/' }));
+    wfState.resolveStatus = 500;
+    refusedOnes.push(await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' }));
+    wfState.resolveStatus = 0;
+    const domAt = wfState.domCalls.length, updatesAt = wfState.pageUpdates.length;
+    const fixedBefore = getJ('site:siteA').keywords.find((k) => k.id === kVen.id).fixedAt;
+    await new Promise((done) => setTimeout(done, 5));
+    refusedOnes.push(await ext('suggest', { siteId: 'siteA', idToken: 'idt:otherSite', pageId: 'p2', path: '/about', what: 'meta' }));
+    refusedOnes.push(await ext('applied', { siteId: 'siteA', idToken: 'bad-token', pageId: 'p2', path: '/about', keywordId: kVen.id }));
+    const first = JSON.parse(refusedOnes[0].body);
+    assert(refusedOnes.every((x) => x.status === 200 && x.body === refusedOnes[0].body) && Object.keys(first).sort().join() === 'connect,connectUrl' && first.connect === true && first.connectUrl === 'https://app.test/app?available=1', 'an unknown ID token, a token of another site, a site that is not connected and a failing Webflow all get the same answer: it does not tell which sites use the app');
+    assert(wfState.domCalls.length === domAt && wfState.pageUpdates.length === updatesAt && getJ('site:siteA').keywords.find((k) => k.id === kVen.id).fixedAt === fixedBefore, 'and nothing is read or changed for such a caller');
+    r = await ext('context', { siteId: 'siteA', pageId: 'p2', path: '/about' });
+    assert(r.status === 400, 'a request without an ID token is a bad request');
+    r = await ext('context', { siteId: ['siteA'], idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    assert(r.status === 400, 'and so is one whose site id is not a plain id');
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA:user_77', pageId: 'p2', path: '/about' });
+    assert(r.status === 200 && JSON.parse(r.body).ok === true, 'a teammate who opens the panel on the same site in the Designer is confirmed by Webflow for that site');
+  }
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
   let ctx = JSON.parse(r.body);
   assert(r.status === 200 && ctx.ok && ctx.page.path === '/about' && ctx.page.audited && ctx.plan.canApply === true && /\/app\/site\?id=siteA/.test(ctx.site.url), 'the panel gets the page it is on, matched by its id');
@@ -935,11 +768,11 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(call && call.effort === 'fast' && call.country === 'GB', 'Agent API asked with effort fast and the country');
     assert(ans.text && ans.queries.length === 2 && ans.sources.length >= 1 && !ans.sources.some((s) => /uncited/.test(s.url)) && ans.consulted.some((s) => /uncited/.test(s.url)), 'Agent API answer read: cited results are sources, the rest consulted, searches kept');
     delete process.env.PERPLEXITY_API;
-    sonarGone = true;
+    flags.sonarGone = true;
     const before = engineCalls.filter((c) => c.e === 'perplexity-agent').length;
     ans = await engines.ask('perplexity', q, { country: 'GB', timeoutMs: 5000 });
     assert(ans.text && engineCalls.filter((c) => c.e === 'perplexity-agent').length === before + 1, 'when Sonar is gone, Perplexity answers come from the Agent API');
-    sonarGone = false;
+    flags.sonarGone = false;
   }
 
   console.log('slow engines get a full window');
@@ -1069,9 +902,13 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   delete process.env.MAX_DAILY_CALLS;
 
   console.log('delete account');
+  r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
+  assert(r.body.includes('deletes everything we stored') && r.body.includes('the Webflow access tokens') && r.body.includes('The app stays listed in Webflow until you remove it there'), 'the account page says what deleting the account deletes and what it leaves to Webflow');
   r = await post('/app/delete', cookie, 'sure=1');
-  assert(r.headers.location === '/?deleted=1' && !db.get('user:user_1') && !db.get('site:siteA') && !db.get('audit:siteA') && !db.get('hist:siteA') && !db.get('res:' + run4.id), 'account and all site data deleted, single keyword checks included');
-  assert(wfState.revokeCalls.length === 1, 'Webflow access revoked');
+  assert(r.status === 200 && r.body.includes('Your account is deleted') && r.body.includes('Uninstall app') && !db.get('user:user_1') && !db.get('site:siteA') && !db.get('audit:siteA') && !db.get('hist:siteA') && !db.get('res:' + run4.id) && ![...db.keys()].some((k) => k.startsWith('email:')), 'account and all site data deleted, single keyword checks included, and the page says how to remove the app in Webflow');
+  assert(wfState.revokeCalls.length === 0 && (r.headers['set-cookie'] || []).some((c) => c.startsWith('ad_session=;')), 'the stored tokens are deleted with the account and the session ends; nothing is revoked at Webflow');
+  r = await request(port, 'GET', '/app', { headers: { cookie } });
+  assert(r.status === 302 && r.headers.location === '/login', 'the old session opens nothing');
 
   console.log('signed in keyword from the home page, uninstall detection');
   r = await request(port, 'GET', '/auth');
@@ -1079,7 +916,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/callback?code=good-code&state=' + st2, { headers: { cookie: cookiesFrom(r) } });
   const cookie2 = cookiesFrom(r);
   r = await post('/app/setup', cookie2, { id: 'siteA', brand: 'Lumen Dental', domains: host, language: 'en', pick: ['veneers in antalya'] });
-  const firstRun = getJ('site:siteA').sched.runId;
+  let firstRun = getJ('site:siteA').sched.runId;
   assert(!!firstRun, 'reconnected site starts its first check');
   r = await request(port, 'GET', '/auth?plan=studio&interval=yearly', { headers: { cookie: cookie2 } });
   assert(r.headers.location === '/app/start?plan=studio&interval=yearly', 'a signed in user goes from a plan button straight to the start page');
@@ -1088,18 +925,88 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(cookiesFrom(r).includes('ad_plan='), 'the plan waits in a cookie during Webflow sign in');
   r = await request(port, 'GET', '/callback?code=good-code&state=' + st3, { headers: { cookie: cookiesFrom(r) } });
   assert(r.headers.location === '/app/start?plan=solo&interval=monthly', 'after Webflow the plan opens the start page');
+  assert(getJ('user:user_1').connections.length === 1 && getJ('site:siteA').connectionId === getJ('user:user_1').connections[0].id && wfState.revokeCalls.length === 0, 'a new authorization takes the place of the older one for the same sites: the older token is forgotten, and nothing is revoked at Webflow');
   r = await request(port, 'GET', '/auth?kw=all%20on%204%20antalya', { headers: { cookie: cookie2 } });
   assert(r.headers.location === '/app?kw=all%20on%204%20antalya', 'a signed in user skips Webflow and goes to the app with the keyword');
   r = await request(port, 'GET', r.headers.location, { headers: { cookie: cookie2 } });
   assert(r.headers.location === '/app/site?id=siteA&tab=keywords&kw=all%20on%204%20antalya', 'the keyword opens on the only site');
   r = await request(port, 'GET', r.headers.location, { headers: { cookie: cookie2 } });
   assert(r.body.includes('value="all on 4 antalya"'), 'the add keyword box holds it');
+
+  console.log('disconnect, and connect again without a new authorization');
+  {
+    const tokensBefore = wfState.tokenRequests.length;
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=settings', { headers: { cookie: cookie2 } });
+    assert(r.body.includes('Disconnect this site') && r.body.includes('connect this site again from your Sites page without authorizing again') && r.body.includes('Uninstall app') && r.body.includes('then Revoke next to AI SEO Deck'), 'the settings of a site explain Disconnect, and how access is removed in Webflow');
+    r = await post('/app/site/remove', cookie2, { id: 'siteA' });
+    assert(!!getJ('site:siteA'), 'Disconnect asks for a confirmation');
+    r = await post('/app/site/remove', cookie2, { id: 'siteA', sure: '1' });
+    assert(r.status === 302 && r.headers.location.startsWith('/app?available=1') && !db.get('site:siteA') && !db.get('run:' + firstRun) && getJ('user:user_1').connections.length === 1 && wfState.revokeCalls.length === 0, 'Disconnect deletes what is kept about the site, keeps the authorization and revokes nothing at Webflow');
+    r = await request(port, 'GET', r.headers.location, { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Sites you authorized in Webflow') && r.body.includes('name="site" value="siteA"') && /data-read-from-webflow>Read from Webflow just now\./.test(r.body) && r.body.includes('Connecting one of these needs no new authorization') && r.body.includes('Authorize another site or Workspace in Webflow'), 'the Sites page lists the sites the authorization covers, read from Webflow at that moment');
+    r = await post('/app/sites/connect', cookie2, { site: 'siteZ' });
+    assert(!db.get('site:siteZ') && decodeURIComponent(r.headers.location).includes('not among the sites you authorized'), 'a site Webflow does not list for this account cannot be connected, whatever id is posted');
+    r = await post('/app/sites/connect', cookie2, { site: 'siteA' });
+    assert(r.headers.location === '/app/setup?id=siteA' && getJ('site:siteA') && getJ('site:siteA').userId === 'user_1' && getJ('site:siteA').keywords.length === 0 && wfState.tokenRequests.length === tokensBefore, 'the site is connected again, empty, without a new authorization at Webflow');
+    r = await request(port, 'GET', '/app/settings', { headers: { cookie: cookie2 } });
+    assert(r.body.includes('Webflow authorizations') && r.body.includes('1 site connected') && r.body.includes('action="/app/connection/remove"') && r.body.includes('Uninstall app') && r.body.includes('at the latest within a day'), 'the account page lists the authorizations and says how the app is uninstalled in Webflow and what happens then');
+    const connId = getJ('user:user_1').connections[0].id;
+    r = await post('/app/connection/remove', cookie2, { id: connId });
+    assert(!!getJ('site:siteA'), 'Disconnect for an authorization asks for a confirmation too');
+    r = await post('/app/connection/remove', cookie2, { id: connId, sure: '1' });
+    assert(!db.get('site:siteA') && getJ('user:user_1').connections.length === 1 && getJ('user:user_1').siteIds.length === 0 && wfState.revokeCalls.length === 0 && decodeURIComponent(r.headers.location).includes('The app is still installed in Webflow'), 'Disconnect for an authorization removes its sites here and leaves the authorization as it is');
+    r = await post('/app/connection/remove', cookie2, { id: 'someone-elses', sure: '1' });
+    assert(r.status === 404, 'an authorization of another account cannot be disconnected');
+    r = await request(port, 'GET', '/app', { headers: { cookie: cookie2 } });
+    assert(r.body.includes('No site is connected') && r.body.includes('href="/app?available=1"') && r.body.includes('href="/auth"'), 'with no site connected, the Sites page offers the sites already authorized, and a new authorization for others');
+    r = await post('/app/sites/connect', cookie2, { site: 'siteA' });
+    r = await post('/app/setup', cookie2, { id: 'siteA', brand: 'Lumen Dental', language: 'en', pick: ['veneers in antalya'] });
+    firstRun = getJ('site:siteA').sched.runId;
+    assert(!!firstRun && wfState.tokenRequests.length === tokensBefore && wfState.revokeCalls.length === 0, 'and the site works again after connecting, still without a new authorization');
+  }
+
+  console.log('uninstalled in Webflow');
   await store.endRun(firstRun);
   await store.updateSite('siteA', (s) => { s.sched.runId = ''; s.sched.firstRunDone = true; s.sched.nextRunAt = Date.now() - 1000; });
   wfState.revoked = true;
+  wfState.refused.length = 0;
   r = await request(port, 'GET', '/cron/tick?key=cronkey', {});
-  assert(!db.get('site:siteA') && /uninstalled/.test(getJ('user:user_1').notice || ''), 'an uninstalled app is noticed before the next check and its sites are deleted');
+  assert(!db.get('site:siteA') && !db.get('audit:siteA') && /uninstalled/.test(getJ('user:user_1').notice || '') && getJ('user:user_1').connections.length === 0 && getJ('user:user_1').siteIds.length === 0, 'an uninstalled app is noticed before the next check: the token is forgotten and the sites are deleted with what was kept about them');
+  assert(wfState.refused.join() === 'GET /v2/token/authorized_by' && wfState.revokeCalls.length === 0, 'one call found it out, and nothing more was asked of Webflow with that token');
+  r = await request(port, 'GET', '/cron/tick?key=cronkey', {});
+  r = await request(port, 'GET', '/app', { headers: { cookie: cookie2 } });
+  assert(wfState.refused.length === 1 && r.body.includes('no longer has access to Webflow') && r.body.includes('Connect Webflow'), 'later ticks and pages ask Webflow nothing, and the Sites page says what happened');
   wfState.revoked = false;
+  {
+    // the same, found by something the user does
+    let a = await request(port, 'GET', '/auth', { headers: { cookie: cookie2 } });
+    a = await request(port, 'GET', '/callback?code=good-code&state=' + new URL(a.headers.location).searchParams.get('state'), { headers: { cookie: cookie2 + '; ' + cookiesFrom(a) } });
+    assert(a.status === 302 && getJ('site:siteA') && getJ('user:user_1').connections.length === 1, 'installing the app again brings the site back, empty');
+    wfState.revoked = true;
+    wfState.refused.length = 0;
+    r = await post('/app/site/audit', cookie2, { id: 'siteA' });
+    assert(r.status === 302 && r.headers.location === '/app' && !db.get('site:siteA') && getJ('user:user_1').connections.length === 0 && /uninstalled/.test(getJ('user:user_1').notice || ''), 'when a user action meets the refusal, the same happens at once');
+    assert(wfState.refused.length === 2 && wfState.refused[1] === 'GET /v2/token/authorized_by', 'two calls in all: the one that was refused, and one that asked Webflow whether the token still works');
+    wfState.revoked = false;
+    // and by the daily look at the stored tokens, for a site nobody opens
+    a = await request(port, 'GET', '/auth', { headers: { cookie: cookie2 } });
+    a = await request(port, 'GET', '/callback?code=good-code&state=' + new URL(a.headers.location).searchParams.get('state'), { headers: { cookie: cookie2 + '; ' + cookiesFrom(a) } });
+    const jobsLib = require('../api/_lib/jobs');
+    const clearChecks = () => { for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); } };
+    clearChecks();
+    let seen = await jobsLib.checkConnections(Date.now(), 8000);
+    assert(seen.asked === 1 && seen.removed === 0 && getJ('site:siteA'), 'once a day each stored token is asked whether Webflow still accepts it; a working one changes nothing');
+    seen = await jobsLib.checkConnections(Date.now(), 8000);
+    db.delete('lock:conncheck');
+    const seen2 = await jobsLib.checkConnections(Date.now(), 8000);
+    assert(seen.asked === 0 && seen2.asked === 0, 'the look runs at most once an hour, and a token is asked about at most once in 24 hours');
+    clearChecks();
+    wfState.revoked = true;
+    wfState.refused.length = 0;
+    seen = await jobsLib.checkConnections(Date.now(), 8000);
+    assert(seen.asked === 1 && seen.removed === 1 && !db.get('site:siteA') && getJ('user:user_1').connections.length === 0 && wfState.refused.join() === 'GET /v2/token/authorized_by', 'a token Webflow refuses is forgotten at that moment, with its sites');
+    wfState.revoked = false;
+  }
 
   console.log('shared database prefix');
   {
