@@ -194,7 +194,17 @@ Done
   - To remember at the deploy: the Designer Extension published in the app's settings is the old panel. It stops working with the new server until the new bundle is uploaded, so the bundle goes up in the same sitting as the deploy.
 - `npm test`: `test/app.js` 377, `test/panel.js` 46.
 
-Still to do, in this order: step 7 (the report leaves), the deploy, then the end-to-end run of section 7, the final bundle and review ZIP, Preflight, the video and screenshots.
+- 24 Nov, 00:40: the report's own repository is ready and tested (170 tests): the report, the modules it uses, an entry point that answers the report's addresses and its cron job only, a webhook that takes report orders only, and its setup notes. It waits for its GitHub repository; until then it is kept on the branch `report-standalone` of this repository (delete that branch once the code is in `silit/ai-visibility-report`).
+- 24 Nov: the five screenshots of this build and a spare are in `assets/marketplace/screenshots/`, made by `scripts/marketplace-shots.js`; `docs/listing.md` follows the submission form field by field.
+
+Where it stands, and who does what next
+1. Owner: sign in to GitHub and Webflow in the Chrome used for Silit Labs (both sessions ended). Say yes or no to Claude creating the private repository, the Vercel project and the Redis connection there.
+2. Owner: enter the environment values of the new Vercel project (the AI keys, DataForSEO, Resend, the Polar token, two new secrets) and add the report's webhook at Polar. They are listed in the README of the report's repository.
+3. Claude: point the three rewrites of silitlabs.com at the new project, check the report live (landing page, sample, a free check, an old check link).
+4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded in the app's settings and the Install URL there is set to `/auth`.
+5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a.
+6. Claude: final `bundle.zip` and `review.zip` with their checksums, the scene list and captions of the demo video, the `[to fill]` fields.
+7. Owner: App Review Preflight on the final files, the new demo video, two-factor authentication on the Workspace admin, the form. Claude does not submit.
 
 The steps as they were planned (1 to 5 are done)
 1. Domains and rivals (finding 3).
