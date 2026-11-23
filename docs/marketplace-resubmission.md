@@ -207,7 +207,8 @@ Done
   - An account with no authorization left and no paid plan is deleted 30 days after its last authorization ended (`jobs.leftBehind`, in the hourly token pass).
   - The authorize address joins scopes with `%20`. The packaging script refuses a bundle over 5 MB. The first submission's video captions moved to `assets/marketplace/previous/`. A 512 x 512 copy of the logo is in `assets/marketplace/`.
   - Measured: a quiet tick costs 7 database commands (about 2,000 a day); the hourly token pass about 2 per account.
-- `npm test`: `test/app.js` 409, `test/panel.js` 63.
+  - The web app's contrast: a new test, `test/contrast.js`, measures every text of 24 pages in a browser, in the light and the dark theme, on the free plan and on a paid one. What it found was fixed in the colors of `api/_lib/html.js` and the public pages (faint text, green, red and blue on their tints, dimmed counts, muted text on tinted boxes in the dark, the faded links of a home page illustration). The screenshots were made again.
+- `npm test`: `test/app.js` 409, `test/panel.js` 63, `test/contrast.js` 80.
 
 Where it stands, and who does what next
 1. Owner: sign in to GitHub and Webflow in the Chrome used for Silit Labs (both sessions ended). Say yes or no to Claude creating the private repository, the Vercel project and the Redis connection there.

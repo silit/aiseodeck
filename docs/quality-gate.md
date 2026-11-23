@@ -8,7 +8,7 @@ Checked on 24 November 2026, on the branch `marketplace-rework`, against three s
 
 Each line says **Pass** with where it is shown, **N/A** with the reason, or **Sitting**: it can only be shown on Webflow itself, in the sitting where this build goes live and is run end to end on the test site. Nothing here is a promise of approval; it is the list of what was looked at and what the evidence is.
 
-`npm test` on this build: `test/app.js` 409 passed, `test/panel.js` 63 passed. Every safeguard added in this pass was broken on purpose once to see a test fail.
+`npm test` on this build: `test/app.js` 409 passed, `test/panel.js` 63 passed, `test/contrast.js` 80 passed. Every safeguard added in this pass was broken on purpose once to see a test fail.
 
 ## What this pass changed
 
@@ -16,6 +16,7 @@ Found by reading the guidelines again, and fixed:
 
 1. **Design of the panel.** The guidelines ask that a Designer Extension aligns its style, type and colors with Webflow's design guidelines. The panel had a palette of its own. It now uses Webflow's CSS variables for apps (default dark theme as the fallback, so it follows the user's Appearance where the Designer provides them), Inter at 11.5px and 13px in two weights, 4px corners, sentence case, and main actions that fill the width. Inter ships inside the panel (two font files for Latin text, SIL Open Font License), which is one of the two ways the design guidelines name; nothing is loaded from another host.
 2. **Accessibility of the panel.** Contrast is now measured by a test for every text and icon on screen, in Webflow's dark and light themes (text at least 4.5 to 1, icons at least 3 to 1). Every mark has a shape as well as a color. Messages reach screen readers through one status line and `role="alert"`.
+   **And of the web app.** The same measurement on the web app found text under 4.5 to 1: table heads and other faint text, counts dimmed with opacity, green, red and blue text on their own tints, muted text on tinted boxes in the dark theme, and the faded links of an illustration on the home page. The colors were moved the little that was needed, and `test/contrast.js` now measures every text of 24 pages in the light and the dark theme, on the free plan and on a paid one.
 3. **Moving between pages in the Designer.** An answer for a page the user had left could be shown under the next page, and an Apply could set the description on the page opened meanwhile. Both are closed and tested: late answers are dropped, and an Apply finishes on the page it was pressed for. When the Designer takes the title and refuses the description, the panel says exactly that.
 4. **A name a scanner could misread.** A function of the panel was called `top`. Preflight blocks access to the top document, so the name is gone and a test keeps such names out of the script.
 5. **Languages.** The texts said the app writes the primary language only. That is true for the server. The panel sets the values through the Designer, which has no locale parameter and does not tell an app which locale is shown. The panel now says so on a site with more than one language, before anything is applied, and the guide, the review notes and the listing say the same.
@@ -118,7 +119,7 @@ Found by reading the guidelines again, and fixed:
 | --- | --- | --- |
 | Logo 900 x 900, a mark without text | Pass | `assets/marketplace/ai-seo-deck-logo.png` |
 | Avatar 512 x 512 | Pass | `assets/marketplace/ai-seo-deck-avatar-512.png`, the same mark, for a field that asks for it. |
-| 3 to 5 screenshots at 1280 x 846, under 2 MB | Pass | Five and a spare in `assets/marketplace/screenshots/`, each under 350 KB. Picture 5 was made again after the panel's new design. |
+| 3 to 5 screenshots at 1280 x 846, under 2 MB | Pass | Five and a spare in `assets/marketplace/screenshots/`, each under 350 KB. All were made again after the panel's new design and the color fixes. |
 | Demo video, 2 to 5 minutes, approve and deny | Sitting | Recorded by the owner after the end-to-end run; captions in English. |
 | Homepage over HTTPS | Pass | `https://aiseodeck.silitlabs.com` |
 
@@ -135,7 +136,7 @@ Found by reading the guidelines again, and fixed:
 | Style, type and color follow Webflow's design guidelines | Pass / Sitting | Webflow's tokens, Inter, 11.5px and 13px, 4px corners. `test/panel.js`: section "the look". Sitting: that the Designer provides its variables to the panel (then it follows Appearance; if not, it shows the default dark theme). |
 | Clear navigation and labels, little input | Pass | One page view and one editor; two fields. |
 | No keyboard shortcuts | Pass | No key handler. `test/app.js`: "has no keyboard shortcuts". |
-| Alt text, keyboard, contrast | Pass | Every control and mark has a name; native controls with a focus ring; contrast measured in both themes. |
+| Alt text, keyboard, contrast | Pass | Every control and mark has a name; native controls with a focus ring; contrast measured in both themes. The web app and the public pages are measured the same way by `test/contrast.js`. |
 | No long-running background work | Pass | No timer and no polling. The panel reads the page when it opens and when the page changes. |
 
 ## More from the published guidelines

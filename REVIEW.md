@@ -144,5 +144,6 @@ All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3
 
 - `node test/app.js`: `[to fill: N passed, 0 failed]` (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
 - `node test/panel.js`: `[to fill: N passed, 0 failed]` (the panel in Chromium, served from the extension's address under a strict Content Security Policy, against the real server code).
+- `node test/contrast.js`: `[to fill: N passed, 0 failed]` (every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one: the contrast of every text is at least 4.5 to 1, or 3 to 1 for large text).
 - End-to-end on the published test site: `[to fill: date and result]`.
 - App Review Preflight: `[to fill: readiness and receipt]`.

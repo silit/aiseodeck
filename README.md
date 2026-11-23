@@ -41,10 +41,11 @@ These came out of the review of 23 November 2026. `REVIEW.md` holds the notes fo
 
 ## Tests
 
-`npm test` runs both:
+`npm test` runs all three:
 
 - `node test/app.js`: the whole app against stand-ins for Webflow, the database, the AI engines, mail and billing (`test/mocks.js`). A stand-in for the customer's published website must receive no request, and the Webflow endpoints called during the run must be exactly the ones `REVIEW.md` lists.
 - `node test/panel.js`: the panel in Chromium (Playwright), served from the extension's address under a strict Content Security Policy, against the real server code. It is skipped with a message when Playwright is not installed.
+- `node test/contrast.js`: every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one. It measures the contrast of every text against what is behind it (4.5 to 1, or 3 to 1 for large text). Also skipped without Playwright.
 
 ## Plans
 

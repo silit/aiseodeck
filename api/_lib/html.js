@@ -46,11 +46,11 @@ const siteHref = (site, extra) => '/app/site?id=' + encodeURIComponent(site.id) 
 const kwHref = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(k.id) + (extra ? '&' + extra : '');
 
 const CSS = `
-:root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#8087A6;
+:root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#A3A8BF;
 --mark:#F3D46E;--mark-ink:#2A2200;--mark-ring:transparent;--mark-text:#F3D46E;--cite:#93B3F2;--cite-soft:rgba(147,179,242,.15);--rival:#EE9DB0;--good:#74D3AA;--good-soft:rgba(116,211,170,.14);--bad:#EE8C8C;--bad-soft:rgba(238,140,140,.14);--warn:#EDC57A;--warn-soft:rgba(237,197,122,.14);
 --shadow:0 24px 60px -36px rgba(8,10,25,.6);--sans:"Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
-@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#868CAE;
---mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#8F6E00;--cite:#2F5BFF;--cite-soft:#E6ECFF;--rival:#C2335A;--good:#138A5A;--good-soft:#E2F5EB;--bad:#C93C34;--bad-soft:#FBE8E6;--warn:#9A6400;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
+@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#60678F;
+--mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#836500;--cite:#2755FF;--cite-soft:#E6ECFF;--rival:#C03259;--good:#11784E;--good-soft:#E2F5EB;--bad:#BE3931;--bad-soft:#FBE8E6;--warn:#915E00;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:450 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:56px}
 body.inshell{padding-bottom:0}
@@ -376,7 +376,7 @@ ol.nf .nk a:hover{text-decoration:underline}
 .sidenav a:hover{color:var(--ink);background:var(--panel2)}
 .sidenav a[aria-current=page]{background:var(--ink);color:var(--bg)}
 .sidenav svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.sidenav .n{margin-left:auto;font-size:12px;font-weight:600;opacity:.8}
+.sidenav .n{margin-left:auto;font-size:12px;font-weight:600}
 .sidenav .badge{margin-left:auto;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--warn-soft);color:var(--warn)}
 .sidenav a[aria-current=page] .badge{background:var(--mark);color:var(--mark-ink)}
 .planbox{margin-top:auto;display:grid;gap:9px;padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line2)}
@@ -485,7 +485,7 @@ ol.todo .go:hover{filter:brightness(1.05)}
 .vtabs button{font:inherit;font-size:14.5px;font-weight:650;color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 14px;min-height:44px;cursor:pointer;border-radius:8px 8px 0 0}
 .vtabs button:hover{color:var(--ink)}
 .vtabs button[aria-selected=true]{color:var(--ink);font-weight:800;border-bottom-color:var(--ink)}
-.vtabs .n{font-size:12px;font-weight:700;margin-left:6px;opacity:.75}
+.vtabs .n{font-size:12px;font-weight:700;margin-left:6px}
 .tabbed .vpanel+.vpanel{margin-top:22px}
 .tabbed.js .vpanel+.vpanel{margin-top:0}
 .tick{font-size:13px;font-weight:800;font-stretch:100%}
@@ -495,6 +495,7 @@ ol.todo .go:hover{filter:brightness(1.05)}
 .diff2 .was{background:var(--panel2);border:1px solid var(--line2)}
 .diff2 .now{background:color-mix(in srgb,var(--mark) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--mark) 55%,var(--line))}
 .diff2 .l{font-size:12px;font-weight:700;color:var(--muted)}
+.diff2 .now .l,.checkit .muted{color:var(--ink)}
 .diff2 .was b{font-size:14px;overflow-wrap:anywhere}.diff2 .was span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .who{display:grid;gap:12px}
 @media (prefers-reduced-motion:reduce){.c.st-run{animation:none}.progress i{transition:none}.btn,.kt tbody tr{transition:none}.spin{animation:none}}
