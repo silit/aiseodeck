@@ -94,6 +94,13 @@ function primaryUrl(meta) {
   return host ? scheme + '://' + host : '';
 }
 const bareHost = (u) => String(u || '').replace(/^[a-z]+:\/\//i, '').replace(/\/.*$/, '').replace(/^www\./i, '').toLowerCase();
+// The addresses Webflow serves the site on: its custom domains and its webflow.io address. An AI answer that links
+// to one of them counts as a citation. They are read from Webflow and never typed by the user.
+function domainsOf(meta) {
+  const domains = ((meta && meta.customDomains) || []).map((d) => bareHost(d.url)).filter(Boolean);
+  if (meta && meta.shortName) domains.push(String(meta.shortName).toLowerCase() + '.webflow.io');
+  return [...new Set(domains)];
+}
 
 // Webflow Localization: the site's primary locale (the language AI SEO Deck reads, checks and writes) and the names
 // of its other enabled languages. null when Webflow sends no locales.
@@ -107,8 +114,6 @@ function localeOf(meta) {
 
 function newSite(meta, userId, connectionId) {
   const url = primaryUrl(meta);
-  const domains = (meta.customDomains || []).map((d) => bareHost(d.url)).filter(Boolean);
-  if (meta.shortName) domains.push(meta.shortName + '.webflow.io');
   return {
     id: meta.id,
     userId,
@@ -118,10 +123,11 @@ function newSite(meta, userId, connectionId) {
     domains: (meta.customDomains || []).map((d) => d.url).filter(Boolean),
     url,
     locale: localeOf(meta),
+    metaAt: Date.now(), // when the name, addresses and languages above were last read from Webflow
     createdAt: Date.now(),
     tracked: false,
     pausedByUser: false,
-    project: { brand: meta.displayName || '', aliases: [], domains: [...new Set(domains)], competitors: [], country: '', language: '', ready: false },
+    project: { brand: meta.displayName || '', aliases: [], domains: domainsOf(meta), competitors: [], country: '', language: '', ready: false },
     keywords: [], // [{ id, text, questions: [], volume, source, page, at, fixedAt }]
     kw: {}, // latest summary per keyword id (see analyze.keywordSummary) plus { at, runId, trend: [[at, visibility]] }
     sched: { lastRunAt: null, nextRunAt: null, runId: '', lastManualAt: null, firstRunDone: false },
@@ -136,6 +142,9 @@ function refreshMeta(site, meta) {
   site.domains = (meta.customDomains || []).map((d) => d.url).filter(Boolean);
   site.url = primaryUrl(meta) || site.url;
   if (meta.locales) site.locale = localeOf(meta);
+  const domains = domainsOf(meta);
+  if (domains.length && site.project) site.project.domains = domains;
+  site.metaAt = Date.now();
   return site;
 }
 // Sites saved before keywords existed tracked questions ("prompts"): each question becomes a keyword asked as itself.
@@ -342,7 +351,7 @@ async function unlock(name) { return kv.del('lock:' + name); }
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
   getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, newUser, addConnection, tokenOf, tokenForSite,
-  primaryUrl, bareHost, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
+  primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock
 };

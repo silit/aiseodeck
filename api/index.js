@@ -225,14 +225,12 @@ const notFound = (res) => send(res, 404, html.errorPage('Site not found', 'This 
 function splitList(v, max, each) {
   return String(v || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, max).map((x) => x.slice(0, each || 80));
 }
+// Rivals are names. A website typed after a comma is left out: the app asks nobody to type a website address.
 function parseRivals(text) {
   const out = [];
   for (const line of String(text || '').split('\n')) {
-    const parts = line.split(',').map((x) => x.trim()).filter(Boolean);
-    if (!parts.length) continue;
-    const name = parts[0].slice(0, 80);
-    const domain = parts[1] ? require('./_lib/analyze').cleanDomain(parts[1]).slice(0, 120) : '';
-    if (name.length >= 2 && !out.some((r) => r.name.toLowerCase() === name.toLowerCase())) out.push({ name, domain });
+    const name = line.split(',')[0].trim().slice(0, 80);
+    if (name.length >= 2 && !out.some((r) => r.name.toLowerCase() === name.toLowerCase())) out.push({ name, domain: '' });
     if (out.length >= 5) break;
   }
   return out;
@@ -242,8 +240,7 @@ function applyProjectFields(site, b) {
   const brand = String(b.brand || '').trim().slice(0, 80);
   if (brand.length >= 2) p.brand = brand;
   p.aliases = splitList(b.aliases, 6, 80).filter((a) => a.length >= 2);
-  const doms = splitList(b.domains, 6, 120).map((d) => require('./_lib/analyze').cleanDomain(d)).filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d));
-  if (doms.length) p.domains = [...new Set(doms)];
+  // the site's addresses are not a field: they come from Webflow (store.refreshMeta)
   p.competitors = parseRivals(b.rivals);
   p.country = /^[A-Z]{2}$/.test(String(b.country || '')) ? String(b.country) : '';
   p.language = /^[a-z]{2}$/.test(String(b.language || '')) ? String(b.language) : (p.language || 'en');
@@ -383,15 +380,38 @@ async function handleStart(req, res, user) {
   send(res, 200, html.startPage(user, { plan, interval, kw, next, notice, offers, trialDays: billing.trialEligible(user) ? billing.trialDays() : 0 }));
 }
 
+// The site's name, addresses and languages, read from Webflow again (GET /v2/sites/:site_id) and kept.
+// Answers { site } with the saved site, or { error } when Webflow could not be asked.
+async function refreshFromWebflow(user, site) {
+  const token = store.tokenForSite(user, site);
+  if (!token) return { error: Object.assign(new Error('This site has no Webflow connection.'), { status: 401 }) };
+  let meta;
+  try { meta = await wf.getSite(token, site.id); } catch (e) { return { error: e }; }
+  if (!meta || !meta.id) return { error: new Error('Webflow returned no site.') };
+  return { site: (await store.updateSite(site.id, (s) => { store.refreshMeta(s, meta); })) || site };
+}
+const META_FRESH_MS = 5 * 60000;
+
 async function handleSetupPage(req, res, user) {
   const q = queryOf(req);
-  const site = await ownedSite(user, q.id);
+  let site = await ownedSite(user, q.id);
   if (!site) return notFound(res);
-  if (!site.project.language && site.url) {
-    const r = await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 3500, maxBytes: 400000 });
-    if (r.ok) { const lang = (auditLib.readPage(r.text).lang || '').slice(0, 2).toLowerCase(); if (/^[a-z]{2}$/.test(lang)) site.project.language = lang; }
-  }
+  // the addresses shown on this page come from Webflow, so they are read again unless they were read just now
+  if (!site.metaAt || Date.now() - site.metaAt > META_FRESH_MS) site = (await refreshFromWebflow(user, site)).site || site;
+  // the keyword language starts as the language of the site's primary locale in Webflow
+  if (!site.project.language && site.locale && /^[a-z]{2}/i.test(site.locale.tag || '')) site.project.language = site.locale.tag.slice(0, 2).toLowerCase();
   send(res, 200, html.setupPage(user, site, user._limits, { usedElsewhere: await store.keywordCount(user, site.id), notice: html.esc(noticeFrom(q, user)), prefill: kwLib.clean(q.kw || '') }));
+}
+
+// "Refresh from Webflow" on setup and on the site's settings: reads the site again and goes back.
+async function handleSiteRefresh(req, res, user) {
+  const b = await readBody(req);
+  const site = await ownedSite(user, b.id);
+  if (!site) return notFound(res);
+  const back = b.back === 'setup' ? '/app/setup?id=' + encodeURIComponent(site.id) : siteUrl(site, 'tab=settings');
+  const r = await refreshFromWebflow(user, site);
+  if (r.error) return webflowFailed(res, user, site, r.error, back, 'Webflow could not be read: ');
+  redirect(res, back + '&' + noticeQuery(user, 'Read from Webflow just now.'));
 }
 
 // Keyword ideas from the homepage and the keywords where Google's AI Overviews already cite the site, with volumes.
@@ -1039,13 +1059,13 @@ async function fixContext(user, siteId, path) {
 const draftKey = (path) => 'fix:' + crypto.createHash('sha1').update(String(path)).digest('hex').slice(0, 16);
 const fixUrl = (site, path, extra) => '/app/fix?id=' + encodeURIComponent(site.id) + '&page=' + encodeURIComponent(path) + (extra ? '&' + extra : '');
 
-async function webflowFailed(res, user, site, e, back) {
+async function webflowFailed(res, user, site, e, back, lead) {
   if (wf.isRevoked(e)) {
     const removed = await store.confirmRevoked(user, site.connectionId, Date.now());
     if (removed) { user.notice = 'Webflow access was removed for ' + (removed.label || 'one connection') + ', so its sites were deleted from AI SEO Deck. Connect again to bring them back.'; await store.saveUser(user); return redirect(res, '/app'); }
     return redirect(res, back + '&' + noticeQuery(user, 'Webflow refused the change. Check that AI SEO Deck still has access to this site, then try again.'));
   }
-  return redirect(res, back + '&' + noticeQuery(user, 'Webflow did not accept the change: ' + e.message));
+  return redirect(res, back + '&' + noticeQuery(user, (lead || 'Webflow did not accept the change: ') + e.message));
 }
 
 function proposedSchema(site, row, audit, faqPairs, existing) {
@@ -1417,6 +1437,7 @@ module.exports = async function handler(req, res) {
       if (r === 'POST /app/run/pump') return await handlePump(req, res, user);
       if (r === 'GET /app/run/progress') return await handleProgress(req, res, user);
       if (r === 'POST /app/site/settings') return await handleSiteSettings(req, res, user);
+      if (r === 'POST /app/site/refresh') return await handleSiteRefresh(req, res, user);
       if (r === 'POST /app/keywords') return await handleKeywordsAdd(req, res, user);
       if (r === 'GET /app/keyword') return await handleKeywordPage(req, res, user);
       if (r === 'POST /app/keyword/check') return await handleKeywordCheck(req, res, user);

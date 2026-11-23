@@ -284,7 +284,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     POLAR_ACCESS_TOKEN: 'polar_oat', POLAR_API_BASE: 'http://127.0.0.1:' + polarPort, POLAR_WEBHOOK_SECRET: 'whsec_' + Buffer.from('polar-secret-key').toString('base64')
   });
   const host = '127.0.0.1:' + custPort;
-  wfState.sites = [{ id: 'siteA', workspaceId: 'ws1', displayName: 'Lumen Dental', shortName: 'lumen-dental', customDomains: [{ id: 'd1', url: host }] }];
+  wfState.sites = [{ id: 'siteA', workspaceId: 'ws1', displayName: 'Lumen Dental', shortName: 'lumen-dental', customDomains: [{ id: 'd1', url: host }, { id: 'd0', url: 'lumendental.com' }] }];
   wfState.pages.siteA = [
     { id: 'p1', title: 'Home', slug: 'home', publishedPath: '/' },
     { id: 'p2', title: 'About', slug: 'about', publishedPath: '/about' },
@@ -386,7 +386,9 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   const cookie = cookiesFrom(r);
   assert(r.status === 302 && r.headers.location === '/app/setup?id=siteA&kw=veneers%20in%20antalya', 'one new site goes straight to setup, with the keyword');
   r = await request(port, 'GET', '/app/setup?id=siteA&kw=veneers%20in%20antalya', { headers: { cookie } });
-  assert(r.status === 200 && r.body.includes('Set up Lumen Dental') && r.body.includes('value="en" selected') && r.body.includes('>veneers in antalya</textarea>'), 'setup page shows the site, detects its language and holds the keyword');
+  assert(r.status === 200 && r.body.includes('Set up Lumen Dental') && r.body.includes('value="en" selected') && r.body.includes('>veneers in antalya</textarea>'), 'setup page shows the site and holds the keyword');
+  assert(!/name="domains"/.test(r.body) && r.body.includes('Your website, read from Webflow') && r.body.includes('lumendental.com, lumen-dental.webflow.io') && r.body.includes('Read from Webflow just now') && /<button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow<\/button>/.test(r.body), 'setup asks for no website address: the addresses come from Webflow, with the time they were read and a refresh');
+  assert(!/name, then website|brightline\.com/.test(r.body) && r.body.includes('one name per line'), 'rivals are asked for by name only');
   r = await post('/app/setup/suggest', cookie, { id: 'siteA' });
   const sug = JSON.parse(r.body);
   assert(sug.ideas.length === 3 && sug.ideas[0].keyword === 'veneers in antalya' && sug.ideas[0].volume === 1800 && !sug.ideas.some((x) => /lumen/.test(x.keyword)), 'keyword ideas come back lowercased, with volumes, without the brand');
@@ -399,7 +401,18 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(site.project.ready && site.tracked && site.keywords.length === 3 && site.keywords.map((k) => k.text).join() === 'veneers in antalya,dental implants antalya,smile makeover antalya', 'free plan: 3 keywords tracked, duplicates removed');
   assert(site.keywords.every((k) => k.questions.length === 2) && site.keywords[0].questions[0] === 'Which clinic is best for veneers in antalya?', 'each keyword gets two customer questions');
   assert(site.keywords[0].volume === 1800 && site.keywords[2].volume === 880 && site.keywords[2].source === 'aio' && site.keywords[0].source === 'idea', 'volumes and sources kept from the suggestions');
-  assert(site.project.competitors[0].domain === 'brightsmile.com' && site.project.country === 'GB', 'rivals and market saved');
+  assert(site.project.competitors.length === 1 && site.project.competitors[0].name === 'Bright Smile Clinic' && site.project.competitors[0].domain === '' && site.project.country === 'GB', 'rivals are saved by name, a website typed after the name is left out, and the market is saved');
+  assert(site.project.domains.join() === host + ',lumendental.com,lumen-dental.webflow.io' && site.metaAt > Date.now() - 60000, 'the addresses of the site are the ones Webflow gives, not the ones typed into the form');
+  wfState.sites[0].customDomains.push({ id: 'd2', url: 'https://www.lumen.example' });
+  r = await post('/app/site/refresh', cookie, { id: 'siteA', back: 'settings' });
+  assert(r.status === 302 && r.headers.location.startsWith('/app/site?id=siteA&tab=settings') && /Read%20from%20Webflow%20just%20now/.test(r.headers.location) && getJ('site:siteA').project.domains.includes('lumen.example'), 'Refresh from Webflow reads the addresses of the site again and goes back to the settings');
+  r = await request(port, 'GET', '/app/site?id=siteA&tab=settings', { headers: { cookie } });
+  assert(r.status === 200 && !/name="domains"/.test(r.body) && r.body.includes('Your website, read from Webflow') && r.body.includes('lumen.example') && r.body.includes('form="wfrefresh"') && r.body.includes('Rivals, one name per line') && />Bright Smile Clinic<\/textarea>/.test(r.body), 'the site settings show the addresses from Webflow read-only, and the rivals by name');
+  wfState.sites[0].customDomains.pop();
+  r = await post('/app/site/refresh', cookie, { id: 'siteA', back: 'setup' });
+  assert(r.status === 302 && r.headers.location.startsWith('/app/setup?id=siteA') && !getJ('site:siteA').project.domains.includes('lumen.example'), 'a domain removed in Webflow is gone after the next refresh');
+  r = await post('/app/site/refresh', cookie, { id: 'siteZ', back: 'setup' });
+  assert(r.status === 404, 'only the owner of a site can refresh it');
   const run1 = getJ('run:' + site.sched.runId);
   assert(run1 && run1.engines.join() === 'openai,aio,perplexity' && run1.total === 15 && !run1.partial, 'free plan: first run on ChatGPT, Google AI Overviews and Perplexity, 5 answers per keyword');
   assert(run1.units.filter((u) => u.q === 'k').length === 3 && run1.units.find((u) => u.id.endsWith('.0')).text.startsWith('Which clinic'), 'Google gets the keyword, chat engines get the questions');

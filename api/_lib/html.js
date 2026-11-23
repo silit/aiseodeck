@@ -88,7 +88,9 @@ p{margin:0}
 .pill.good{background:var(--good-soft);color:var(--good)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.named{background:var(--mark);color:var(--mark-ink)}.pill.cite{background:var(--cite-soft);color:var(--cite)}.pill.none{background:transparent;border-color:var(--line);color:var(--muted)}.pill.na{background:transparent;border:1px dashed var(--line);color:var(--faint)}
 .fields{display:grid;gap:16px}.field{display:grid;gap:6px;min-width:0}
-label{font-size:13.5px;font-weight:700}
+label,.lbl{font-size:13.5px;font-weight:700}
+.fromwf{margin:0;font-size:14.5px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;overflow-wrap:anywhere}
+.wfbtn{font:inherit;color:inherit;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 .hint{font-size:12.5px;color:var(--muted)}
 input[type=text],input[type=email],input[type=url],input[type=tel],input[type=search],select,textarea{width:100%;font:inherit;font-size:14.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 input:focus,select:focus,textarea:focus{border-color:var(--cite);outline:none}
@@ -745,7 +747,16 @@ function dashboard(user, sites, limits, notice, opts) {
 const COUNTRIES = [['', 'Anywhere'], ['US', 'United States'], ['GB', 'United Kingdom'], ['IE', 'Ireland'], ['CA', 'Canada'], ['AU', 'Australia'], ['DE', 'Germany'], ['FR', 'France'], ['NL', 'Netherlands'], ['ES', 'Spain'], ['IT', 'Italy'], ['TR', 'Türkiye'], ['AE', 'United Arab Emirates'], ['SA', 'Saudi Arabia'], ['PL', 'Poland'], ['SE', 'Sweden'], ['IN', 'India'], ['BR', 'Brazil'], ['MX', 'Mexico']];
 const LANGS = [['en', 'English'], ['tr', 'Turkish'], ['de', 'German'], ['fr', 'French'], ['es', 'Spanish'], ['it', 'Italian'], ['nl', 'Dutch'], ['pt', 'Portuguese'], ['pl', 'Polish'], ['ar', 'Arabic'], ['sv', 'Swedish']];
 const options = (list, v) => list.map(([k, t]) => `<option value="${esc(k)}"${k === v ? ' selected' : ''}>${esc(t)}</option>`).join('');
-const rivalLines = (p) => (p.competitors || []).map((c) => c.name + (c.domain ? ', ' + c.domain : '')).join('\n');
+const rivalLines = (p) => (p.competitors || []).map((c) => c.name).join('\n');
+
+// The site's addresses as Webflow gives them, when they were read, and a button that reads them again. Nobody types
+// them. The button belongs to a form of its own (refreshForm), so pressing it does not send the form around it.
+const refreshForm = (site, back) => `<form id="wfrefresh" method="post" action="/app/site/refresh" hidden><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="back" value="${esc(back)}"></form>`;
+function webflowDomains(site) {
+  const domains = (site.project && site.project.domains) || [];
+  const list = domains.length ? domains.join(', ') : 'No address yet. Publish the site in Webflow, then refresh.';
+  return `<div class="field"><span class="lbl">Your website, read from Webflow</span><p class="fromwf">${esc(list)}</p><span class="hint">Read from Webflow ${esc(site.metaAt ? ago(site.metaAt) : 'when the site was connected')}. An answer that links to one of these counts as a citation. To change them, change the domains of the site in Webflow. <button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow</button></span></div>`;
+}
 
 // The keyword picker on setup: ideas and keywords already cited in AI Overviews come from /app/setup/suggest.
 const SUGGEST_JS = (room) => `
@@ -773,16 +784,16 @@ function setupPage(user, site, limits, opts) {
 <section class="panel step stack"><h2><span>1</span>Your brand</h2>
 <div class="cols"><div class="field"><label for="brand">Brand name as people say it</label><input type="text" id="brand" name="brand" required maxlength="80" value="${esc(p.brand)}"><span class="hint">This is what we look for in AI answers.</span></div>
 <div class="field"><label for="aliases">Other names (optional)</label><input type="text" id="aliases" name="aliases" maxlength="200" value="${esc((p.aliases || []).join(', '))}" placeholder="Short name, old name, product name"><span class="hint">Separate with commas.</span></div>
-<div class="field"><label for="domains">Your website domains</label><input type="text" id="domains" name="domains" maxlength="300" value="${esc((p.domains || []).join(', '))}"><span class="hint">An answer that links to these counts as a citation.</span></div>
+${webflowDomains(site)}
 <div class="field"><label for="country">Where your customers are</label><select id="country" name="country">${options(COUNTRIES, p.country || '')}</select></div>
 <div class="field"><label for="language">Language of your keywords</label><select id="language" name="language">${options(LANGS, p.language || 'en')}</select></div></div></section>
-<section class="panel step stack"><h2><span>2</span>Your rivals</h2><p class="muted">Up to 5 businesses you compete with, one per line: name, then website. We show where the AI recommends them instead of you.</p>
-<div class="field"><label for="rivals" class="tiny muted" style="font-weight:600">Rivals</label><textarea id="rivals" name="rivals" placeholder="Brightline Studio, brightline.com&#10;Northfield Co, northfield.co">${esc(rivalLines(p))}</textarea></div></section>
+<section class="panel step stack"><h2><span>2</span>Your rivals</h2><p class="muted">Up to 5 businesses you compete with, one name per line. We show where the AI recommends them instead of you.</p>
+<div class="field"><label for="rivals" class="tiny muted" style="font-weight:600">Rivals</label><textarea id="rivals" name="rivals" placeholder="Brightline Studio&#10;Northfield Co">${esc(rivalLines(p))}</textarea></div></section>
 <section class="panel step stack"><h2><span>3</span>Keywords to track</h2><p class="muted">Your plan tracks ${plural(room, 'keyword')} here. Each keyword is asked the way people ask, on every AI engine in your plan. Tick the ideas that fit and add your own.</p>
 <div id="sugg" class="picklist" aria-live="polite"><p class="hint">Finding keywords for your site…</p></div>
 <div class="field"><label for="own">Your own keywords, one per line</label><textarea id="own" name="own" placeholder="crm for small business&#10;webflow agency in london">${esc(prefill.join('\n'))}</textarea></div>
 <div class="actions"><button class="btn mark" type="submit">Save and run the first check</button><a class="btn ghost" href="/app">Cancel</a></div></section>
-</form>`, { user, nav: 'sites', script: SUGGEST_JS(room) });
+</form>${refreshForm(site, 'setup')}`, { user, nav: 'sites', script: SUGGEST_JS(room) });
 }
 
 /* ---------- site page ---------- */
@@ -1086,12 +1097,12 @@ function settingsTab(site, limits) {
   const p = site.project;
   const biz = p.business || {};
   const id = esc(site.id);
-  return `<div class="cols">
+  return `${refreshForm(site, 'settings')}<div class="cols">
 <form class="panel stack" method="post" action="/app/site/settings"><input type="hidden" name="id" value="${id}"><h2>Brand and rivals</h2>
 <div class="field"><label for="brand">Brand name</label><input type="text" id="brand" name="brand" required maxlength="80" value="${esc(p.brand)}"></div>
 <div class="field"><label for="aliases">Other names</label><input type="text" id="aliases" name="aliases" maxlength="200" value="${esc((p.aliases || []).join(', '))}"></div>
-<div class="field"><label for="domains">Website domains</label><input type="text" id="domains" name="domains" maxlength="300" value="${esc((p.domains || []).join(', '))}"></div>
-<div class="field"><label for="rivals">Rivals, one per line: name, website</label><textarea id="rivals" name="rivals">${esc(rivalLines(p))}</textarea></div>
+${webflowDomains(site)}
+<div class="field"><label for="rivals">Rivals, one name per line</label><textarea id="rivals" name="rivals">${esc(rivalLines(p))}</textarea></div>
 <div class="cols" style="gap:12px"><div class="field"><label for="country">Customers in</label><select id="country" name="country">${options(COUNTRIES, p.country || '')}</select></div>
 <div class="field"><label for="language">Keyword language</label><select id="language" name="language">${options(LANGS, p.language || 'en')}</select></div></div>
 <h3 style="margin-top:6px">Business details for structured data</h3><p class="tiny muted">Used in the Organization schema on your homepage. Leave empty what you do not want to publish.</p>
