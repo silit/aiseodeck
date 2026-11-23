@@ -151,17 +151,20 @@ function mergeSchema(existing, nodes) {
 }
 
 /* ---------- llms.txt and robots.txt ---------- */
+// The file follows the llms.txt proposal (llmstxt.org): a title, a one-line summary, then a section of links, each
+// written "- [Title](address): note". Every list line is a link, so the file passes a format check as it stands.
+// The summary is the home page's description, or failing that what we worked out the business is (audit.site.summary);
+// a summary that only repeats the name says nothing, so without either there is none.
 function llmsTxt(project, audit) {
-  const origin = audit.origin;
+  const origin = String(audit.origin || '').replace(/\/+$/, '');
+  const site = audit.site || {};
   const home = (audit.pages || []).find((p) => p.path === '/') || {};
-  const lines = [`# ${project.brand}`, '', `> ${clean(home.description || audit.site.homeDescription || '', 300) || clean(project.brand, 100)}`, ''];
+  const about = clean(home.description || site.homeDescription || site.summary || '', 300);
+  const lines = [`# ${project.brand}`, ''];
+  if (about) lines.push(`> ${about}`, '');
   const pages = (audit.pages || []).filter((p) => p.ok && !p.noindex && p.path !== '/').slice(0, 40);
-  if (pages.length) {
-    lines.push('## Pages', '');
-    for (const p of pages) lines.push(`- [${clean(p.title || p.name || p.path, 90)}](${origin}${p.path})${p.description ? ': ' + clean(p.description, 160) : ''}`);
-    lines.push('');
-  }
-  lines.push('## Contact', '', `- Website: ${origin}`);
+  lines.push('## Pages', '', `- [Home page](${origin}/)`);
+  for (const p of pages) lines.push(`- [${clean(p.title || p.name || p.path, 90)}](${origin}${p.path})${p.description ? ': ' + clean(p.description, 160) : ''}`);
   return lines.join('\n') + '\n';
 }
 function robotsLines(blocked) {

@@ -531,6 +531,13 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 200 && r.body.includes('User-agent: PerplexityBot') && r.body.includes('Download llms.txt'), 'audit tab shows the robots lines and the llms.txt download');
   r = await request(port, 'GET', '/app/llms?id=siteA', { headers: { cookie } });
   assert(r.status === 200 && r.body.startsWith('# Lumen Dental') && r.body.includes('/about'), 'llms.txt is written from the pages');
+  {
+    // every list line is a link ("- [Title](address)"), the home page comes first, and nothing follows the pages
+    const listLines = r.body.split('\n').filter((l) => l.startsWith('- '));
+    const notLink = listLines.find((l) => !/^- \[[^\]]+\]\(https?:\/\/[^)\s]+\)(: .+)?$/.test(l));
+    assert(listLines.length >= 2 && !notLink, 'every list line of llms.txt is a link' + (notLink ? ', but not: ' + notLink : ''));
+    assert(/^- \[Home page\]\(https?:\/\/[^)]+\/\)$/.test(listLines[0]) && !/## Contact|Website:/.test(r.body), 'llms.txt starts its list with the home page and has no loose "Website:" line');
+  }
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('&quot;@type&quot;: &quot;Organization&quot;') && r.body.includes('instagram.com/lumendental'), 'homepage fix proposes Organization schema with the social profile');
   r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/', schema: '{"@context":"https://schema.org","@graph":[{"@type":"Dentist","name":"Lumen Dental"}]}' });
