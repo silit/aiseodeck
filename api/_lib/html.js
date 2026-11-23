@@ -46,10 +46,10 @@ const siteHref = (site, extra) => '/app/site?id=' + encodeURIComponent(site.id) 
 const kwHref = (site, k, extra) => '/app/keyword?id=' + encodeURIComponent(site.id) + '&k=' + encodeURIComponent(k.id) + (extra ? '&' + extra : '');
 
 const CSS = `
-:root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#A3A8BF;
+:root{--bg:#1E2336;--bg2:#22283C;--panel:#272E45;--panel2:#2D3550;--lift:#343C59;--line:#3A4363;--line2:#313957;--ink:#E3E6F1;--muted:#A4AAC4;--faint:#A3A8BF;--focus:#F3D46E;
 --mark:#F3D46E;--mark-ink:#2A2200;--mark-ring:transparent;--mark-text:#F3D46E;--cite:#93B3F2;--cite-soft:rgba(147,179,242,.15);--rival:#EE9DB0;--good:#74D3AA;--good-soft:rgba(116,211,170,.14);--bad:#EE8C8C;--bad-soft:rgba(238,140,140,.14);--warn:#EDC57A;--warn-soft:rgba(237,197,122,.14);
 --shadow:0 24px 60px -36px rgba(8,10,25,.6);--sans:"Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:"Martian Mono","Martian Mono Variable",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color-scheme:dark}
-@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#60678F;
+@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--bg2:#ECEFF8;--panel:#FFFFFF;--panel2:#F7F8FD;--lift:#E8EBF8;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#60678F;--focus:#2755FF;
 --mark:#FFE14D;--mark-ink:#1B1600;--mark-ring:rgba(27,22,0,.18);--mark-text:#836500;--cite:#2755FF;--cite-soft:#E6ECFF;--rival:#C03259;--good:#11784E;--good-soft:#E2F5EB;--bad:#BE3931;--bad-soft:#FBE8E6;--warn:#915E00;--warn-soft:#FFF3D6;--shadow:0 24px 60px -36px rgba(15,20,51,.35);color-scheme:light}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:450 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:56px}
@@ -57,7 +57,7 @@ body.inshell{padding-bottom:0}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 a{color:var(--cite);text-underline-offset:3px}
-:focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:6px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
 h1,h2,h3{margin:0;line-height:1.1;text-wrap:balance;font-stretch:110%}
 h1{font-size:clamp(28px,3.4vw,40px);font-weight:800;letter-spacing:-.02em}
 h2{font-size:20px;font-weight:760;letter-spacing:-.014em}

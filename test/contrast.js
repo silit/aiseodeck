@@ -1,5 +1,6 @@
 // The contrast of every text on the pages of the web app and its public pages, measured in a real browser in the
-// light and in the dark theme, on the free plan and on a paid one (WCAG 2: 4.5 to 1, or 3 to 1 for large text).
+// light and in the dark theme, on the free plan and on a paid one (WCAG 2: 4.5 to 1, or 3 to 1 for large text),
+// and the ring around the control the Tab key reaches first (3 to 1 against the page).
 // The real server code answers; Webflow, the database, the AI engines, mail and billing are the stand-ins the
 // other tests use. Run: node test/contrast.js
 // Needs Playwright with Chromium. Without it the test says so and passes, so `npm test` works everywhere.
@@ -128,6 +129,22 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
     }
     return out;
   });
+  // The ring of the control that has the keyboard focus, against what is behind it. null when the focus is in a
+  // text field (fields show their focus with their border) or nowhere.
+  const focusRing = (page) => page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body || el.matches('input, textarea, select')) return null;
+    const parse = (c) => { c = String(c); let m = c.match(/^color\(srgb\s+([^)]+)\)/); if (m) { const p = m[1].split(/[\s/]+/).filter(Boolean).map(Number); return [p[0] * 255, p[1] * 255, p[2] * 255, p.length > 3 ? p[3] : 1]; } m = c.match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+    const over = (top, under) => { const a = top[3]; return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)).concat([1]); };
+    const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const behind = (from) => { const layers = []; for (let e = from; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c[3] > 0) { layers.push(c); if (c[3] === 1) break; } } let out = [255, 255, 255, 1]; for (let i = layers.length - 1; i >= 0; i--) out = over(layers[i], out); return out; };
+    const cs = getComputedStyle(el);
+    const bg = behind(el.parentElement);
+    const ring = over(parse(cs.outlineColor), bg);
+    const x = lum(ring), y = lum(bg);
+    return { what: el.tagName.toLowerCase(), text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30), width: cs.outlineStyle === 'none' ? 0 : parseFloat(cs.outlineWidth), ratio: +((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2), color: cs.outlineColor, bg: 'rgb(' + bg.slice(0, 3).map(Math.round).join(', ') + ')' };
+  });
+  let rings = 0;
   const kid = encodeURIComponent(k.id);
   const PAGES = [
     ['home', '/'], ['guide', '/docs'], ['privacy policy', '/privacy'], ['terms', '/terms'],
@@ -174,6 +191,11 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
           await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
           texts = await page.evaluate(() => document.body.innerText.trim().length);
           low = await lowContrast(page);
+          // the Tab key: the control it reaches has to show a ring that stands out from the page (3 to 1)
+          await page.keyboard.press('Tab');
+          const ring = await focusRing(page);
+          if (ring && !(ring.width >= 2 && ring.ratio >= 3)) low.push({ what: 'focus ring of ' + ring.what, text: ring.text, ratio: ring.ratio, need: 3, color: ring.color, bg: ring.bg });
+          if (ring) rings++;
         } catch (e) { low = [{ what: 'the page did not load', text: String(e.message).slice(0, 120), ratio: 0, need: 0, color: '', bg: '' }]; }
         pagesSeen++;
         const seen = new Set();
@@ -184,6 +206,7 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
     }
   }
   assert(pagesSeen === PAGES.length * 2 + PAGES.filter((p) => p[2] !== 'out' && !STATIC[p[1]]).length * 2, 'every page was measured in both themes, and the pages of the app on both plans (' + pagesSeen + ' page views)');
+  assert(rings >= pagesSeen - 4, 'and on each of them the Tab key reached a control whose focus ring was measured (' + rings + ' of ' + pagesSeen + ')');
 
   await browser.close();
   console.log(`\n${passed} passed, ${failed} failed`);
