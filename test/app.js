@@ -1,5 +1,6 @@
 // End-to-end test: mock Webflow, mock Upstash Redis, mock AI engines (OpenAI, Perplexity, Gemini),
-// mock Resend, mock Polar and a mock customer website. Run: node test/app.js
+// mock Resend and mock Polar. The customer's published website is here too, only to prove that the app
+// never requests it: everything the app knows about a site comes from the Webflow API. Run: node test/app.js
 const http = require('http');
 const crypto = require('crypto');
 
@@ -63,21 +64,21 @@ const redis = http.createServer(async (req, res) => {
   try { json(res, 200, { result: exec(body) }); } catch (e) { json(res, 400, { error: e.message }); }
 });
 
-/* ---- mock customer website ---- */
-const pagesHtml = {
-  '/': `<!doctype html><html lang="en"><head><title>Lumen Dental</title><meta name="description" content="Dentist."><meta property="og:image" content="/og.png"><link rel="icon" href="/fav.png"></head><body><h1>Lumen Dental</h1><p>${'Smile design and veneers in Antalya for international patients. '.repeat(30)}</p><a href="https://www.instagram.com/lumendental/">Instagram</a><img src="a.jpg"></body></html>`,
-  '/about': `<!doctype html><html lang="en"><head><title>About Lumen Dental Antalya | Our clinic and team</title><meta name="description" content="Meet the Lumen Dental team in Antalya: digital smile design, veneers and implants for patients from the UK and Ireland."><meta property="og:title" content="About"><meta property="og:description" content="About"><meta property="og:image" content="/og.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"AboutPage"}</script></head><body><h1>About us</h1><h2>How long do veneers last?</h2><p>Veneers usually last 10 to 15 years with good care and checkups twice a year.</p><h2>Do I need a visa?</h2><p>Most UK and Irish visitors do not need a visa for a short treatment stay in Turkey.</p><p>${'Our team works with a fully digital workflow. '.repeat(40)}</p></body></html>`,
-  '/blog/post-1': `<!doctype html><html lang="en"><head><title>Blog post one about dental tourism in Turkey</title></head><body><h1>Post</h1><p>Short.</p></body></html>`
-};
-let robotsTxt = 'User-agent: *\nDisallow: /private\n\nUser-agent: PerplexityBot\nDisallow: /\n';
-const customer = http.createServer((req, res) => {
-  const u = new URL(req.url, 'http://x');
-  if (u.pathname === '/robots.txt') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end(robotsTxt); }
-  if (u.pathname === '/sitemap.xml') { res.writeHead(200, { 'Content-Type': 'application/xml' }); return res.end(`<?xml version="1.0"?><urlset><url><loc>http://${req.headers.host}/</loc></url><url><loc>http://${req.headers.host}/about</loc></url><url><loc>http://${req.headers.host}/blog/post-1</loc></url></urlset>`); }
-  const page = pagesHtml[u.pathname.replace(/\/+$/, '') || '/'];
-  if (!page) { res.writeHead(404, { 'Content-Type': 'text/html' }); return res.end('<h1>404</h1>'); }
-  res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(page);
-});
+/* ---- the customer's published website ---- */
+// The app must never request it. This server counts what it gets, and the run ends by checking that it got nothing.
+const customerHits = [];
+const customer = http.createServer((req, res) => { customerHits.push(req.method + ' ' + req.url); res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<h1>The published site</h1>'); });
+
+// Every address the app requests during the run, to check at the end that each one is a service the app is
+// meant to call (Webflow's API, the AI and keyword data providers, the mail and billing providers, its database).
+const requestedHosts = new Set();
+{
+  const realFetch = global.fetch;
+  global.fetch = (input, init) => {
+    try { requestedHosts.add(new URL(typeof input === 'string' ? input : input.url).host); } catch (e) { requestedHosts.add('unreadable: ' + String(input).slice(0, 60)); }
+    return realFetch(input, init);
+  };
+}
 
 /* ---- mock AI engines and text generation ---- */
 const engineCalls = [];
@@ -181,7 +182,12 @@ const emails = [];
 const resend = http.createServer(async (req, res) => { const body = await readJSON(req); emails.push(body); json(res, 200, { id: 'em_' + emails.length }); });
 
 /* ---- mock Webflow ---- */
-const wfState = { sites: [], pages: {}, pageUpdates: [], schemaPuts: [], schemas: {}, items: [], revoked: false, revokeCalls: [] };
+const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [] };
+let nodeSeq = 0;
+// a text node as GET /v2/pages/:page_id/dom returns it: the HTML of the element and its plain text
+const textNode = (html) => ({ id: 'n' + (++nodeSeq), type: 'text', text: { html, text: html.replace(/<[^>]+>/g, '') }, attributes: {} });
+const imageNode = (alt) => ({ id: 'n' + (++nodeSeq), type: 'image', image: { alt, assetId: 'asset' + nodeSeq }, attributes: {} });
+const findPage = (id) => { for (const [sid, list] of Object.entries(wfState.pages)) { const pg = list.find((x) => x.id === id); if (pg) return { sid, pg }; } return null; };
 const webflow = http.createServer(async (req, res) => {
   const body = await readJSON(req);
   const u = new URL(req.url, 'http://x');
@@ -193,10 +199,22 @@ const webflow = http.createServer(async (req, res) => {
   if (u.pathname === '/oauth/revoke_authorization') { wfState.revokeCalls.push(body); return json(res, 200, { didRevoke: true }); }
   if (wfState.revoked || (req.headers.authorization || '') !== 'Bearer tok_abc') return json(res, 401, { message: 'Request not authorized' });
   const p = u.pathname;
+  wfState.paths.push(req.method + ' ' + p);
   let m;
   if (p === '/v2/token/authorized_by') return json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' });
   if (p === '/beta/token/resolve' && req.method === 'POST') { const t = String((body && body.idToken) || ''); return t.startsWith('idt:') ? json(res, 200, { id: t.split(':')[2] || 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L', siteId: t.split(':')[1] }) : json(res, 401, { message: 'Invalid ID token' }); }
-  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'GET') { for (const [sid, list] of Object.entries(wfState.pages)) { const pg = list.find((x) => x.id === m[1]); if (pg) return json(res, 200, Object.assign({ siteId: sid }, pg)); } return json(res, 404, { message: 'mock: no page' }); }
+  if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'GET') { const f = findPage(m[1]); return f ? json(res, 200, Object.assign({ siteId: f.sid }, f.pg)) : json(res, 404, { message: 'mock: no page' }); }
+  if ((m = p.match(/^\/v2\/pages\/(\w+)\/dom$/)) && req.method === 'GET') {
+    // like Webflow: at most 100 nodes a call, with the total in the pagination
+    wfState.domCalls.push(m[1]);
+    if (wfState.domFail[m[1]]) return json(res, wfState.domFail[m[1]], { message: 'mock: the content of this page is not served now' });
+    const f = findPage(m[1]);
+    if (!f) return json(res, 404, { message: 'mock: no page' });
+    const all = wfState.dom[m[1]] || [];
+    const limit = Math.min(100, parseInt(u.searchParams.get('limit') || '100', 10));
+    const offset = parseInt(u.searchParams.get('offset') || '0', 10);
+    return json(res, 200, { pageId: m[1], nodes: all.slice(offset, offset + limit), pagination: { limit, offset, total: all.length }, lastUpdated: f.pg.lastUpdated || null });
+  }
   if (p === '/v2/sites') return json(res, 200, { sites: wfState.sites });
   if ((m = p.match(/^\/v2\/sites\/(\w+)$/)) && req.method === 'GET') { const one = wfState.sites.find((x) => x.id === m[1]); return one ? json(res, 200, one) : json(res, 404, { message: 'mock: no site' }); }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/pages$/))) { const all = wfState.pages[m[1]] || []; return json(res, 200, { pages: all, pagination: { limit: 100, offset: 0, total: all.length } }); }
@@ -205,11 +223,13 @@ const webflow = http.createServer(async (req, res) => {
     const lid = u.searchParams.get('localeId');
     const site0 = wfState.sites[0] || {};
     if (lid && site0.locales && site0.locales.primary && site0.locales.primary.id === lid) return json(res, 400, { code: 'bad_request', message: 'Bad Request: Request is malformed: The provided locale must be a secondary locale.' });
-    wfState.pageUpdates.push({ id: m[1], body, localeId: lid }); return json(res, 200, Object.assign({ id: m[1] }, body));
-  }
-  if ((m = p.match(/^\/beta\/pages\/(\w+)\/schema-markup$/))) {
-    if (req.method === 'PUT') { wfState.schemaPuts.push({ id: m[1], body, localeId: u.searchParams.get('localeId') }); wfState.schemas[m[1]] = body.jsonLdSchema; return json(res, 200, { id: m[1], jsonLdSchema: body.jsonLdSchema }); }
-    return json(res, 200, { id: m[1], jsonLdSchema: wfState.schemas[m[1]] || null });
+    const f = findPage(m[1]);
+    if (!f) return json(res, 404, { message: 'mock: no page' });
+    // like Webflow: the page keeps what was sent, and the answer is the page as it is now
+    if (body && body.seo) f.pg.seo = Object.assign({}, f.pg.seo, body.seo);
+    if (body && body.openGraph) f.pg.openGraph = Object.assign({}, f.pg.openGraph, body.openGraph);
+    wfState.pageUpdates.push({ id: m[1], body, localeId: lid });
+    return json(res, 200, Object.assign({ siteId: f.sid }, f.pg));
   }
   if ((m = p.match(/^\/v2\/sites\/(\w+)\/collections$/))) return json(res, 200, { collections: [{ id: 'colFaq', displayName: 'FAQs', slug: 'faqs' }] });
   if (p === '/v2/collections/colFaq') return json(res, 200, { id: 'colFaq', displayName: 'FAQs', fields: [{ slug: 'name', type: 'PlainText', displayName: 'Name' }, { slug: 'slug', type: 'PlainText', displayName: 'Slug' }, { slug: 'answer', type: 'RichText', displayName: 'Answer' }] });
@@ -285,12 +305,19 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   });
   const host = '127.0.0.1:' + custPort;
   wfState.sites = [{ id: 'siteA', workspaceId: 'ws1', displayName: 'Lumen Dental', shortName: 'lumen-dental', customDomains: [{ id: 'd1', url: host }, { id: 'd0', url: 'lumendental.com' }] }];
+  // the pages as GET /v2/sites/:site_id/pages lists them, with their SEO and Open Graph settings
+  const ABOUT_TITLE = 'About Lumen Dental Antalya | Our clinic and team';
+  const ABOUT_DESC = 'Meet the Lumen Dental team in Antalya: digital smile design, veneers and implants for patients from the UK and Ireland.';
   wfState.pages.siteA = [
-    { id: 'p1', title: 'Home', slug: 'home', publishedPath: '/' },
-    { id: 'p2', title: 'About', slug: 'about', publishedPath: '/about' },
-    { id: 'p404', title: '404', slug: '404', publishedPath: '/404' },
-    { id: 'tpl', title: 'Blog Template', slug: 'detail_blog', publishedPath: '/blog/[slug]', collectionId: 'colBlog' }
+    { id: 'p1', title: 'Home', slug: 'home', publishedPath: '/', lastUpdated: '2026-11-20T09:00:00.000Z', seo: { title: 'Lumen Dental', description: 'Dentist.' }, openGraph: { title: '', titleCopied: true, description: '', descriptionCopied: true } },
+    { id: 'p2', title: 'About', slug: 'about', publishedPath: '/about', lastUpdated: '2026-11-21T09:00:00.000Z', seo: { title: ABOUT_TITLE, description: ABOUT_DESC }, openGraph: { title: 'About', titleCopied: false, description: 'About', descriptionCopied: false } },
+    { id: 'p404', title: '404', slug: '404', publishedPath: '/404', seo: {}, openGraph: {} },
+    { id: 'pDraft', title: 'Coming soon', slug: 'soon', publishedPath: '/soon', draft: true, seo: {}, openGraph: {} },
+    { id: 'tpl', title: 'Blog Template', slug: 'detail_blog', publishedPath: '/blog/[slug]', collectionId: 'colBlog', seo: { title: '{{wf {"path":"name","type":"PlainText"} }}', description: '' }, openGraph: { title: '', titleCopied: true, description: '', descriptionCopied: true } }
   ];
+  // and what GET /v2/pages/:page_id/dom returns for the two static pages
+  wfState.dom.p1 = [textNode('<h1>Lumen Dental</h1>'), textNode('<p>' + 'Smile design and veneers in Antalya for international patients. '.repeat(40) + '</p>'), imageNode('')];
+  wfState.dom.p2 = [textNode('<h1>About us</h1>'), textNode('<h2>How long do veneers last?</h2>'), textNode('<p>Veneers usually last 10 to 15 years with good care and checkups twice a year.</p>'), textNode('<h2>Do I need a visa?</h2>'), textNode('<p>Most UK and Irish visitors do not need a visa for a short treatment stay in Turkey.</p>'), textNode('<p>' + 'Our team works with a fully digital workflow. '.repeat(40) + '</p>'), imageNode('__wf_reserved_decorative')];
 
   console.log('unit: analysis, audit, fixes, plans, keywords');
   {
@@ -329,14 +356,44 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const m = kw.matchPage('veneers in antalya', pages);
     assert(m && m.path === '/veneers' && m.static === true, 'a keyword matches the page about it');
     assert(kw.matchPage('wedding photographer lisbon', pages) === null, 'no page is matched when nothing fits');
-    const audit = require('../api/_lib/audit');
-    assert(audit.robotsBlocks('User-agent: *\nDisallow: /', 'OAI-SearchBot') === true, 'wildcard disallow blocks a bot');
-    assert(audit.robotsBlocks('User-agent: *\nDisallow: /\n\nUser-agent: OAI-SearchBot\nAllow: /', 'OAI-SearchBot') === false, 'a specific allow group wins');
-    const tricky = '<html lang="en"><head><title>Implant clinic</title><style>/* the menu moves under <body>; the item classes survive that move */ .m > a { display: flex !important; }</style><script>var s = "<body class=x>"; document.write("<!-- not a comment");</script></head><body><h1>Teeth in a day</h1><p>We place implants in one day.</p><!-- <script> --><p>Clinics across the UK.</p><script>var x = 1;</script></body></html>';
-    const trickyRead = audit.readPage(tricky);
-    assert(trickyRead.text === 'Teeth in a day We place implants in one day. Clinics across the UK.' && trickyRead.words === 14 && trickyRead.title === 'Implant clinic' && trickyRead.h1[0] === 'Teeth in a day', 'a "<body" written in a stylesheet or a script in the head is not where the page text starts');
-    assert(audit.visibleHtml('<p>a</p><style>p{}') === '<p>a</p> ' && audit.visibleHtml('<p>a</p><!-- open') === '<p>a</p> ' && audit.visibleHtml('<p>a</p><SCRIPT>x</SCRIPT ><p>b</p>') === '<p>a</p> <p>b</p>', 'a script, style or comment that is never closed runs to the end of the page, and tag names match in any case');
-    assert(audit.visibleHtml('<p>a</p><script>var c = "<!--";</script><p>b</p><!-- <style> --><p>c</p>') === '<p>a</p> <p>b</p> <p>c</p>', 'what starts first wins: a comment mark inside a script and a style tag inside a comment hide nothing more');
+    const pt = require('../api/_lib/pagetext');
+    const tricky = '<h1>Teeth in a day</h1><style>/* the menu moves under <h1>; the item classes survive that move */ .m > a { display: flex !important; }</style><script>var s = "<h1>not a heading</h1>"; document.write("<!-- not a comment");</script><p>We place implants in one day.</p><!-- <script> --><p>Clinics across the UK.</p><script>var x = 1;</script>';
+    const trickyRead = pt.readFragment(tricky);
+    assert(trickyRead.text === 'Teeth in a day We place implants in one day. Clinics across the UK.' && trickyRead.words === 14 && trickyRead.h1.length === 1 && trickyRead.h1[0] === 'Teeth in a day', 'the text of a page leaves out scripts, styles and comments, and a heading written inside one is not a heading');
+    assert(pt.visibleHtml('<p>a</p><style>p{}') === '<p>a</p> ' && pt.visibleHtml('<p>a</p><!-- open') === '<p>a</p> ' && pt.visibleHtml('<p>a</p><SCRIPT>x</SCRIPT ><p>b</p>') === '<p>a</p> <p>b</p>', 'a script, style or comment that is never closed runs to the end of the page, and tag names match in any case');
+    assert(pt.visibleHtml('<p>a</p><script>var c = "<!--";</script><p>b</p><!-- <style> --><p>c</p>') === '<p>a</p> <p>b</p> <p>c</p>', 'what starts first wins: a comment mark inside a script and a style tag inside a comment hide nothing more');
+    const qa = pt.readFragment('<h1>Veneers</h1><h2>How long do veneers last?</h2><p>Usually 10 to 15 years with good care.</p><h2>Our team</h2><p>Five dentists.</p><details><summary>Is it painful?</summary><p>No, the teeth are numbed first.</p></details><h3>Short?</h3><p>Yes.</p>');
+    assert(qa.faq.length === 2 && qa.faq[0].q === 'How long do veneers last?' && qa.faq[0].a === 'Usually 10 to 15 years with good care.' && qa.faq[1].q === 'Is it painful?' && qa.headings.length === 4, 'questions a page answers: a heading that ends in a question mark with the text under it, or a details block; an answer of a few letters does not count');
+
+    // Site health works on what the Webflow API returns for a page: its settings and its nodes
+    const hl = require('../api/_lib/health');
+    const fromNodes = hl.domToHtml([
+      { id: 'a', type: 'text', text: { html: '<h1>Veneers in Antalya</h1>', text: 'Veneers in Antalya' } },
+      { id: 'b', type: 'text', text: { html: null, text: 'Plain <b>text</b> & more' } },
+      { id: 'c', type: 'image', image: { alt: 'A smile', assetId: 'x1' } },
+      { id: 'd', type: 'image', image: { alt: '', assetId: 'x2' } },
+      { id: 'e', type: 'image', image: { alt: '__wf_reserved_decorative', assetId: 'x3' } },
+      { id: 'f', type: 'image', image: { alt: '__wf_reserved_inherit', assetId: 'x4' } },
+      { id: 'g', type: 'component-instance', componentId: 'cmp1', propertyOverrides: [{ propertyId: 'p1', type: 'Plain Text', label: 'Button', text: { html: null, text: 'Book a call' } }] },
+      { id: 'h', type: 'a-node-type-added-later' },
+      null
+    ]);
+    const fromNodesRead = pt.readFragment(fromNodes.html);
+    assert(fromNodes.components === 1 && fromNodes.imagesInherit === 1 && fromNodesRead.images === 4 && fromNodesRead.imagesNoAlt === 1 && fromNodesRead.h1.join() === 'Veneers in Antalya', 'the nodes of a page: an image with no alt text is counted, one marked decorative or using the alt of its asset is not, and component instances are counted');
+    assert(fromNodesRead.text === 'Veneers in Antalya Plain <b>text</b> & more Book a call', 'text that Webflow gives without HTML is read as text, never as markup, and the text set on a component instance is read too');
+    const pageMeta = { id: 'pg1', title: 'Veneers', slug: 'veneers', publishedPath: '/veneers', lastUpdated: '2026-11-02T10:00:00.000Z', seo: { title: 'Veneers in Antalya | Lumen Dental', description: 'Emax veneers planned with digital smile design in Antalya, for patients from the UK and Ireland.' }, openGraph: { title: '', titleCopied: true, description: '', descriptionCopied: false } };
+    const thinRow = hl.rowFor(pageMeta, { h1: ['Veneers in Antalya'], words: 120, images: 2, imagesNoAlt: 1, components: 0, faq: [], readAt: 5 });
+    assert(thinRow.issues.join() === 'og_missing,thin,alt_missing' && thinRow.unknown.length === 0 && thinRow.score === 78 && thinRow.og.title === true && thinRow.og.description === false && thinRow.contentAt === 5 && thinRow.metaAt > 0, 'a page row: an Open Graph title that copies the SEO title counts as set, an empty one that does not is a finding; thin text and a missing alt text are findings');
+    const partRow = hl.rowFor(pageMeta, { h1: [], words: 120, images: 0, imagesNoAlt: 0, components: 2, faq: [], readAt: 5 });
+    assert(partRow.issues.join() === 'og_missing' && partRow.unknown.join() === 'h1_missing,thin' && partRow.score === 94, 'what depends on text inside components is "not determined": it is never reported as a fact and takes nothing off the score');
+    const cutRow = hl.rowFor(pageMeta, { h1: [], words: 120, images: 0, imagesNoAlt: 0, components: 0, truncated: true, faq: [], readAt: 5 });
+    assert(cutRow.unknown.join() === 'h1_missing,thin' && cutRow.truncated === true, 'the same holds for a page too long to read in full');
+    const twoH1 = hl.rowFor(pageMeta, { h1: ['One', 'Two', 'Three'], words: 400, images: 0, imagesNoAlt: 0, components: 3, faq: [], readAt: 5 });
+    assert(twoH1.issues.includes('h1_multiple') && twoH1.h1Count === 3 && twoH1.h1.length === 2, 'more than one H1 is a fact even when part of the page is inside components');
+    const tplUnit = hl.rowFor(Object.assign({}, pageMeta, { collectionId: 'col1', seo: { title: '{{wf {"path":"name"} }}', description: '' } }), null);
+    assert(tplUnit.template && tplUnit.content === false && tplUnit.words === null && tplUnit.issues.join() === 'desc_missing,og_missing', 'a Collection template is checked on its settings only, and the length of a title made of a field binding is not judged');
+    assert(hl.listed([{ id: 'a', publishedPath: '/' }, { id: 'b', publishedPath: '/404' }, { id: 'c', publishedPath: '/search' }, { id: 'd', publishedPath: '/x', draft: true }, { id: 'e', publishedPath: '/y', archived: true }, { id: 'f' }, { publishedPath: '/z' }, null]).map((p) => p.id).join() === 'a', 'utility pages, drafts, archived pages and pages without an address are left out of Site health');
+    assert(hl.LIMITS.title.min === 20 && hl.LIMITS.title.max === 65 && hl.RULES.title_length.text.includes('20') && hl.RULES.title_length.text.includes('65') && hl.RULES.desc_length.text.includes('165'), 'the length limits are named once and the texts of the findings use them');
     {
       // Webflow's rate limit: wait and try again, three more times at most
       const wfLib = require('../api/_lib/webflow');
@@ -351,14 +408,26 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
       let gaveUp = null;
       try { await wfLib.listSites('tok'); } catch (e) { gaveUp = e; }
       assert(gaveUp && gaveUp.status === 429 && calls === 4, 'and after three more tries it gives up');
+      // a long page comes from Webflow in parts of 100 nodes
+      let offsets = [];
+      global.fetch = async (url) => {
+        const q = new URL(String(url)).searchParams;
+        const off = parseInt(q.get('offset'), 10);
+        offsets.push(off + ':' + q.get('limit'));
+        const n = Math.max(0, Math.min(100, 250 - off));
+        return new Response(JSON.stringify({ pageId: 'pg1', nodes: Array.from({ length: n }, (_, i) => ({ id: 'n' + (off + i), type: 'text', text: { html: '<p>word</p>', text: 'word' } })), pagination: { limit: 100, offset: off, total: 250 }, lastUpdated: '2026-11-01T00:00:00.000Z' }), { status: 200 });
+      };
+      const whole = await wfLib.pageDom('tok', 'pg1');
+      assert(whole.nodes.length === 250 && whole.total === 250 && !whole.truncated && offsets.join() === '0:100,100:100,200:100' && whole.lastUpdated === '2026-11-01T00:00:00.000Z', 'the content of a long page is read from Webflow in parts of 100 nodes');
+      offsets = [];
+      const cut = await wfLib.pageDom('tok', 'pg1', 200);
+      assert(cut.nodes.length === 200 && cut.truncated && offsets.join() === '0:100,100:100', 'and a page longer than the limit is marked as read in part');
+      const hl2 = require('../api/_lib/health');
+      const longRead = await hl2.readContent('tok', 'pg1', 200);
+      assert(longRead.truncated === true && longRead.words === 200 && longRead.readAt > 0, 'the content read says when it was read and whether it is complete');
       global.fetch = realFetch;
       delete process.env.WEBFLOW_RETRY_BASE_MS;
     }
-    const fx = require('../api/_lib/fixes');
-    const merged = fx.mergeSchema({ '@context': 'https://schema.org', '@type': 'Dentist', name: 'Old' }, [fx.orgSchema({ type: 'Dentist', name: 'New', url: 'https://x.com/' }), fx.faqSchema([{ q: 'Q1?', a: 'A1' }, { q: 'Q2?', a: 'A2' }])]);
-    assert(merged['@graph'].length === 2 && merged['@graph'][0].name === 'New' && merged['@graph'][1]['@type'] === 'FAQPage', 'merge replaces the old organization node and adds FAQ');
-    const kept = fx.mergeSchema({ '@graph': [{ '@type': 'Product', name: 'Kit' }] }, [fx.faqSchema([{ q: 'a?', a: 'b' }, { q: 'c?', a: 'd' }])]);
-    assert(kept['@graph'].some((n) => n['@type'] === 'Product'), 'merge keeps unrelated existing nodes');
     const { limitsFor } = require('../api/_lib/plans');
     assert(limitsFor({ plan: 'free', email: 'a@b.com' }).allEngines === false && limitsFor({ plan: 'free' }).keywords === 3 && limitsFor({ plan: 'solo' }).keywords === 10 && limitsFor({ plan: 'agency' }).keywords === 100 && limitsFor({ plan: 'solo' }).rechecks === 10 && limitsFor({ plan: 'studio' }).keywords === 30, 'plan limits in keywords and keyword checks');
     assert(limitsFor({ plan: 'free', email: 'reviewer@webflow.com' }).plan === 'agency', 'Webflow reviewers get Agency');
@@ -370,6 +439,39 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const old = await st.getSite('old1');
     assert(old.keywords.length === 1 && old.keywords[0].text === 'best clinic for veneers in antalya' && old.keywords[0].questions[0] === 'Best clinic for veneers in Antalya?' && !old.prompts && old.kw, 'sites saved with questions read as keywords asked as those questions');
     db.delete('site:old1');
+  }
+
+  console.log('unit: where the app sends requests');
+  {
+    const fs = require('fs');
+    const pathLib = require('path');
+    const root = pathLib.join(__dirname, '..');
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(pathLib.join(d, e.name)) : [pathLib.join(d, e.name)]));
+    const code = walk(pathLib.join(root, 'api')).filter((f) => /\.(js|mjs|cjs|ts)$/.test(f)).map((f) => ({ f: pathLib.relative(root, f).split(pathLib.sep).join('/'), s: fs.readFileSync(f, 'utf8') }));
+    const NET = /\bfetch\s*\(|\bhttps?\.(request|get)\s*\(|require\(\s*['"](node:)?(https?|http2|tls|dgram|dns|child_process|undici|axios|got|node-fetch|puppeteer|playwright)['"]\s*\)|\bimport\b[^;]*['"](node:)?(https?|http2|tls|undici|axios|got|node-fetch)['"]|\bnet\.(connect|createConnection|Socket|createServer)\b|XMLHttpRequest|WebSocket|EventSource/;
+    const senders = code.filter((c) => NET.test(c.s)).map((c) => c.f).sort();
+    assert(senders.join() === 'api/_lib/email.js,api/_lib/engines.js,api/_lib/html.js,api/_lib/keywords.js,api/_lib/kv.js,api/_lib/llm.js,api/_lib/polar.js,api/_lib/webflow.js',
+      'requests leave the app from these modules only: the Webflow client, the AI engines, the writer, keyword data, mail, billing and the database (found: ' + senders.join(', ') + ')');
+    const htmlSrc = code.find((c) => c.f === 'api/_lib/html.js').s;
+    assert((htmlSrc.match(/\bfetch\s*\(/g) || []).length === 3 && (htmlSrc.match(/\bfetch\s*\(\s*'\/app\//g) || []).length === 3, "the scripts in the app's own pages call the app itself and nothing else");
+    const wfSrc = code.find((c) => c.f === 'api/_lib/webflow.js').s;
+    assert((wfSrc.match(/\bfetch\s*\(/g) || []).length === 3 && (wfSrc.match(/\bfetch\s*\(\s*API_BASE\(\) \+/g) || []).length === 3, "every call of the Webflow client goes to Webflow's API address");
+    const betaPaths = code.flatMap((c) => (c.s.match(/\/beta\/[A-Za-z0-9_\/:{}$.-]*/g) || []).map((x) => c.f + ' ' + x));
+    assert([...new Set(betaPaths)].join() === 'api/_lib/webflow.js /beta/token/resolve', 'no feature uses a beta endpoint of Webflow: the one beta path in the code resolves the ID token of the Designer panel (found: ' + betaPaths.join(', ') + ')');
+    assert(!code.some((c) => /schema-markup|jsonLdSchema|ld\+json|robots\.txt|sitemap\.xml/i.test(c.s) && c.f !== 'api/_lib/html.js' && c.f !== 'api/_lib/health.js'), 'nothing in the app reads or writes schema markup, robots.txt or a sitemap');
+    assert(!fs.existsSync(pathLib.join(root, 'api/_lib/audit.js')) && !fs.existsSync(pathLib.join(root, 'api/_lib/fetcher.js')) && !fs.existsSync(pathLib.join(root, 'api/_lib/vr')), 'the reader of published websites is not part of the app');
+    const wfLib = require('../api/_lib/webflow');
+    assert(wfLib.SCOPES.join(' ') === 'authorized_user:read sites:read pages:read pages:write cms:read cms:write' && !wfLib.getSchema && !wfLib.putSchema && !wfLib.querySchemas, 'the scopes are the six the features use, and the Webflow client has no schema calls');
+
+    // the Designer panel: what it may call and what it must not do
+    const panel = fs.readFileSync(pathLib.join(root, 'extension/public/app.js'), 'utf8');
+    const panelPage = fs.readFileSync(pathLib.join(root, 'extension/public/index.html'), 'utf8');
+    assert((panel.match(/\bfetch\s*\(/g) || []).length === 1 && /fetch\(API \+ '\/ext\/' \+ route,/.test(panel) && /var API = 'https:\/\/aiseodeck\.silitlabs\.com';/.test(panel), 'the Designer panel calls one server, the app itself, over HTTPS');
+    assert(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\s*\(|new Function|setInterval|setTimeout|importScripts|createElement\(\s*['"]script|javascript:/.test(panel), 'the Designer panel adds no HTML from strings, runs no generated code and has no timers');
+    assert(!/keydown|keyup|keypress|accesskey|localStorage|sessionStorage|indexedDB|document\.cookie|postMessage|window\.open|location\.(href|assign|replace)/i.test(panel), 'the Designer panel has no keyboard shortcuts, stores nothing in the browser, opens no windows and sends no messages');
+    assert(!/\son[a-z]+\s*=|javascript:|<script(?![^>]*\ssrc="app\.js")|style\s*=/i.test(panelPage) && /<script src="app\.js"><\/script>/.test(panelPage), 'the page of the panel has no inline scripts, handlers or styles');
+    const usesWebflow = [...new Set(panel.match(/\bwebflow\.[A-Za-z]+/g) || [])].sort();
+    assert(usesWebflow.join() === 'webflow.getCurrentPage,webflow.getIdToken,webflow.getSiteInfo,webflow.notify,webflow.setExtensionSize,webflow.subscribe', 'the Designer API calls of the panel are the ones the review notes list (found: ' + usesWebflow.join(', ') + ')');
   }
 
   const app = startApp();
@@ -389,7 +491,9 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 200 && r.body.includes('Set up Lumen Dental') && r.body.includes('value="en" selected') && r.body.includes('>veneers in antalya</textarea>'), 'setup page shows the site and holds the keyword');
   assert(!/name="domains"/.test(r.body) && r.body.includes('Your website, read from Webflow') && r.body.includes('lumendental.com, lumen-dental.webflow.io') && r.body.includes('Read from Webflow just now') && /<button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow<\/button>/.test(r.body), 'setup asks for no website address: the addresses come from Webflow, with the time they were read and a refresh');
   assert(!/name, then website|brightline\.com/.test(r.body) && r.body.includes('one name per line'), 'rivals are asked for by name only');
+  assert(r.body.includes('id="suggbtn">Suggest keywords from my site</button>') && r.body.includes("btn.addEventListener('click'") && wfState.domCalls.length === 0 && !engineCalls.some((c) => c.e === 'gen'), 'opening the setup page reads no page content and asks no AI: keyword ideas come when the user asks for them');
   r = await post('/app/setup/suggest', cookie, { id: 'siteA' });
+  assert(wfState.domCalls.join() === 'p1', 'the ideas are written from the home page as the Webflow API returns it');
   const sug = JSON.parse(r.body);
   assert(sug.ideas.length === 3 && sug.ideas[0].keyword === 'veneers in antalya' && sug.ideas[0].volume === 1800 && !sug.ideas.some((x) => /lumen/.test(x.keyword)), 'keyword ideas come back lowercased, with volumes, without the brand');
   assert(sug.cited.length === 1 && sug.cited[0].keyword === 'smile makeover antalya' && sug.cited[0].volume === 880, 'keywords already cited in Google AI Overviews come back');
@@ -452,8 +556,8 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
 
   r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('class="shell"') && r.body.includes('aria-current="page">' ) && r.body.includes('>Overview<') && r.body.includes('AI visibility') && r.body.includes('Do these next') && r.body.includes('Keywords each engine names you for'), 'a site opens on its overview, inside the sidebar');
-  assert(r.body.includes('Open the fix plan') && r.body.includes('Run the site audit') && /<ol class="todo">/.test(r.body), 'the overview says what to do next: keywords worth fixing, then the site audit');
-  assert(r.body.includes('Who AI names') && r.body.includes('Sites the AI reads') && r.body.includes('Not run'), 'rivals, sources and the site health badge');
+  assert(r.body.includes('Open the fix plan') && r.body.includes('Read your pages from Webflow') && r.body.includes('Open Site health') && /<ol class="todo">/.test(r.body), 'the overview says what to do next: keywords worth fixing, then Site health');
+  assert(r.body.includes('Who AI names') && r.body.includes('Sites the AI reads') && r.body.includes('Not read yet'), 'rivals, sources and the Site health badge');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=keywords', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('class="kt"') && r.body.includes('veneers in antalya') && r.body.includes('c st-b') && r.body.includes('c st-x'), 'the keyword deck renders with engine states');
   assert(r.body.includes('What the marks mean') && r.body.includes('Names you and links your site') && r.body.includes('Named by') && (r.body.includes('Fix this first') || r.body.includes('Fix plan')), 'the marks are explained in words, each keyword says how many engines name it and what to do');
@@ -463,7 +567,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('Yes. 3 of 3 AI engines name Lumen Dental.') && r.body.includes('<mark>Lumen Dental</mark>') && r.body.includes('rival-name') && r.body.includes('chip own'), 'keyword page: the verdict and the answers with the brand marked');
   assert(r.body.includes('Which clinic is best for veneers in antalya?') && r.body.includes('Search <b>veneers in antalya</b>'), 'keyword page shows the questions and the search behind each answer');
-  assert(r.body.includes('Run the site audit') && r.body.includes('Searches related to this keyword'), 'before an audit the plan asks to read the pages; related searches offered');
+  assert(r.body.includes('Read my pages from Webflow') && r.body.includes('Searches related to this keyword'), 'before Site health has read the pages the plan asks to read them; related searches offered');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=insights', { headers: { cookie } });
   assert(r.body.includes('Where rivals win') && r.body.includes('dental implants antalya') && r.body.includes('whatclinic.com') && !/class="host" title="lumendental\.com"/.test(r.body) && r.body.includes('lumendental.com/veneers'), 'rivals and sources: the gap, the sites the AI uses, the own pages cited');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=discover', { headers: { cookie } });
@@ -537,69 +641,141 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie } });
   assert(r.body.includes('Checking all 3 keywords needs 3 keyword checks; 0 are left'), 'check all is refused without enough keyword checks');
 
-  console.log('site audit, keyword fixes and page fixes');
+  console.log('site health from the Webflow API, keyword fixes and page fixes');
+  r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie } });
+  assert(r.status === 200 && r.body.includes('Read my pages from Webflow') && r.body.includes('Nothing is changed in Webflow') && !r.body.includes('llms.txt'), 'before the first read, Site health offers to read the pages through Webflow');
+  const domBefore = wfState.domCalls.length;
   r = await post('/app/site/audit', cookie, { id: 'siteA', back: kVen.id });
-  const audit = getJ('audit:siteA');
-  assert(audit && audit.pagesChecked === 3 && r.headers.location.startsWith('/app/keyword?id=siteA&k=' + kVen.id), 'audit read the pages and came back to the keyword');
-  assert(audit.site.blockedBots.includes('PerplexityBot') && audit.siteIssues.some((x) => x.code === 'robots_blocks_ai'), 'audit flags PerplexityBot blocked');
-  assert(!audit.site.llms && audit.site.sitemap && !audit.site.orgSchema, 'llms.txt missing, sitemap found, no organization schema');
-  const home = audit.pages.find((p) => p.path === '/');
-  const about = audit.pages.find((p) => p.path === '/about');
-  assert(home.pageId === 'p1' && home.issues.includes('title_length') && home.issues.includes('desc_length') && home.issues.includes('schema_missing'), 'homepage issues found');
-  assert(about.faq.length === 2 && about.issues.includes('faq_no_schema'), 'questions on the about page without FAQ schema');
-  assert(!audit.pages.some((p) => p.path === '/404'), 'utility pages skipped');
+  let audit = getJ('audit:siteA');
+  assert(audit && audit.source === 'webflow-data-api' && audit.pagesListed === 3 && audit.pagesChecked === 3 && audit.complete && audit.pages.length === 3 && r.headers.location.startsWith('/app/keyword?id=siteA&k=' + kVen.id), 'Site health reads the pages through the Webflow API and comes back to the keyword');
+  assert(wfState.domCalls.slice(domBefore).sort().join() === 'p1,p2', 'the text of the static pages comes from GET /v2/pages/:page_id/dom; the utility page, the draft and the Collection template are not read');
+  let home = audit.pages.find((p) => p.path === '/');
+  let about = audit.pages.find((p) => p.path === '/about');
+  assert(home.pageId === 'p1' && home.issues.join() === 'title_length,desc_length,alt_missing' && home.score === 82 && home.h1[0] === 'Lumen Dental' && home.words > 300 && home.og.title && home.og.description && home.contentAt > 0, 'home page: a short title and description, and an image without alt text; its Open Graph values copy the SEO ones');
+  assert(about.faq.length === 2 && about.faq[0].q === 'How long do veneers last?' && !('a' in about.faq[0]) && about.issues.length === 0 && about.score === 100 && about.images === 1 && about.imagesNoAlt === 0 && !('text' in about), 'about page: two questions found, an image marked decorative is not a finding, and the text of the page is not kept');
+  const tplRow = audit.pages.find((p) => p.template);
+  assert(tplRow && tplRow.content === false && tplRow.issues.join() === 'desc_missing,og_missing' && !audit.pages.some((p) => p.path === '/404' || p.path === '/soon'), 'a Collection template is checked on its settings only; utility pages and drafts are left out');
+  assert(audit.origin === 'http://' + host && audit.readAt >= audit.at && audit.score === 85 && getJ('site:siteA').audit.complete === true && getJ('site:siteA').audit.pages === 3, 'the read is stamped with its time and its summary is kept on the site');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
-  assert(r.body.includes('Best page: <a href="http://' + host + '/about"') && r.body.includes('Write the fixes'), 'the keyword is matched to its best page');
+  assert(r.body.includes('Best page: <a href="http://' + host + '/about"') && r.body.includes('Write the fixes') && !r.body.includes('<option value="/blog/[slug]"'), 'the keyword is matched to its best page, and a Collection template is not offered as its page');
   assert(!r.body.includes('API key not valid') && r.body.includes('This engine could not answer right now. It is asked again at the next check.'), 'customers see plain words for a failed answer, never the provider message');
+  r = await post('/app/keyword/page', cookie, { id: 'siteA', k: kVen.id, path: '/blog/[slug]' });
+  assert(!getJ('site:siteA').keywords.find((k) => k.id === kVen.id).page, 'a Collection template cannot be chosen as the page of a keyword');
+  const domAtPlan = wfState.domCalls.length;
   r = await post('/app/keyword/plan', cookie, { id: 'siteA', k: kVen.id });
+  assert(wfState.domCalls.slice(domAtPlan).join() === 'p2' && decodeURIComponent(r.headers.location).includes('Fixes ready'), 'the writer gets the text of the page from Webflow, read when the user asks for the fixes');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
   assert(r.body.includes('Veneers and smile design in Antalya | Lumen Dental') && r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('Apply to Webflow') && r.body.includes('value="colFaq"'), 'the fixes are written from the page, with the keyword, ready to apply');
+  assert(r.body.includes('<span class="l">Now in Webflow</span><b>' + ABOUT_TITLE + '</b>') && r.body.includes('<span class="l">Suggested</span>') && /data-read-from-webflow>Read from Webflow just now\.</.test(r.body) && r.body.includes('name="seen_title" value="' + ABOUT_TITLE + '" form="applyform"'), 'what the page has in Webflow now stands apart from the suggestion, with the time it was read');
+  assert(!r.body.includes('do_schema') && !/schema/i.test(r.body), 'no schema markup is offered or mentioned');
   const metaGen = engineCalls.filter((c) => c.e === 'gen' && /meta descriptions/.test(c.ins)).length;
   assert(metaGen >= 1, 'the title and description were written by the AI');
-  r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', title: 'Veneers in Antalya | Lumen Dental', description: 'Emax veneers and digital smile design in Antalya for patients from the UK and Ireland, planned in one visit.', do_schema: '1', do_cms: '1', collection: 'colFaq', faq: 'Q: How long do veneers last?\nA: Usually 10 to 15 years.\n\nQ: Do UK visitors need a visa?\nA: Most do not.' });
-  assert(wfState.pageUpdates.length === 1 && wfState.pageUpdates[0].id === 'p2' && wfState.pageUpdates[0].body.seo.title === 'Veneers in Antalya | Lumen Dental', 'one click: the title and description go to the matched page');
-  assert(wfState.schemaPuts.length === 1 && wfState.schemaPuts[0].id === 'p2' && JSON.stringify(wfState.schemaPuts[0].body.jsonLdSchema).includes('FAQPage') && JSON.stringify(wfState.schemaPuts[0].body.jsonLdSchema).includes('How long do veneers last?'), 'one click: FAQ schema written to the page');
+  const NEW_DESC = 'Emax veneers and digital smile design in Antalya for patients from the UK and Ireland, planned in one visit.';
+  r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', title: 'A title sent without what was seen', description: NEW_DESC });
+  assert(wfState.pageUpdates.length === 0 && decodeURIComponent(r.headers.location).includes('changed in Webflow after you opened it'), 'a write that does not name the values the user was shown is not written');
+  r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', seen: '1', seen_title: ABOUT_TITLE, seen_description: ABOUT_DESC, title: 'Veneers in Antalya | Lumen Dental', description: NEW_DESC, do_cms: '1', collection: 'colFaq', faq: 'Q: How long do veneers last?\nA: Usually 10 to 15 years.\n\nQ: Do UK visitors need a visa?\nA: Most do not.' });
+  assert(wfState.pageUpdates.length === 1 && wfState.pageUpdates[0].id === 'p2' && wfState.pageUpdates[0].body.seo.title === 'Veneers in Antalya | Lumen Dental' && wfState.pageUpdates[0].body.seo.description === NEW_DESC && !wfState.pageUpdates[0].body.openGraph && !wfState.pageUpdates[0].body.slug, 'one click: the title and description go to the matched page, and nothing else of the page is sent');
   assert(wfState.items.length === 2 && wfState.items.every((x) => x.isDraft === true) && wfState.items[0].fieldData.answer === '<p>Usually 10 to 15 years.</p>', 'one click: the answers go to the CMS as drafts');
-  assert(getJ('site:siteA').keywords.find((k) => k.id === kVen.id).fixedAt > 0 && decodeURIComponent(r.headers.location).includes('Applied the title and description, FAQ schema and 2 answers as drafts in FAQs'), 'the keyword remembers it was fixed');
+  assert(getJ('site:siteA').keywords.find((k) => k.id === kVen.id).fixedAt > 0 && decodeURIComponent(r.headers.location).includes('Applied the title and description and 2 answers as drafts in FAQs'), 'the keyword remembers it was fixed');
+  assert(getJ('audit:siteA').pages.find((p) => p.path === '/about').title === 'Veneers in Antalya | Lumen Dental', 'Site health holds what Webflow answered to the write');
+  {
+    // someone changes the page in Webflow while the fix is open here: nothing is overwritten
+    wfState.pages.siteA.find((p) => p.id === 'p2').seo.title = 'Veneers in Antalya, edited in the Designer';
+    const before = wfState.pageUpdates.length;
+    r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', seen: '1', seen_title: 'Veneers in Antalya | Lumen Dental', seen_description: NEW_DESC, title: 'Another title for this page', description: 'Another description, long enough to pass the length check of the form.' });
+    assert(wfState.pageUpdates.length === before && decodeURIComponent(r.headers.location).includes('changed in Webflow after you opened it') && getJ('audit:siteA').pages.find((p) => p.path === '/about').title === 'Veneers in Antalya, edited in the Designer', 'a page changed in Webflow in the meantime is not overwritten: the write stops and the values from Webflow are shown');
+    r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
+    assert(r.body.includes('name="seen_title" value="Veneers in Antalya, edited in the Designer"'), 'and the next Apply starts from the values Webflow has now');
+  }
   r = await post('/app/keyword/page', cookie, { id: 'siteA', k: kImp.id, path: 'new' });
   r = await post('/app/keyword/plan', cookie, { id: 'siteA', k: kImp.id });
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kImp.id, { headers: { cookie } });
-  assert(r.body.includes('Dental implants in Antalya | Lumen Dental') && r.body.includes('/dental-implants-antalya') && r.body.includes('Add the draft to Webflow'), 'a keyword without a page gets a new page drafted from the site');
+  assert(r.body.includes('Dental implants in Antalya | Lumen Dental') && r.body.includes('/dental-implants-antalya') && r.body.includes('Add the draft to Webflow'), 'a keyword without a page gets a new page drafted from what the site says');
   r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kImp.id, what: 'newpage', collection: 'colFaq' });
   assert(wfState.items.length === 3 && wfState.items[2].fieldData.name === 'Dental implants in Antalya | Lumen Dental' && wfState.items[2].fieldData.answer.includes('<h3>How long do implants take?</h3>') && wfState.items[2].isDraft, 'the new page lands in the CMS as a draft');
   r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie } });
-  assert(r.status === 200 && r.body.includes('User-agent: PerplexityBot') && r.body.includes('Download llms.txt'), 'audit tab shows the robots lines and the llms.txt download');
+  assert(r.status === 200 && /data-read-from-webflow>3 pages of 3\. Read from Webflow just now\./.test(r.body) && r.body.includes('>Refresh from Webflow</button>') && r.body.includes('The published site is not requested') && !r.body.includes('Download llms.txt') && !r.body.includes('User-agent:'), 'Site health says where its data comes from and when it was read, and offers a refresh');
+  assert(r.body.includes('>Title length</span>') && r.body.includes('>Alt text</span>') && r.body.includes('Collection template') && r.body.includes('/app/fix?id=siteA&page=%2Fabout') && !r.body.includes('/app/fix?id=siteA&page=%2Fblog'), 'the findings of each page are listed; a Collection template has no Fix button');
   r = await request(port, 'GET', '/app/llms?id=siteA', { headers: { cookie } });
-  assert(r.status === 200 && r.body.startsWith('# Lumen Dental') && r.body.includes('/about'), 'llms.txt is written from the pages');
-  {
-    // every list line is a link ("- [Title](address)"), the home page comes first, and nothing follows the pages
-    const listLines = r.body.split('\n').filter((l) => l.startsWith('- '));
-    const notLink = listLines.find((l) => !/^- \[[^\]]+\]\(https?:\/\/[^)\s]+\)(: .+)?$/.test(l));
-    assert(listLines.length >= 2 && !notLink, 'every list line of llms.txt is a link' + (notLink ? ', but not: ' + notLink : ''));
-    assert(/^- \[Home page\]\(https?:\/\/[^)]+\/\)$/.test(listLines[0]) && !/## Contact|Website:/.test(r.body), 'llms.txt starts its list with the home page and has no loose "Website:" line');
-  }
+  assert(r.status === 404, 'the llms.txt download is gone');
+  r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/', schema: '{"@context":"https://schema.org","@type":"Dentist"}' });
+  assert(r.status === 404 && !wfState.paths.some((x) => /schema/.test(x)), 'and so is the route that wrote schema markup');
+  r = await request(port, 'GET', '/app/fix?id=siteA&page=' + encodeURIComponent('/blog/[slug]'), { headers: { cookie } });
+  assert(r.status === 302 && r.headers.location.includes('tab=audit'), 'a Collection template has no fix page');
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
-  assert(r.status === 200 && r.body.includes('&quot;@type&quot;: &quot;Organization&quot;') && r.body.includes('instagram.com/lumendental'), 'homepage fix proposes Organization schema with the social profile');
-  r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/', schema: '{"@context":"https://schema.org","@graph":[{"@type":"Dentist","name":"Lumen Dental"}]}' });
-  assert(wfState.schemaPuts.length === 2 && wfState.schemaPuts[1].body.jsonLdSchema['@graph'][0]['@type'] === 'Dentist', 'schema written through the Webflow schema markup API');
-  assert(getJ('audit:siteA').site.orgSchema === true, 'organization check passes after the fix');
-  r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/', schema: '{bad json' });
-  assert(wfState.schemaPuts.length === 2 && decodeURIComponent(r.headers.location).includes('not valid JSON'), 'invalid JSON is refused before Webflow');
+  assert(r.status === 200 && r.body.includes('Now in Webflow') && r.body.includes('name="seen_title" value="Lumen Dental"') && r.body.includes('name="seen_description" value="Dentist."') && /data-read-from-webflow>Read from Webflow just now</.test(r.body) && r.body.includes('action="/app/fix/refresh"') && !/schema/i.test(r.body), 'the fix page shows the title and description the page has in Webflow now, when they were read and a refresh');
+  {
+    // the page changes in Webflow: opening the fix shows the new values, and Refresh reads its content again
+    wfState.pages.siteA.find((p) => p.id === 'p1').seo.title = 'Lumen Dental Antalya';
+    r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
+    assert(r.body.includes('name="seen_title" value="Lumen Dental Antalya"') && !getJ('audit:siteA').pages.find((p) => p.path === '/').issues.includes('title_length'), 'opening a fix reads the title and description from Webflow again');
+    wfState.dom.p1.push(textNode('<h1>A second main heading</h1>'));
+    r = await post('/app/fix/refresh', cookie, { id: 'siteA', path: '/' });
+    assert(r.status === 302 && /Read%20from%20Webflow%20just%20now/.test(r.headers.location) && getJ('audit:siteA').pages.find((p) => p.path === '/').issues.includes('h1_multiple'), 'Refresh from Webflow on a fix page reads the content of the page again');
+    wfState.dom.p1.pop();
+    r = await post('/app/fix/refresh', cookie, { id: 'siteA', path: '/' });
+    assert(!getJ('audit:siteA').pages.find((p) => p.path === '/').issues.includes('h1_multiple'), 'and again after the page is corrected in Webflow');
+  }
   r = await post('/app/fix/suggest', cookie, { id: 'siteA', path: '/about', what: 'faq' });
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2Fabout', { headers: { cookie } });
-  assert(r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('FAQPage'), 'AI FAQ answers feed the FAQPage proposal');
+  assert(r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('Save the draft') && r.body.includes('We found 2 questions answered on this page.'), 'AI answers are written from the page as Webflow returns it, as a draft to review');
+  r = await post('/app/fix/suggest', cookie, { id: 'siteA', path: '/', what: 'meta' });
+  r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
+  assert(r.body.includes('New title (suggested by AI, change what you like)') && r.body.includes('value="Veneers and smile design in Antalya | Lumen Dental"') && r.body.includes('name="seen_title" value="Lumen Dental Antalya"'), 'an AI suggestion is labelled as one and stays apart from what Webflow has');
+  {
+    const before = wfState.pageUpdates.length;
+    const HOME_TITLE = 'Lumen Dental | Veneers and implants in Antalya';
+    const HOME_DESC = 'Emax veneers, implants and digital smile design in Antalya for patients from the UK and Ireland.';
+    r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', seen: '1', seen_title: 'Lumen Dental', seen_description: 'Dentist.', title: HOME_TITLE, description: HOME_DESC });
+    assert(wfState.pageUpdates.length === before && decodeURIComponent(r.headers.location).includes('changed in Webflow after you opened it'), 'the fix page does not overwrite a title that changed in Webflow after it was shown');
+    r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: HOME_TITLE, description: HOME_DESC });
+    assert(wfState.pageUpdates.length === before, 'and it writes nothing for a form that does not say what the user was shown');
+    r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', seen: '1', seen_title: 'Lumen Dental Antalya', seen_description: 'Dentist.', title: HOME_TITLE, description: HOME_DESC });
+    const last = wfState.pageUpdates[wfState.pageUpdates.length - 1];
+    assert(wfState.pageUpdates.length === before + 1 && last.id === 'p1' && last.body.seo.title === HOME_TITLE && decodeURIComponent(r.headers.location).includes('Saved to Webflow. Publish your site in Webflow to make it live.') && getJ('audit:siteA').pages.find((p) => p.path === '/').title === HOME_TITLE, 'the title and description are written when the user presses Apply on the values shown, as an unpublished change');
+  }
+  {
+    // a long site, or a Webflow rate limit, leaves the read in parts: nothing is guessed for a page not read yet
+    process.env.WEBFLOW_RETRY_BASE_MS = '1';
+    wfState.domFail.p2 = 429;
+    const at = wfState.domCalls.length;
+    r = await post('/app/site/audit', cookie, { id: 'siteA' });
+    audit = getJ('audit:siteA');
+    about = audit.pages.find((p) => p.path === '/about');
+    assert(!audit.complete && audit.pending === 1 && audit.pagesChecked === 2 && about.state === 'pending' && about.words === null && about.content === false && !about.issues.includes('thin') && !about.issues.includes('h1_missing'), 'when Webflow asks to slow down, the page that was not read is marked as not read: no finding is made up for it');
+    assert(wfState.domCalls.slice(at).filter((x) => x === 'p2').length === 4 && decodeURIComponent(r.headers.location).includes('2 of 3 pages are read so far. Press "Read the rest" to go on.'), 'the rate-limited call is tried three more times, then the read stops and says how far it got');
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie } });
+    assert(r.body.includes('>Read the rest</button>') && r.body.includes('Text not read yet') && r.body.includes('The text of 1 page is not read yet.'), 'Site health shows what is not read yet and offers to read the rest');
+    delete wfState.domFail.p2;
+    const at2 = wfState.domCalls.length;
+    r = await post('/app/site/audit', cookie, { id: 'siteA', resume: '1' });
+    audit = getJ('audit:siteA');
+    assert(audit.complete && audit.pending === 0 && audit.pagesChecked === 3 && wfState.domCalls.slice(at2).join() === 'p2' && audit.pages.find((p) => p.path === '/about').faq.length === 2, '"Read the rest" reads only the pages that were left');
+    wfState.domFail.p2 = 500;
+    r = await post('/app/site/audit', cookie, { id: 'siteA' });
+    audit = getJ('audit:siteA');
+    assert(audit.complete && audit.pages.find((p) => p.path === '/about').state === 'unreadable' && audit.pages.find((p) => p.path === '/about').words === null, 'a page whose content Webflow does not return is listed with its settings and marked as not available');
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie } });
+    assert(r.body.includes('Text not available'), 'and Site health says so');
+    delete wfState.domFail.p2;
+    r = await post('/app/site/audit', cookie, { id: 'siteA' });
+    delete process.env.WEBFLOW_RETRY_BASE_MS;
+    assert(getJ('audit:siteA').pages.every((p) => !p.state), 'the next refresh reads every page again');
+  }
 
   console.log("localized sites: writes go to the primary locale");
   assert(wfState.pageUpdates.every((x) => !x.localeId) && wfState.items.every((x) => !x.cmsLocaleId), 'a site without locales is written exactly as before');
   wfState.sites[0].locales = { primary: { id: 'loc_en', cmsLocaleId: 'cms_en', displayName: 'English', tag: 'en', enabled: true }, secondary: [{ id: 'loc_tr', cmsLocaleId: 'cms_tr', displayName: 'Turkish', tag: 'tr', enabled: true }, { id: 'loc_de', cmsLocaleId: 'cms_de', displayName: 'German', tag: 'de', enabled: false }] };
-  r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'Lumen Dental | Veneers and implants in Antalya', description: 'Emax veneers, implants and digital smile design in Antalya for patients from the UK and Ireland.' });
-  assert(r.status === 302 && !decodeURIComponent(r.headers.location).includes('not accept'), 'the title and description of a localized site are accepted by Webflow');
-  assert(wfState.pageUpdates[wfState.pageUpdates.length - 1].localeId === null && wfState.pageUpdates[wfState.pageUpdates.length - 1].body.seo.title.startsWith('Lumen Dental | Veneers'), 'the title and description go to the primary locale without naming it (Webflow refuses a primary locale id)');
+  {
+    const now = wfState.pages.siteA.find((p) => p.id === 'p1').seo;
+    const before = wfState.pageUpdates.length;
+    r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', seen: '1', seen_title: now.title, seen_description: now.description, title: 'Lumen Dental | Veneers, implants and smile design', description: 'Emax veneers, implants and digital smile design in Antalya for patients from the UK and Ireland.' });
+    assert(r.status === 302 && wfState.pageUpdates.length === before + 1 && decodeURIComponent(r.headers.location).includes('Saved to Webflow'), 'the title and description of a localized site are accepted by Webflow');
+    assert(wfState.pageUpdates[wfState.pageUpdates.length - 1].localeId === null && wfState.pageUpdates[wfState.pageUpdates.length - 1].body.seo.title.startsWith('Lumen Dental | Veneers'), 'the title and description go to the primary locale without naming it (Webflow refuses a primary locale id)');
+  }
   r = await post('/app/fix/faq', cookie, { id: 'siteA', path: '/about', action: 'cms', collection: 'colFaq', faq: 'Q: Do you speak English?\nA: Yes, every coordinator does.' });
   const lastItem = wfState.items[wfState.items.length - 1];
   assert(!lastItem.cmsLocaleId && lastItem.isDraft === true && lastItem.fieldData.name === 'Do you speak English?', 'CMS drafts are created in the primary locale without naming it');
-  r = await post('/app/fix/schema', cookie, { id: 'siteA', path: '/about', schema: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[]}' });
-  assert(wfState.schemaPuts[wfState.schemaPuts.length - 1].localeId === null, 'schema markup goes to the primary locale (Webflow documents localeId there for secondary locales only)');
   assert(getJ('site:siteA').locale && getJ('site:siteA').locale.id === 'loc_en' && getJ('site:siteA').locale.others.join() === 'Turkish', 'the site keeps its languages; a disabled one is left out');
   r = await request(port, 'GET', '/app/fix?id=siteA&page=%2F', { headers: { cookie } });
   assert(r.body.includes('data-locale-note') && r.body.includes('one more language (Turkish)') && r.body.includes('primary language, English, only'), 'the fix page says only the primary language is written');
@@ -630,31 +806,40 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
   let ctx = JSON.parse(r.body);
   assert(r.status === 200 && ctx.ok && ctx.page.path === '/about' && ctx.page.audited && ctx.plan.canApply === true && /\/app\/site\?id=siteA/.test(ctx.site.url), 'the panel gets the page it is on, matched by its id');
+  assert(ctx.page.readAt > Date.now() - 60000 && ctx.rules.title.min === 20 && ctx.rules.title.max === 65 && ctx.rules.description.aimMax === 155 && !('schemaTypes' in ctx.page) && /tab=audit/.test(ctx.site.healthUrl), 'with the time Site health read it from Webflow, the length limits, and no schema fields');
   assert(ctx.keywords.some((k) => k.text === 'veneers in antalya' && k.answered > 0 && /\/app\/keyword\?id=siteA&k=/.test(k.url)) && ctx.engines.length >= 3, 'and the keywords that belong to the page, with each engine');
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pNew', path: 'about/' });
   assert(JSON.parse(r.body).page.path === '/about', 'a page id the audit has not read is matched by its path');
   r = await ext('suggest', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', what: 'meta' });
   const panelSug = JSON.parse(r.body);
   assert(panelSug.ok && /Lumen Dental/.test(panelSug.meta.title) && panelSug.meta.description.length > 40, 'the panel writes a title and description from the page');
-  const putsBefore = wfState.schemaPuts.length;
+  assert(panelSug.readAt > Date.now() - 60000 && wfState.domCalls[wfState.domCalls.length - 1] === 'p2', 'and the text it writes from is the page as the Webflow API returns it, read at that moment');
   r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', keywordId: kVen.id, faq: [{ q: 'How long do veneers last?', a: 'Usually 10 to 15 years.' }, { q: 'Do UK visitors need a visa?', a: 'Most do not for a short stay.' }] });
-  const lastPut = wfState.schemaPuts[wfState.schemaPuts.length - 1];
-  assert(JSON.parse(r.body).ok && wfState.schemaPuts.length === putsBefore + 1 && lastPut.id === 'p2' && JSON.stringify(lastPut.body).includes('FAQPage'), 'FAQ schema goes to the page through Webflow');
-  assert(getJ('audit:siteA').pages.find((x) => x.path === '/about').schemaTypes.includes('FAQPage') && getJ('site:siteA').keywords.find((x) => x.id === kVen.id).fixedAt > Date.now() - 60000, 'the audit and the keyword know about the fix');
-  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p404', path: '/somewhere', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
-  assert(JSON.parse(r.body).ok === true, 'a page the audit skipped is checked with Webflow before writing');
-  wfState.pages.siteB = [{ id: 'pB', title: 'B', slug: 'b', publishedPath: '/b' }];
-  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pB', path: '/b', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
-  assert(r.status === 403 && /another site/.test(JSON.parse(r.body).error), 'a page of another site is refused');
-  r = await ext('applied', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', title: 'About Lumen Dental, veneers in Antalya', description: 'Who we are and how we plan veneers and implants for patients from the UK.' });
-  assert(JSON.parse(r.body).ok && getJ('audit:siteA').pages.find((x) => x.path === '/about').title === 'About Lumen Dental, veneers in Antalya', 'a title set in the Designer is recorded');
+  assert(r.status === 404 && !wfState.paths.some((x) => /schema/.test(x)), 'the panel route that wrote FAQ schema is gone');
+  wfState.pages.siteB = [{ id: 'pB', title: 'B', slug: 'b', publishedPath: '/b', seo: { title: 'A page of another site', description: '' }, openGraph: {} }];
+  wfState.dom.pB = [textNode('<h1>Another site</h1>')];
+  const domAtB = wfState.domCalls.length;
+  r = await ext('suggest', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'pB', path: '/b', what: 'meta' });
+  assert(r.status === 404 && /not part of this site/.test(JSON.parse(r.body).error) && wfState.domCalls.length === domAtB, 'a page of another site is refused whatever id the panel sends, before its content is read');
+  delete wfState.pages.siteB;
+  {
+    // the user sets a title in the Designer; the server takes the values of the page from Webflow, not from the panel
+    wfState.pages.siteA.find((p) => p.id === 'p2').seo.title = 'About Lumen Dental, veneers in Antalya';
+    const before = wfState.pageUpdates.length;
+    r = await ext('applied', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', title: 'A title the panel made up', description: 'Not what Webflow has.', keywordId: kImp.id });
+    assert(JSON.parse(r.body).ok && wfState.pageUpdates.length === before && getJ('audit:siteA').pages.find((x) => x.path === '/about').title === 'About Lumen Dental, veneers in Antalya', 'after a change in the Designer, Site health holds what Webflow has, not what the panel reports, and the server writes nothing');
+    assert(getJ('site:siteA').keywords.find((x) => x.id === kImp.id).fixedAt > Date.now() - 60000, 'and the keyword knows about the fix');
+  }
+  r = await request(port, 'GET', '/ext/context', { headers: { origin: PANEL } });
+  assert(r.status === 405, 'the panel routes take POST only');
 
   console.log('free plan limits on fixes');
   const u2 = getJ('user:user_1'); u2.plan = 'free'; db.set('user:user_1', JSON.stringify(u2));
-  r = await ext('faq', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about', faq: [{ q: 'A?', a: 'B.' }, { q: 'C?', a: 'D.' }] });
-  assert(r.status === 402 && /paid plans/.test(JSON.parse(r.body).error), 'the panel cannot write on the free plan');
+  r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+  assert(JSON.parse(r.body).plan.canApply === false && /\/app\/settings#plan$/.test(JSON.parse(r.body).plan.upgradeUrl), 'on the free plan the panel is told it cannot apply, with the address of the plans');
   const updatesBefore = wfState.pageUpdates.length;
-  r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
+  const homeNow = wfState.pages.siteA.find((p) => p.id === 'p1').seo;
+  r = await post('/app/fix/meta', cookie, { id: 'siteA', path: '/', seen: '1', seen_title: homeNow.title, seen_description: homeNow.description, title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
   assert(wfState.pageUpdates.length === updatesBefore && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot write to Webflow');
   r = await post('/app/keyword/apply', cookie, { id: 'siteA', k: kVen.id, what: 'page', do_meta: '1', title: 'A title that is long enough', description: 'A description that is long enough to pass the check.' });
   assert(wfState.pageUpdates.length === updatesBefore && decodeURIComponent(r.headers.location).includes('paid plans'), 'free plan cannot apply keyword fixes');
@@ -932,6 +1117,19 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(!db.has('asd:user:p1') && !db.has('asd:sites:p') && db.get('user:other_app') === '"keep"', 'deleting never touches the other app');
     delete process.env.KV_PREFIX;
     db.delete('user:other_app');
+  }
+
+  console.log('where the requests of the whole run went');
+  {
+    const expected = { ['127.0.0.1:' + redisPort]: 'the database', ['127.0.0.1:' + aiPort]: 'AI engines and keyword data', ['127.0.0.1:' + resendPort]: 'mail', ['127.0.0.1:' + wfPort]: 'the Webflow API', ['127.0.0.1:' + polarPort]: 'billing' };
+    const other = [...requestedHosts].filter((h) => !expected[h]);
+    assert(requestedHosts.has('127.0.0.1:' + wfPort) && other.length === 0, 'every request of the run went to the Webflow API, an AI or keyword data provider, the mail provider, the billing provider or the database' + (other.length ? ' (also asked: ' + other.join(', ') + ')' : ''));
+    assert(customerHits.length === 0 && !requestedHosts.has(host), 'the published website of the customer was never requested' + (customerHits.length ? ' (got: ' + customerHits.slice(0, 5).join(', ') + ')' : ''));
+    const beta = [...new Set(wfState.paths.filter((x) => !x.includes(' /v2/')))];
+    assert(beta.join() === 'POST /beta/token/resolve', 'every Webflow call of the run was on the stable /v2 API, except the one that resolves the ID token of the Designer panel (found: ' + beta.join(', ') + ')');
+    const used = [...new Set(wfState.paths.map((x) => x.replace(/\/(sites|pages|collections)\/[A-Za-z0-9]+/g, '/$1/:id')))].sort();
+    const known = ['GET /v2/collections/:id', 'GET /v2/pages/:id', 'GET /v2/pages/:id/dom', 'GET /v2/sites', 'GET /v2/sites/:id', 'GET /v2/sites/:id/collections', 'GET /v2/sites/:id/pages', 'GET /v2/token/authorized_by', 'POST /beta/token/resolve', 'POST /v2/collections/:id/items', 'PUT /v2/pages/:id'];
+    assert(used.every((x) => known.includes(x)) && known.every((x) => used.includes(x)), 'the Webflow endpoints the app calls are exactly the ones the review notes list (called: ' + used.join(', ') + ')');
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

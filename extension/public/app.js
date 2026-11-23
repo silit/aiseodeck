@@ -9,7 +9,6 @@
     info: null,
     ctx: null,
     meta: null,
-    faq: null,
     busy: '',
     msg: null,
     token: null,
@@ -97,6 +96,14 @@
   }
   function plural(n, one, many) {
     return n + ' ' + (n === 1 ? one : many || one + 's');
+  }
+  function ago(ts) {
+    if (!ts) return 'some time ago';
+    var sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (sec < 60) return 'just now';
+    if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
+    if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
+    return plural(Math.floor(sec / 86400), 'day') + ' ago';
   }
   function andList(a) {
     return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
@@ -197,7 +204,6 @@
     S.view = 'page';
     S.msg = null;
     S.meta = null;
-    S.faq = null;
     render(h('p', { class: 'loading', text: 'Reading this page…' }));
     try {
       S.info = await pageInfo();
@@ -320,7 +326,6 @@
       ]);
     }
     if (S.view === 'meta') return drawMeta();
-    if (S.view === 'faq') return drawFaq();
     return drawPage();
   }
 
@@ -403,35 +408,9 @@
           draw();
         }
       });
-    if (has('faq_no_schema') || (has('schema_missing') && p.path !== '/'))
-      items.push({
-        title: has('faq_no_schema') ? 'Questions without FAQ schema' : 'No structured data',
-        note: p.faqFound
-          ? plural(p.faqFound, 'question') + ' found on this page.'
-          : 'Answers written from this page, added as FAQ schema.',
-        cta: 'Add',
-        run: function () {
-          S.view = 'faq';
-          draw();
-        }
-      });
-    if (has('schema_missing') && p.path === '/')
-      items.push({
-        title: 'No structured data',
-        note: 'Add the Organization schema from the site audit.',
-        cta: 'Open',
-        href: S.ctx.site.healthUrl
-      });
     p.issues.forEach(function (x) {
       if (
-        [
-          'title_missing',
-          'title_length',
-          'desc_missing',
-          'desc_length',
-          'faq_no_schema',
-          'schema_missing'
-        ].indexOf(x.code) > -1
+        ['title_missing', 'title_length', 'desc_missing', 'desc_length'].indexOf(x.code) > -1
       )
         return;
       items.push({ title: x.label, note: x.text });
@@ -453,7 +432,6 @@
           draw();
         }
       });
-    if (p.schemaTypes.indexOf('FAQPage') > -1) items.push({ ok: true, title: 'FAQ schema is on the page' });
     return items;
   }
 
@@ -495,9 +473,9 @@
         h(
           'section',
           { class: 'card' },
-          h('h2', { text: 'Run the site audit' }),
+          h('h2', { text: 'Read your pages from Webflow' }),
           h('p', {
-            text: 'It reads your published pages and lists the fixes for each one. You can still write a title and description now.'
+            text: 'Site health reads the pages of this site through Webflow and lists the fixes for each one. You can still write a title and description now.'
           }),
           h(
             'div',
@@ -563,7 +541,13 @@
             h('h2', { id: 'fixh', text: 'Fix this page' }),
             h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })
           ),
-          list
+          list,
+          h(
+            'p',
+            { class: 'note' },
+            'Site health read this page from Webflow ' + ago(p.readAt || p.auditAt) + '. ',
+            link(c.site.healthUrl, '', 'Refresh in Site health')
+          )
         )
       );
     }
@@ -753,127 +737,6 @@
       )
     ]);
     sync();
-  }
-
-  function drawFaq() {
-    var c = S.ctx;
-    var pairs = S.faq || [];
-    var busy = S.busy;
-    var write = h(
-      'button',
-      {
-        class: pairs.length ? 'btn' : 'btn mark',
-        type: 'button',
-        disabled: !!busy,
-        onclick: async function () {
-          S.busy = 'write';
-          S.msg = { kind: 'info', text: 'Writing answers from this page, this takes a few seconds…' };
-          drawFaq();
-          var r = await call('suggest', { what: 'faq', keywordId: c.keywords[0] ? c.keywords[0].id : '' });
-          S.busy = '';
-          if (r.ok) {
-            S.faq = r.faq;
-            S.msg = {
-              kind: 'ok',
-              text: 'Written from this page. Every answer should also be visible on the page itself.'
-            };
-          } else S.msg = { kind: 'err', text: r.error || 'No answers this time.' };
-          drawFaq();
-        }
-      },
-      pairs.length ? 'Write again' : 'Write answers with AI'
-    );
-    var list = pairs.map(function (x, i) {
-      var q = h('input', { type: 'text', 'aria-label': 'Question ' + (i + 1), maxlength: '200', value: x.q });
-      var a = h('textarea', { 'aria-label': 'Answer ' + (i + 1), maxlength: '900', rows: '3' });
-      a.value = x.a;
-      q.addEventListener('input', function () {
-        pairs[i].q = q.value;
-      });
-      a.addEventListener('input', function () {
-        pairs[i].a = a.value;
-      });
-      return h(
-        'div',
-        { class: 'qa' },
-        q,
-        a,
-        h(
-          'button',
-          {
-            class: 'btn rm',
-            type: 'button',
-            onclick: function () {
-              pairs.splice(i, 1);
-              S.faq = pairs;
-              drawFaq();
-            }
-          },
-          'Remove'
-        )
-      );
-    });
-    var applyBtn = pairs.length
-      ? h(
-          'button',
-          {
-            class: 'btn mark',
-            type: 'button',
-            disabled: !!busy || !c.plan.canApply || pairs.length < 2,
-            onclick: async function () {
-              S.busy = 'apply';
-              drawFaq();
-              var r = await call('faq', { faq: pairs, keywordId: c.keywords[0] ? c.keywords[0].id : '' });
-              S.busy = '';
-              if (!r.ok) {
-                S.msg = { kind: 'err', text: r.error || 'Webflow did not take the change.' };
-                return drawFaq();
-              }
-              notify('Success', 'FAQ schema added. Publish the site to make it live.');
-              await load();
-              S.msg = {
-                kind: 'ok',
-                text: 'FAQ schema added to this page. Publish the site to make it live.'
-              };
-              drawPage();
-            }
-          },
-          busy === 'apply' ? 'Adding…' : 'Add FAQ schema'
-        )
-      : null;
-    var body = h(
-      'div',
-      { class: 'body' },
-      msgBox(),
-      h('p', {
-        class: 'muted',
-        style: 'font-size:12px',
-        text: 'Questions people ask about this page, answered from its own text and added as FAQ schema, the format AI engines read.'
-      }),
-      list,
-      pairs.length && pairs.length < 2
-        ? h('div', { class: 'msg info', text: 'FAQ schema needs at least two questions and answers.' })
-        : null,
-      !c.plan.canApply
-        ? h(
-            'div',
-            { class: 'msg info' },
-            'Adding schema is part of the paid plans. ',
-            h('a', { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener' }, 'See the plans'),
-            '.'
-          )
-        : null
-    );
-    render([
-      top(true, 'FAQ schema'),
-      body,
-      h(
-        'footer',
-        { class: 'foot' },
-        h('div', { class: 'row' }, applyBtn, write),
-        h('span', { class: 'note', text: 'Nothing is added until you press Add FAQ schema.' })
-      )
-    ]);
   }
 
   /* ---------- start ---------- */

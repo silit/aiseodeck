@@ -1,8 +1,8 @@
 'use strict';
-// Suggestions the user reviews before anything is written to Webflow: meta titles and descriptions,
-// JSON-LD schema (Organization, WebSite, FAQPage), FAQ answers, prompt ideas, llms.txt and robots.txt lines.
+// Suggestions the user reviews before anything is written to Webflow: keyword ideas, the questions behind a
+// keyword, page titles and meta descriptions, answers to customer questions and a draft of a new page.
+// Each is written by an AI provider from what the Webflow API returned for the page, when the user asks for it.
 const llm = require('./llm');
-const { BOTS } = require('./audit');
 
 const clean = (s, max) => String(s || '').replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, max || 500);
 const LANG_NAMES = { en: 'English', tr: 'Turkish', de: 'German', fr: 'French', es: 'Spanish', it: 'Italian', nl: 'Dutch', pt: 'Portuguese', pl: 'Polish', ar: 'Arabic', ru: 'Russian', sv: 'Swedish', da: 'Danish', no: 'Norwegian', fi: 'Finnish', cs: 'Czech', hu: 'Hungarian', ro: 'Romanian', el: 'Greek', ja: 'Japanese', ko: 'Korean', zh: 'Chinese' };
@@ -101,79 +101,4 @@ async function suggestNewPage(project, keyword, questions, source) {
   return { title: clean(j.title, 70) || clean(keyword, 70), slug, intro: clean(j.intro, 600), faq };
 }
 
-/* ---------- JSON-LD ---------- */
-const ORG_TYPES = ['Organization', 'LocalBusiness', 'ProfessionalService', 'Dentist', 'MedicalClinic', 'BeautySalon', 'HealthAndBeautyBusiness', 'Restaurant', 'Store', 'RealEstateAgent', 'LegalService', 'EducationalOrganization'];
-
-function abs(url, origin) { try { return url ? new URL(url, origin).toString() : ''; } catch (e) { return ''; } }
-
-// info: { type, name, url, logo, description, phone, email, street, city, region, postal, country, sameAs[] }
-function orgSchema(info) {
-  const type = ORG_TYPES.includes(info.type) ? info.type : 'Organization';
-  const o = { '@type': type, '@id': info.url.replace(/\/+$/, '') + '/#organization', name: info.name, url: info.url };
-  if (info.logo) o.logo = info.logo;
-  if (info.logo && type !== 'Organization') o.image = info.logo;
-  if (info.description) o.description = clean(info.description, 300);
-  if (info.phone) o.telephone = clean(info.phone, 40);
-  if (info.email) o.email = clean(info.email, 120);
-  if (info.street || info.city || info.country) {
-    o.address = { '@type': 'PostalAddress' };
-    if (info.street) o.address.streetAddress = clean(info.street, 160);
-    if (info.city) o.address.addressLocality = clean(info.city, 80);
-    if (info.region) o.address.addressRegion = clean(info.region, 80);
-    if (info.postal) o.address.postalCode = clean(info.postal, 20);
-    if (info.country) o.address.addressCountry = clean(info.country, 60);
-  }
-  const same = (info.sameAs || []).filter((u) => /^https:\/\//.test(u)).slice(0, 10);
-  if (same.length) o.sameAs = same;
-  return o;
-}
-function websiteSchema(info) {
-  return { '@type': 'WebSite', '@id': info.url.replace(/\/+$/, '') + '/#website', name: info.name, url: info.url, publisher: { '@id': info.url.replace(/\/+$/, '') + '/#organization' } };
-}
-function faqSchema(pairs) {
-  return { '@type': 'FAQPage', mainEntity: pairs.filter((p) => p.q && p.a).slice(0, 20).map((p) => ({ '@type': 'Question', name: clean(p.q, 300), acceptedAnswer: { '@type': 'Answer', text: clean(p.a, 1500) } })) };
-}
-
-const typesOf = (n) => (Array.isArray(n['@type']) ? n['@type'] : [n['@type']]).filter(Boolean);
-// Combines what the page already has with our nodes in one @graph. A node of the same type as one of
-// ours is replaced (the user saw both and chose ours); every other existing node is kept as it is.
-function mergeSchema(existing, nodes) {
-  const ours = nodes.filter(Boolean);
-  let current = [];
-  if (existing && typeof existing === 'object') {
-    if (Array.isArray(existing)) current = existing.slice();
-    else if (Array.isArray(existing['@graph'])) current = existing['@graph'].slice();
-    else { const c = Object.assign({}, existing); delete c['@context']; current = [c]; }
-  }
-  const ourTypes = new Set(ours.flatMap(typesOf));
-  const kept = current.filter((n) => n && typeof n === 'object' && !typesOf(n).some((t) => ourTypes.has(t) || (ORG_TYPES.includes(t) && ours.some((o) => typesOf(o).some((x) => ORG_TYPES.includes(x))))));
-  return { '@context': 'https://schema.org', '@graph': kept.concat(ours) };
-}
-
-/* ---------- llms.txt and robots.txt ---------- */
-// The file follows the llms.txt proposal (llmstxt.org): a title, a one-line summary, then a section of links, each
-// written "- [Title](address): note". Every list line is a link, so the file passes a format check as it stands.
-// The summary is the home page's description, or failing that what we worked out the business is (audit.site.summary);
-// a summary that only repeats the name says nothing, so without either there is none.
-function llmsTxt(project, audit) {
-  const origin = String(audit.origin || '').replace(/\/+$/, '');
-  const site = audit.site || {};
-  const home = (audit.pages || []).find((p) => p.path === '/') || {};
-  const about = clean(home.description || site.homeDescription || site.summary || '', 300);
-  const lines = [`# ${project.brand}`, ''];
-  if (about) lines.push(`> ${about}`, '');
-  const pages = (audit.pages || []).filter((p) => p.ok && !p.noindex && p.path !== '/').slice(0, 40);
-  lines.push('## Pages', '', `- [Home page](${origin}/)`);
-  for (const p of pages) lines.push(`- [${clean(p.title || p.name || p.path, 90)}](${origin}${p.path})${p.description ? ': ' + clean(p.description, 160) : ''}`);
-  return lines.join('\n') + '\n';
-}
-function robotsLines(blocked) {
-  const out = [];
-  for (const ua of blocked || []) {
-    const b = BOTS.find((x) => x.ua === ua);
-    if (b && b.kind === 'search') out.push(`User-agent: ${ua}`, 'Allow: /', '');
-  }
-  return out.join('\n');
-}
-
-module.exports = { suggestKeywords, questionsFor, suggestMeta, suggestFaq, suggestNewPage, orgSchema, websiteSchema, faqSchema, mergeSchema, llmsTxt, robotsLines, ORG_TYPES, abs, langName, LANG_NAMES };
+module.exports = { suggestKeywords, questionsFor, suggestMeta, suggestFaq, suggestNewPage, langName, LANG_NAMES };

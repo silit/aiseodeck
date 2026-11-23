@@ -1,6 +1,7 @@
 'use strict';
-// Minimal Webflow Data API client (v2 and the v2 beta paths) with 429 backoff.
-// Scopes: read sites and pages, write page SEO settings and JSON-LD schema, read and write CMS items (FAQ drafts).
+// Minimal Webflow Data API client (v2) with 429 backoff. Every piece of site data the app uses comes through here:
+// the app never requests a customer's published website.
+// Scopes: read sites and pages, write page SEO settings, read and write CMS items (drafts).
 
 const API_BASE = () => (process.env.WEBFLOW_API_BASE || 'https://api.webflow.com').replace(/\/+$/, '');
 const AUTH_BASE = () => (process.env.WEBFLOW_AUTH_BASE || 'https://webflow.com').replace(/\/+$/, '');
@@ -11,7 +12,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = () => parseInt(process.env.WEBFLOW_RETRY_BASE_MS || '', 10) || 2000;
 
-// path starts with /v2/ or /beta/
+// path starts with /v2/ (the one exception is named where it is used: resolveIdToken)
 async function request(token, method, path, body, attempt) {
   attempt = attempt || 0;
   const res = await fetch(API_BASE() + path, {
@@ -39,7 +40,6 @@ async function request(token, method, path, body, attempt) {
   return data;
 }
 const call = (token, method, path, body) => request(token, method, '/v2' + path, body);
-const beta = (token, method, path, body) => request(token, method, '/beta' + path, body);
 
 function authorizeUrl({ clientId, redirectUri, state }) {
   return AUTH_BASE() + '/oauth/authorize?' + new URLSearchParams({
@@ -85,7 +85,8 @@ const isRevoked = (e) => !!e && e.status === 401;
 const authorizedBy = (token) => call(token, 'GET', '/token/authorized_by');
 // Who opened the panel inside the Designer: an ID token from webflow.getIdToken(), which only a token of this app
 // can resolve. Answers { id, email, firstName, lastName, siteId }.
-const resolveIdToken = (token, idToken) => beta(token, 'POST', '/token/resolve', { idToken });
+// Webflow offers this endpoint on the /beta path only; it is the documented way for a Hybrid App to verify the ID token.
+const resolveIdToken = (token, idToken) => request(token, 'POST', '/beta/token/resolve', { idToken });
 async function tokenStatus(token) {
   try { await authorizedBy(token); return 'ok'; } catch (e) { return isRevoked(e) ? 'revoked' : 'unknown'; }
 }
@@ -120,18 +121,27 @@ async function updatePageSeo(token, pageId, { title, description, ogTitle, ogDes
   return call(token, 'PUT', '/pages/' + pageId + (localeId ? '?localeId=' + encodeURIComponent(localeId) : ''), body);
 }
 
-// JSON-LD schema markup (Data API v2 beta). One JSON-LD value per page; several types go in an @graph.
-// The API writes and reads the primary locale when localeId is left out; its localeId names a secondary locale, which
-// AI SEO Deck never writes. So the primary locale is targeted by leaving it out, as Webflow documents.
-const getSchema = (token, pageId, secondaryLocaleId) => beta(token, 'GET', `/pages/${pageId}/schema-markup` + (secondaryLocaleId ? '?localeId=' + encodeURIComponent(secondaryLocaleId) : ''));
-const putSchema = (token, pageId, jsonLdSchema, secondaryLocaleId) => beta(token, 'PUT', `/pages/${pageId}/schema-markup` + (secondaryLocaleId ? '?localeId=' + encodeURIComponent(secondaryLocaleId) : ''), { jsonLdSchema });
-async function querySchemas(token, siteId, pageIds) {
-  const out = [];
-  for (let i = 0; i < pageIds.length; i += 100) {
-    const d = await beta(token, 'POST', `/sites/${siteId}/pages/schema-markup/query`, { pages: pageIds.slice(i, i + 100).map((id) => ({ id })) });
-    out.push(...((d && d.pages) || []));
+// One page's settings (title, SEO and Open Graph fields, the site it belongs to).
+const getPage = (token, pageId) => call(token, 'GET', '/pages/' + encodeURIComponent(pageId));
+
+// The content of a static page as Webflow holds it: its text nodes (with their HTML), images (with alt text) and
+// component instances. 100 nodes a call, up to `max` nodes. This is how the app reads what a page says.
+async function pageDom(token, pageId, max) {
+  const cap = max || 600;
+  const nodes = [];
+  let offset = 0;
+  let total = 0;
+  let lastUpdated = null;
+  while (nodes.length < cap) {
+    const d = await call(token, 'GET', `/pages/${encodeURIComponent(pageId)}/dom?limit=100&offset=${offset}`);
+    const batch = (d && d.nodes) || [];
+    nodes.push(...batch);
+    total = d && d.pagination && typeof d.pagination.total === 'number' ? d.pagination.total : nodes.length;
+    lastUpdated = (d && d.lastUpdated) || lastUpdated;
+    offset += batch.length;
+    if (!batch.length || offset >= total) break;
   }
-  return out;
+  return { nodes: nodes.slice(0, cap), total, truncated: total > cap, lastUpdated };
 }
 
 async function listCollections(token, siteId) {
@@ -144,6 +154,6 @@ const getCollection = (token, collectionId) => call(token, 'GET', `/collections/
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
-  SCOPES, call, beta, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
-  listPages, updatePageSeo, getSchema, putSchema, querySchemas, listCollections, getCollection, createDraftItem
+  SCOPES, call, authorizeUrl, exchangeCode, revokeToken, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
+  listPages, getPage, pageDom, updatePageSeo, listCollections, getCollection, createDraftItem
 };

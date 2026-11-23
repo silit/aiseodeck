@@ -4,7 +4,7 @@
 // cited, rose = a rival took the place.
 const { PLANS, FREE, QUESTIONS } = require('./plans');
 const { LABEL, LONG, ORDER, enabled: enginesOn, freeEngines } = require('./engines');
-const { PAGE_RULES, BOTS } = require('./audit');
+const { RULES: PAGE_RULES, LIMITS } = require('./health');
 const { engineCounts, verdict } = require('./analyze');
 const alerts = require('./alerts');
 
@@ -731,7 +731,7 @@ function dashboard(user, sites, limits, notice, opts) {
     const bars = l ? ORDER.filter((e) => l.byEngine && l.byEngine[e] && (l.byEngine[e].k || l.byEngine[e].kx)).map((e) => { const b = l.byEngine[e]; const st = b.km ? (b.kc ? 'b' : 'n') : b.kc ? 'i' : b.k ? 'o' : 'x'; return `<span title="${esc(LONG[e])}: names you for ${b.km} of ${plural(b.k, 'keyword')}">${dot(st, e, true)}${esc(LABEL[e])} ${b.k ? b.km + '/' + b.k : ''}</span>`; }).join('') : '';
     const line = l ? `Named for ${l.kwNamed || 0} of ${plural(l.keywords || 0, 'keyword')}. Checked ${ago(l.finishedAt || l.at, now)}.` : ready ? (s.sched && s.sched.runId ? 'The first check is running.' : 'No check yet.') : 'Add your brand, rivals and keywords to start.';
     return `<div class="panel site"><div class="nm"><div class="actions" style="gap:10px"><h2>${esc(s.name)}</h2>${siteStatus(s)}</div>
-<p class="small muted">${esc(hostOf(s.url))}${s.audit ? `, site audit ${s.audit.score}/100` : ''}</p><p class="small">${line}</p>${bars ? `<div class="engs">${bars}</div>` : ''}</div>
+<p class="small muted">${esc(hostOf(s.url))}${s.audit && s.audit.score != null ? `, site health ${s.audit.score}/100` : ''}</p><p class="small">${line}</p>${bars ? `<div class="engs">${bars}</div>` : ''}</div>
 <div class="num">${l ? `<b>${l.score}%</b><span class="tiny muted">visible in AI answers</span>` : ''}</div>
 <div class="go">${ready ? `<a class="btn" href="${esc(siteHref(s))}">Open</a>` : `<a class="btn mark" href="/app/setup?id=${encodeURIComponent(s.id)}">Set up</a>`}</div></div>`;
   }).join('') : `<div class="panel empty"><h2>No Webflow sites yet</h2><p>Connect Webflow and choose the sites AI SEO Deck may read.</p><a class="btn mark" href="/auth">Connect Webflow</a></div>`;
@@ -758,19 +758,22 @@ function webflowDomains(site) {
   return `<div class="field"><span class="lbl">Your website, read from Webflow</span><p class="fromwf">${esc(list)}</p><span class="hint">Read from Webflow ${esc(site.metaAt ? ago(site.metaAt) : 'when the site was connected')}. An answer that links to one of these counts as a citation. To change them, change the domains of the site in Webflow. <button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow</button></span></div>`;
 }
 
-// The keyword picker on setup: ideas and keywords already cited in AI Overviews come from /app/setup/suggest.
+// The keyword picker on setup. Ideas come from /app/setup/suggest when the user presses the button: the app then
+// reads the home page through Webflow and asks an AI provider, so it does not happen on its own when the page opens.
 const SUGGEST_JS = (room) => `
-(function(){var box=document.getElementById('sugg');if(!box)return;var form=document.getElementById('setup');var room=${room};
+(function(){var box=document.getElementById('sugg');var btn=document.getElementById('suggbtn');if(!box||!btn)return;var form=document.getElementById('setup');var room=${room};
 function vol(v){return v==null?'':Number(v).toLocaleString('en-US')+' a month';}
+function note(t){box.textContent='';var p=document.createElement('p');p.className='hint';p.textContent=t;box.appendChild(p);}
 function row(it,checked){var l=document.createElement('label');l.className='pick';var c=document.createElement('input');c.type='checkbox';c.name='pick';c.value=it.keyword;c.checked=checked;
 var t=document.createElement('span');t.textContent=it.keyword;if(it.src){var s=document.createElement('span');s.className='src';s.textContent=it.src;t.appendChild(s);}
 var v=document.createElement('span');v.className='vol';v.textContent=vol(it.volume);l.appendChild(c);l.appendChild(t);l.appendChild(v);return l;}
+btn.addEventListener('click',function(){btn.disabled=true;note('Finding keywords for your site…');
 var fd=new URLSearchParams();fd.append('id',form.elements.id.value);
 fetch('/app/setup/suggest',{method:'POST',body:fd,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json()}).then(function(j){
-box.innerHTML='';var list=(j.cited||[]).map(function(x){return {keyword:x.keyword,volume:x.volume,src:'Cited in AI Overviews'};}).concat(j.ideas||[]);
-if(!list.length){box.innerHTML='<p class="hint">No ideas came back. Type your own keywords below.</p>';return;}
-var n=0;list.forEach(function(it){box.appendChild(row(it,n<Math.min(room,5)));n++;});
-}).catch(function(){box.innerHTML='<p class="hint">Ideas could not be loaded. Type your own keywords below.</p>';});})();`;
+var list=(j.cited||[]).map(function(x){return {keyword:x.keyword,volume:x.volume,src:'Cited in AI Overviews'};}).concat(j.ideas||[]);
+if(!list.length){note('No ideas came back. Type your own keywords below.');btn.disabled=false;return;}
+box.textContent='';var n=0;list.forEach(function(it){box.appendChild(row(it,n<Math.min(room,5)));n++;});
+}).catch(function(){note('Ideas could not be loaded. Type your own keywords below.');btn.disabled=false;});});})();`;
 
 function setupPage(user, site, limits, opts) {
   opts = opts || {};
@@ -789,8 +792,9 @@ ${webflowDomains(site)}
 <div class="field"><label for="language">Language of your keywords</label><select id="language" name="language">${options(LANGS, p.language || 'en')}</select></div></div></section>
 <section class="panel step stack"><h2><span>2</span>Your rivals</h2><p class="muted">Up to 5 businesses you compete with, one name per line. We show where the AI recommends them instead of you.</p>
 <div class="field"><label for="rivals" class="tiny muted" style="font-weight:600">Rivals</label><textarea id="rivals" name="rivals" placeholder="Brightline Studio&#10;Northfield Co">${esc(rivalLines(p))}</textarea></div></section>
-<section class="panel step stack"><h2><span>3</span>Keywords to track</h2><p class="muted">Your plan tracks ${plural(room, 'keyword')} here. Each keyword is asked the way people ask, on every AI engine in your plan. Tick the ideas that fit and add your own.</p>
-<div id="sugg" class="picklist" aria-live="polite"><p class="hint">Finding keywords for your site…</p></div>
+<section class="panel step stack"><h2><span>3</span>Keywords to track</h2><p class="muted">Your plan tracks ${plural(room, 'keyword')} here. Each keyword is asked the way people ask, on every AI engine in your plan. Ask for ideas, tick the ones that fit and add your own.</p>
+<div class="actions"><button class="btn sm" type="button" id="suggbtn">Suggest keywords from my site</button><span class="hint">Reads your home page through Webflow and sends its title, description and text to our AI provider for ideas. Monthly searches are Google data.</span></div>
+<div id="sugg" class="picklist" aria-live="polite"></div>
 <div class="field"><label for="own">Your own keywords, one per line</label><textarea id="own" name="own" placeholder="crm for small business&#10;webflow agency in london">${esc(prefill.join('\n'))}</textarea></div>
 <div class="actions"><button class="btn mark" type="submit">Save and run the first check</button><a class="btn ghost" href="/app">Cancel</a></div></section>
 </form>${refreshForm(site, 'setup')}`, { user, nav: 'sites', script: SUGGEST_JS(room) });
@@ -826,21 +830,10 @@ const CHEVRON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" str
 const BACK_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>';
 const PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>';
 
-// The site-level checks of the audit that fail, in the order they matter.
-function failingChecks(audit) {
-  if (!audit) return [];
-  const s = audit.site || {};
-  const out = [];
-  if ((s.blockedBots || []).some((b) => (BOTS.find((x) => x.ua === b) || {}).kind === 'search')) out.push('robots_blocks_ai');
-  if (!s.llms) out.push('llms_missing');
-  if (!s.sitemap) out.push('sitemap_missing');
-  if (!s.orgSchema) out.push('org_schema_missing');
-  return out;
-}
-// What the Site health screen asks to fix: the failing site checks and the pages that score under 80.
+// What the Site health screen asks to fix: the pages that score under 80.
 function healthCount(audit) {
   if (!audit) return 0;
-  return failingChecks(audit).length + (audit.pages || []).filter((p) => !p.error && p.score != null && p.score < 80).length;
+  return (audit.pages || []).filter((p) => p.score != null && p.score < 80).length;
 }
 
 // d.side: { limits, used (keywords tracked on the account), checksLeft, audit }
@@ -850,7 +843,7 @@ function siteSide(user, site, active, d) {
   const nav = [['overview', 'Overview'], ['keywords', 'Keywords'], ['audit', 'Site health'], ['settings', 'Settings']].map(([k, label]) => {
     let extra = '';
     if (k === 'keywords') extra = `<span class="n">${(site.keywords || []).length}</span>`;
-    if (k === 'audit') { const n = healthCount(sd.audit); extra = sd.audit ? (n ? `<span class="badge">${n} to fix</span>` : '') : '<span class="badge">Not run</span>'; }
+    if (k === 'audit') { const n = healthCount(sd.audit); extra = sd.audit ? (n ? `<span class="badge">${n} to fix</span>` : '') : '<span class="badge">Not read yet</span>'; }
     return `<a href="${esc(siteHref(site, 'tab=' + k))}"${active === k ? ' aria-current="page"' : ''}>${NAV_ICON[k]}${label}${extra}</a>`;
   }).join('');
   const name = site.project && site.project.brand ? site.project.brand : site.name;
@@ -923,16 +916,13 @@ function fixNext(site) {
   const items = rankGaps(site).slice(0, 3).map(gapAction(site));
   return items.length ? todoList(items) : '';
 }
-// Do these next: a crawler block first, then the keywords worth most, then site health and setup gaps.
+// Do these next: the keywords worth most, then site health and setup gaps.
 function nextActions(site, d) {
   const audit = d.side && d.side.audit;
-  const fails = failingChecks(audit);
-  const health = (code) => ({ title: SITE_CHECKS[code].title, why: SITE_CHECKS[code].fix, cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
   const out = [];
-  if (fails[0] === 'robots_blocks_ai') out.push(health('robots_blocks_ai'));
   out.push(...rankGaps(site).slice(0, 3).map(gapAction(site)));
-  if (!audit) out.push({ title: 'Run the site audit', why: 'It reads your pages, robots.txt, llms.txt and sitemap, then matches each keyword to its best page.', cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
-  else if (fails.length && fails[0] !== 'robots_blocks_ai') out.push(health(fails[0]));
+  if (!audit) out.push({ title: 'Read your pages from Webflow', why: 'Site health reads each page\'s title, description, headings and text through Webflow, then matches each keyword to its best page.', cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
+  else if (healthCount(audit)) out.push({ title: plural(healthCount(audit), 'page') + ' to fix', why: 'Titles, descriptions, headings and alt text that keep a page from being quoted.', cta: 'Open Site health', href: siteHref(site, 'tab=audit') });
   if (!(site.project.competitors || []).length) out.push({ title: 'Add your rivals', why: 'See who AI names instead of you, and on which keywords.', cta: 'Add rivals', href: siteHref(site, 'tab=settings') });
   return out.slice(0, 3);
 }
@@ -1042,60 +1032,41 @@ function insightsTab(site) {
 ${hosts.length ? `<div class="rows">${hosts.map((h) => `<div class="row"><span class="host" title="${esc(h.host)}">${esc(h.host)}</span><span class="bar"><i class="host" style="width:${((h.n / max) * 100).toFixed(1)}%"></i></span><span class="v">${plural(h.n, 'answer')}</span></div>`).join('')}</div>` : '<p class="small muted">No sources were reported yet.</p>'}</section></div>
 <div class="stack"><section class="panel stack">${insightsHtml(l)}</section>
 <section class="panel stack"><h2>Share of voice</h2><p class="tiny muted">Of the answers that name any brand you track.</p>${voiceBlock}</section>
-<section class="panel stack"><h2>Your pages the AI cites</h2>${own.length ? `<ul class="plain">${own.map((u) => `<li><a href="${esc(u.url)}" target="_blank" rel="noopener" class="small">${esc(u.url.replace(/^https?:\/\/(www\.)?/, ''))}</a><span class="small muted">${plural(u.n, 'answer')}</span></li>`).join('')}</ul>` : '<p class="small muted">None of your pages was cited yet. Clear answer pages and structured data help; open a keyword to see its fixes.</p>'}</section></div></div>`;
+<section class="panel stack"><h2>Your pages the AI cites</h2>${own.length ? `<ul class="plain">${own.map((u) => `<li><a href="${esc(u.url)}" target="_blank" rel="noopener" class="small">${esc(u.url.replace(/^https?:\/\/(www\.)?/, ''))}</a><span class="small muted">${plural(u.n, 'answer')}</span></li>`).join('')}</ul>` : '<p class="small muted">None of your pages was cited yet. Pages that answer the question clearly are the ones that get cited; open a keyword to see its fixes.</p>'}</section></div></div>`;
 }
 
 function scoreClass(n) { return n == null ? '' : n >= 80 ? 'high' : n >= 55 ? 'mid' : 'low'; }
 
-const SITE_CHECKS = {
-  robots_blocks_ai: { title: 'AI crawlers are blocked in robots.txt', fix: 'Allow the answer engines below in Site settings > SEO > robots.txt, then publish.' },
-  llms_missing: { title: 'No llms.txt file', fix: 'Download the file we wrote from your pages and upload it in Site settings > SEO > LLMs.txt, then publish.' },
-  sitemap_missing: { title: 'No sitemap.xml', fix: 'Turn on the auto-generated sitemap in Site settings > SEO > Sitemap, then publish.' },
-  org_schema_missing: { title: 'Your homepage does not say who you are (Organization schema)', fix: 'Open the homepage fix and apply the Organization schema.' },
-  not_https: { title: 'The site is not served over HTTPS', fix: 'Turn on SSL in Site settings > Publishing.' },
-  home_unreachable: { title: 'The homepage could not be read', fix: 'Check that the site is published and reachable.' }
-};
 function issueLabel(k) {
-  return { title_missing: 'No title', title_length: 'Title length', desc_missing: 'No description', desc_length: 'Description length', h1_missing: 'No H1', h1_multiple: 'Several H1', schema_missing: 'No schema', schema_invalid: 'Broken schema', faq_no_schema: 'FAQ without schema', og_missing: 'Social preview', thin: 'Thin content', alt_missing: 'Alt text', lang_missing: 'No language' }[k] || k;
+  return { title_missing: 'No title', title_length: 'Title length', desc_missing: 'No description', desc_length: 'Description length', h1_missing: 'No H1', h1_multiple: 'Several H1', og_missing: 'Social preview', thin: 'Thin content', alt_missing: 'Alt text' }[k] || k;
 }
 
 function auditHtml(site, audit) {
   const id = encodeURIComponent(site.id);
-  if (!audit) return `<div class="panel empty"><h2>Find what keeps AI engines from citing you</h2><p>The audit reads your live pages, robots.txt, llms.txt and sitemap, then lists fixes. It also matches each keyword to its best page.</p>
-<form method="post" action="/app/site/audit"><input type="hidden" name="id" value="${esc(site.id)}"><button class="btn primary" type="submit">Run the site audit</button></form><p class="tiny muted">Takes up to a minute.</p></div>`;
-  const s = audit.site || {};
-  const checks = [
-    { ok: !(s.blockedBots || []).some((b) => (BOTS.find((x) => x.ua === b) || {}).kind === 'search'), code: 'robots_blocks_ai', okText: 'AI search crawlers can read the site' },
-    { ok: !!s.llms, code: 'llms_missing', okText: 'llms.txt is published' },
-    { ok: !!s.sitemap, code: 'sitemap_missing', okText: 'sitemap.xml is published' },
-    { ok: !!s.orgSchema, code: 'org_schema_missing', okText: 'The homepage says who you are (Organization schema)' }
-  ];
-  const checkRows = checks.map((c) => {
-    const info = SITE_CHECKS[c.code];
-    let extra = '';
-    if (!c.ok && c.code === 'llms_missing') extra = `<a class="btn sm" href="/app/llms?id=${id}">Download llms.txt</a>`;
-    if (!c.ok && c.code === 'org_schema_missing') { const home = (audit.pages || []).find((p) => p.path === '/' && p.pageId); if (home) extra = `<a class="btn sm" href="/app/fix?id=${id}&page=${encodeURIComponent('/')}">Fix</a>`; }
-    const blocked = c.code === 'robots_blocks_ai' && !c.ok ? `<pre class="copy" style="margin-top:8px">${esc(require('./fixes').robotsLines(s.blockedBots))}</pre>` : '';
-    return `<div class="checkrow"><span class="ico ${c.ok ? 'ok' : 'no'}" aria-hidden="true">${c.ok ? '✓' : '!'}</span><div><b>${esc(c.ok ? c.okText : info.title)}</b>${c.ok ? '' : `<p class="small muted">${esc(info.fix)}</p>${blocked}`}</div><div>${extra}</div></div>`;
-  }).join('');
+  const readForm = (label, cls, resume) => `<form method="post" action="/app/site/audit"><input type="hidden" name="id" value="${esc(site.id)}">${resume ? '<input type="hidden" name="resume" value="1">' : ''}<button class="btn ${cls}" type="submit">${label}</button></form>`;
+  if (!audit) return `<div class="panel empty"><h2>Find what keeps AI engines from quoting your pages</h2><p>Site health reads your pages through Webflow: each page's SEO title and description, its Open Graph settings, its headings, its text and the alt text of its images. Then it lists what to fix and matches each keyword to its best page.</p>
+${readForm('Read my pages from Webflow', 'primary')}<p class="tiny muted">Takes up to a minute. Nothing is changed in Webflow.</p></div>`;
   const rows = (audit.pages || []).map((p) => {
     const issues = (p.issues || []).map((k) => `<span class="pill ${PAGE_RULES[k] && PAGE_RULES[k].w >= 10 ? 'bad' : 'warn'}" title="${esc(PAGE_RULES[k] ? PAGE_RULES[k].text : k)}">${esc(issueLabel(k))}</span>`).join(' ');
-    return `<tr><td><a href="${esc(audit.origin + p.path)}" target="_blank" rel="noopener">${esc(p.path)}</a><div class="tiny muted">${esc((p.title || p.name || '').slice(0, 70))}</div></td>
-<td><span class="score ${scoreClass(p.score)}">${p.score == null ? '-' : p.score}</span></td><td>${p.error ? `<span class="small muted">${esc(p.error)}</span>` : (issues || '<span class="pill good">All good</span>')}${p.noindex ? ' <span class="pill">noindex</span>' : ''}</td>
-<td>${p.pageId && !p.error ? `<a class="btn sm" href="/app/fix?id=${id}&page=${encodeURIComponent(p.path)}">Fix</a>` : (p.template ? '<span class="tiny muted">CMS template</span>' : (!p.error ? '<span class="tiny muted">CMS page</span>' : ''))}</td></tr>`;
+    const unknown = (p.unknown || []).length ? ` <span class="pill na" title="Part of this page's text is inside components, which this read does not open, so this could not be told.">${esc(p.unknown.map(issueLabel).join(', '))}: not determined</span>` : '';
+    const state = p.state === 'pending' ? ' <span class="pill na">Text not read yet</span>' : p.state === 'unreadable' ? ' <span class="pill na" title="Webflow returned no content for this page.">Text not available</span>' : '';
+    return `<tr><td>${p.template ? `<span>${esc(p.name || p.path)}</span>` : `<a href="${esc(audit.origin + p.path)}" target="_blank" rel="noopener">${esc(p.path)}</a>`}<div class="tiny muted">${esc((p.template ? 'Collection template' : p.title || p.name || '').slice(0, 70))}</div></td>
+<td><span class="score ${scoreClass(p.score)}">${p.score == null ? '-' : p.score}</span></td><td>${issues || (p.state === 'pending' ? '' : '<span class="pill good">All good</span>')}${unknown}${state}</td>
+<td>${p.template ? '' : `<a class="btn sm" href="/app/fix?id=${id}&page=${encodeURIComponent(p.path)}">Fix</a>`}</td></tr>`;
   }).join('');
-  return `<div class="cols" style="margin-bottom:18px"><div class="panel stack"><div class="actions" style="justify-content:space-between"><h2>AI readiness <span class="score ${scoreClass(audit.score)}">${audit.score}/100</span></h2>
-<form method="post" action="/app/site/audit"><input type="hidden" name="id" value="${esc(site.id)}"><button class="btn sm" type="submit">Run again</button></form></div>
-<p class="small muted">${plural(audit.pagesChecked, 'page')} read ${ago(audit.at)}${audit.complete ? '' : ` (${audit.pagesListed - audit.pagesChecked} more next time)`}.</p>${checkRows}</div></div>
+  const read = `Read from Webflow ${ago(audit.readAt || audit.at)}.`;
+  const part = audit.pending ? ` The text of ${plural(audit.pending, 'page')} is not read yet.` : '';
+  const over = audit.overPlan ? ` Your plan covers ${plural((audit.pages || []).length, 'page')}; ${audit.overPlan} more are not listed.` : '';
+  return `<div class="cols" style="margin-bottom:18px"><div class="panel stack"><div class="actions" style="justify-content:space-between"><h2>Page health ${audit.score == null ? '' : `<span class="score ${scoreClass(audit.score)}">${audit.score}/100</span>`}</h2>
+<div class="actions">${audit.pending ? readForm('Read the rest', 'sm primary', true) : ''}${readForm('Refresh from Webflow', 'sm')}</div></div>
+<p class="small muted" data-read-from-webflow>${plural(audit.pagesChecked, 'page')} of ${audit.pagesListed}. ${read}${part}${over}</p>
+<p class="small muted">Everything here comes from Webflow through its API: each page's SEO and Open Graph settings, and the headings, text and images of its static pages. The published site is not requested. Structured data, robots.txt, llms.txt and the sitemap are not part of this read, because Webflow's API does not provide them.</p></div></div>
 <div class="panel"><div class="tablewrap"><table class="list"><thead><tr><th>Page</th><th>Score</th><th>What to fix</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-<p class="tiny muted" style="margin-top:10px">Fixes for CMS pages are made in the collection template in Webflow. Static pages can be fixed here.</p></div>`;
+<p class="tiny muted" style="margin-top:10px">Static pages can be fixed here. For a Collection page, the template's SEO settings are checked; its text comes from the CMS items and is edited in Webflow.</p></div>`;
 }
-
-const BUSINESS_TYPES = [['Organization', 'Company or brand'], ['LocalBusiness', 'Local business'], ['ProfessionalService', 'Agency or professional service'], ['Dentist', 'Dental clinic'], ['MedicalClinic', 'Medical clinic'], ['BeautySalon', 'Beauty salon'], ['HealthAndBeautyBusiness', 'Health and beauty'], ['Restaurant', 'Restaurant'], ['Store', 'Shop'], ['RealEstateAgent', 'Real estate'], ['LegalService', 'Legal service'], ['EducationalOrganization', 'School or course']];
 
 function settingsTab(site, limits) {
   const p = site.project;
-  const biz = p.business || {};
   const id = esc(site.id);
   return `${refreshForm(site, 'settings')}<div class="cols">
 <form class="panel stack" method="post" action="/app/site/settings"><input type="hidden" name="id" value="${id}"><h2>Brand and rivals</h2>
@@ -1105,19 +1076,14 @@ ${webflowDomains(site)}
 <div class="field"><label for="rivals">Rivals, one name per line</label><textarea id="rivals" name="rivals">${esc(rivalLines(p))}</textarea></div>
 <div class="cols" style="gap:12px"><div class="field"><label for="country">Customers in</label><select id="country" name="country">${options(COUNTRIES, p.country || '')}</select></div>
 <div class="field"><label for="language">Keyword language</label><select id="language" name="language">${options(LANGS, p.language || 'en')}</select></div></div>
-<h3 style="margin-top:6px">Business details for structured data</h3><p class="tiny muted">Used in the Organization schema on your homepage. Leave empty what you do not want to publish.</p>
-<div class="field"><label for="btype">Type of business</label><select id="btype" name="btype">${options(BUSINESS_TYPES, biz.type || 'Organization')}</select></div>
-<div class="cols" style="gap:12px"><div class="field"><label for="phone">Phone</label><input type="tel" id="phone" name="phone" maxlength="40" value="${esc(biz.phone || '')}"></div><div class="field"><label for="bemail">Public email</label><input type="email" id="bemail" name="bemail" maxlength="120" value="${esc(biz.email || '')}"></div></div>
-<div class="field"><label for="street">Street address</label><input type="text" id="street" name="street" maxlength="160" value="${esc(biz.street || '')}"></div>
-<div class="cols" style="gap:12px"><div class="field"><label for="city">City</label><input type="text" id="city" name="city" maxlength="80" value="${esc(biz.city || '')}"></div><div class="field"><label for="bcountry">Country</label><input type="text" id="bcountry" name="bcountry" maxlength="60" value="${esc(biz.country || '')}"></div></div>
 <div class="actions"><button class="btn primary" type="submit">Save</button></div></form>
 <div class="panel stack"><h2>Tracking</h2><p class="small muted">${site.tracked ? `Every keyword is checked automatically ${limits.plan === 'free' ? 'every month' : 'every week'}${site.sched.nextRunAt ? ', next ' + until(site.sched.nextRunAt) : ''}.` : (site.pausedByUser ? 'Paused. Nothing is checked until you resume.' : 'Waiting for a free slot in your plan.')}</p>
 <form method="post" action="/app/site/track"><input type="hidden" name="id" value="${id}"><input type="hidden" name="on" value="${site.tracked ? '0' : '1'}"><button class="btn" type="submit">${site.tracked ? 'Pause tracking' : 'Resume tracking'}</button></form>
 <h3 style="margin-top:8px">Client report link</h3><p class="small muted">A read-only page with the visibility, the trend and the keyword deck. Anyone with the link can open it.</p>
 ${site.settings.reportToken ? `<pre class="copy">${esc((process.env.APP_URL || '').replace(/\/+$/, '') + '/r/' + site.settings.reportToken)}</pre>` : ''}
 <form method="post" action="/app/site/report" class="actions"><input type="hidden" name="id" value="${id}">${site.settings.reportToken ? '<button class="btn sm" name="action" value="rotate" type="submit">Replace the link</button>' : '<button class="btn sm" type="submit">Create a report link</button>'}</form>
-<h3 style="margin-top:8px">Remove this site</h3><p class="small muted">Deletes its keywords, answers and audit from AI SEO Deck. Nothing changes in Webflow.</p>
-<form method="post" action="/app/site/remove" onsubmit="return this.querySelector('[name=sure]').checked"><input type="hidden" name="id" value="${id}"><label class="check"><input type="checkbox" name="sure" value="1"> I want to remove ${esc(site.name)}</label><button class="btn sm danger" type="submit" style="margin-top:10px">Remove site</button></form></div>
+<h3 style="margin-top:8px">Remove this site</h3><p class="small muted">Deletes its keywords, answers and Site health results from AI SEO Deck. Nothing changes in Webflow.</p>
+<form method="post" action="/app/site/remove"><input type="hidden" name="id" value="${id}"><label class="check"><input type="checkbox" name="sure" value="1" required> I want to remove ${esc(site.name)}</label><button class="btn sm danger" type="submit" style="margin-top:10px">Remove site</button></form></div>
 </div>`;
 }
 
@@ -1191,7 +1157,7 @@ function lanesHtml(site, k, d) {
 
 function faqLines(pairs) { return (pairs || []).map((x) => 'Q: ' + x.q + '\nA: ' + x.a).join('\n\n'); }
 
-// The plan of fixes for one keyword: the page, title and description, answers with FAQ schema, where the AI looks.
+// The plan of fixes for one keyword: the page, title and description, answers to what people ask, where the AI looks.
 function fixPlan(site, k, d) {
   let i = 0;
   return fixPlanBody(site, k, d).replace(/<span class="tick" aria-hidden="true"><\/span>/g, () => `<span class="tick" aria-hidden="true">${++i}</span>`);
@@ -1204,12 +1170,12 @@ function fixPlanBody(site, k, d) {
   const can = d.limits.canApply;
   const hosts = (sum && sum.hosts || []).slice(0, 6);
   const whereItem = `<li class="manual"><span class="tick" aria-hidden="true"></span><div><h3>Be where the AI looks</h3><p class="d">${hosts.length ? 'The engines cited these sites for this keyword. Reviews, listings and articles there move you into the answers.' : 'After the first check, this lists the sites the engines cite for this keyword.'}</p>${hosts.length ? `<div class="chips" style="margin-top:10px">${hosts.map(([h, n]) => `<span class="q">${esc(h)} <span class="faint">${n}</span></span>`).join('')}</div>` : ''}</div></li>`;
-  const pageOptions = (d.pages || []).filter((p) => p.ok !== false && !p.error).slice(0, 80).map((p) => `<option value="${esc(p.path)}"${target && target.path === p.path ? ' selected' : ''}>${esc(p.path)}${p.pageId ? '' : ' (CMS)'}</option>`).join('');
+  const pageOptions = (d.pages || []).filter((p) => !p.template).slice(0, 80).map((p) => `<option value="${esc(p.path)}"${target && target.path === p.path ? ' selected' : ''}>${esc(p.path)}</option>`).join('');
   const pagePicker = d.pages && d.pages.length ? `<form method="post" action="/app/keyword/page" class="actions" style="gap:8px"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><select name="path" aria-label="Page for this keyword" style="width:auto;max-width:260px">${target ? '' : '<option value="">Choose a page</option>'}${pageOptions}<option value="new"${k.page === 'new' ? ' selected' : ''}>A new page in the CMS</option></select><button class="btn sm" type="submit">Use</button></form>` : '';
-  const head = `<div class="plan-head"><div><h2>Your fix plan</h2><p class="small muted" style="margin-top:4px">${target ? `Best page: <a href="${esc(d.origin + target.path)}" target="_blank" rel="noopener">${esc(target.path)}</a>${k.page === target.path ? '' : ' (matched by its title and address)'}` : k.page === 'new' ? 'A new page, drafted in your CMS' : d.pages ? 'No page on your site matches this keyword yet.' : 'Run the site audit to match a page.'}</p></div>${pagePicker}</div>`;
+  const head = `<div class="plan-head"><div><h2>Your fix plan</h2><p class="small muted" style="margin-top:4px">${target ? `Best page: <a href="${esc(d.origin + target.path)}" target="_blank" rel="noopener">${esc(target.path)}</a>${k.page === target.path ? '' : ' (matched by its title and address)'}` : k.page === 'new' ? 'A new page, drafted in your CMS' : d.pages ? 'No page on your site matches this keyword yet.' : 'Read your pages from Webflow to match a page.'}</p></div>${pagePicker}</div>`;
   if (!d.pages) {
-    return `<section class="panel plan-card">${head}<ul class="fx"><li><span class="tick" aria-hidden="true"></span><div><h3>Find the best page for this keyword</h3><p class="d">The site audit reads your pages and matches each keyword to the one that should rank. It takes up to a minute.</p>
-<form method="post" action="/app/site/audit" style="margin-top:12px"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${esc(k.id)}"><button class="btn sm primary" type="submit">Run the site audit</button></form></div></li>${whereItem}</ul></section>`;
+    return `<section class="panel plan-card">${head}<ul class="fx"><li><span class="tick" aria-hidden="true"></span><div><h3>Find the best page for this keyword</h3><p class="d">Site health reads your pages through Webflow and matches each keyword to the one that should rank. It takes up to a minute.</p>
+<form method="post" action="/app/site/audit" style="margin-top:12px"><input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="${esc(k.id)}"><button class="btn sm primary" type="submit">Read my pages from Webflow</button></form></div></li>${whereItem}</ul></section>`;
   }
   const writeBtn = (label) => `<form method="post" action="/app/keyword/plan" class="actions" id="writeplan"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><button class="btn sm${draft.at ? '' : ' mark'}" type="submit">${label}</button><span class="tiny muted" id="writing" hidden>Writing from your page, this takes a few seconds…</span></form>`;
   const collections = (d.collections || []).map((c) => `<option value="${esc(c.id)}">${esc(c.displayName || c.slug)}</option>`).join('');
@@ -1226,12 +1192,12 @@ function fixPlanBody(site, k, d) {
   const faq = draft.faq || [];
   const isStatic = !!target.pageId;
   const titleItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Title and description</h3><p class="d">The first thing search engines and AI read about the page.</p>
-${meta ? `<div class="diff2"><div class="was"><span class="l">Now</span><b>${esc(row.title || '(no title)')}</b><span>${esc(row.description || 'No description')}</span></div><div class="now"><span class="l">Suggested</span><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:84px" aria-label="New description">${esc(meta.description)}</textarea></div></div>
-<label class="include"><input type="checkbox" name="do_meta" value="1" form="applyform" checked> Apply the new title and description</label>` : `<p class="small" style="margin-top:8px">Now: <b>${esc(row.title || '(no title)')}</b></p>`}</div></li>`;
-  const faqItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Answers to what people ask</h3><p class="d">Answers written from your own page for the questions behind this keyword, added to the page as FAQ schema${collections ? ' and to your CMS as drafts' : ''}.</p>
+${meta ? `<div class="diff2"><div class="was"><span class="l">Now in Webflow</span><b>${esc(row.title || '(no title)')}</b><span>${esc(row.description || 'No description')}</span><span class="tiny muted" data-read-from-webflow>Read from Webflow ${esc(ago(row.metaAt || row.contentAt || d.readAt))}.</span><input type="hidden" name="seen" value="1" form="applyform"><input type="hidden" name="seen_title" value="${esc(row.title || '')}" form="applyform"><input type="hidden" name="seen_description" value="${esc(row.description || '')}" form="applyform"></div><div class="now"><span class="l">Suggested</span><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:84px" aria-label="New description">${esc(meta.description)}</textarea></div></div>
+<label class="include"><input type="checkbox" name="do_meta" value="1" form="applyform" checked> Apply the new title and description</label>` : `<p class="small" style="margin-top:8px">Now in Webflow: <b>${esc(row.title || '(no title)')}</b> <span class="tiny muted" data-read-from-webflow>Read ${esc(ago(row.metaAt || row.contentAt || d.readAt))}.</span></p>`}</div></li>`;
+  const faqItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Answers to what people ask</h3><p class="d">Answers written from your own page for the questions behind this keyword. ${collections ? 'They can go to your CMS as draft items; you place them on the page in Webflow.' : 'Copy them into the page in Webflow.'}</p>
 ${faq.length ? `<textarea name="faq" form="applyform" style="min-height:160px;margin-top:10px" aria-label="Questions and answers">${esc(faqLines(faq))}</textarea><span class="hint">Lines start with Q: and A:. Every answer should also be visible on the page.</span>
-<label class="include"><input type="checkbox" name="do_schema" value="1" form="applyform" checked> Add them to the page as FAQ schema</label>${collections ? `<label class="include"><input type="checkbox" name="do_cms" value="1" form="applyform"> Also add them to <select name="collection" form="applyform" style="width:auto;padding:4px 8px;font-size:13px" aria-label="CMS collection">${collections}</select> as drafts</label>` : ''}` : ''}</div></li>`;
-  const cmsNote = isStatic ? '' : '<p class="small" style="padding:0 22px 16px;color:var(--warn)">This is a CMS page. Copy the title and description into the collection item in Webflow; the answers can still go to your CMS as drafts.</p>';
+${collections ? `<label class="include"><input type="checkbox" name="do_cms" value="1" form="applyform"> Add them to <select name="collection" form="applyform" style="width:auto;padding:4px 8px;font-size:13px" aria-label="CMS collection">${collections}</select> as drafts</label>` : ''}` : ''}</div></li>`;
+  const cmsNote = isStatic ? '' : '<p class="small" style="padding:0 22px 16px;color:var(--warn)">This page cannot be written from here. Copy the title and description into its settings in Webflow; the answers can still go to your CMS as drafts.</p>';
   const foot = meta || faq.length
     ? `<form method="post" action="/app/keyword/apply" class="plan-foot" id="applyform"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><input type="hidden" name="what" value="page">
 <p>${k.fixedAt ? `Applied ${esc(ago(k.fixedAt))}. Publish in Webflow, then check the keyword again.` : 'Everything lands in Webflow as unpublished changes. Nothing goes live until you publish.'}</p>${localeNote(site)}<button class="btn mark" type="submit"${can ? '' : ' disabled'}>Apply to Webflow</button></form>${writeBtn('Write new suggestions').replace('class="actions"', 'class="actions" style="padding:0 22px 18px"')}`
@@ -1282,7 +1248,7 @@ function keywordPage(user, site, k, d) {
   const qBox = `<section class="panel stack"><h2>Questions we ask</h2><p class="small muted">The chat engines get these questions; Google AI Overviews and AI Mode get the keyword itself. Edit them to match how your customers ask.</p>
 <form method="post" action="/app/keyword/questions" class="fields"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><div class="field"><label for="qs">One question per line, up to ${QUESTIONS}</label><textarea id="qs" name="questions" style="min-height:90px">${esc((k.questions || []).join('\n'))}</textarea></div>
 <div class="actions"><button class="btn sm" type="submit">Save questions</button></div></form>
-<form method="post" action="/app/keyword/remove" onsubmit="return this.querySelector('[name=sure]').checked" style="border-top:1px solid var(--line2);padding-top:14px"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><label class="check small"><input type="checkbox" name="sure" value="1"> Stop tracking this keyword</label><button class="btn sm danger" type="submit" style="margin-top:8px">Remove keyword</button></form></section>`;
+<form method="post" action="/app/keyword/remove" style="border-top:1px solid var(--line2);padding-top:14px"><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="k" value="${esc(k.id)}"><label class="check small"><input type="checkbox" name="sure" value="1" required> Stop tracking this keyword</label><button class="btn sm danger" type="submit" style="margin-top:8px">Remove keyword</button></form></section>`;
   const answers = sum ? (sum.n || 0) + (sum.na || 0) + (sum.f || 0) : 0;
   const tab = (id, label, n) => `<button type="button" role="tab" id="t-${id}" data-v="${id}" aria-controls="p-${id}" aria-selected="${id === 'plan' ? 'true' : 'false'}"${id === 'plan' ? '' : ' tabindex="-1"'}>${label}${n ? `<span class="n">${n}</span>` : ''}</button>`;
   const views = `<div class="tabbed"><div class="vtabs" role="tablist" aria-label="Keyword views" hidden>${tab('plan', 'Fix plan')}${tab('answers', 'What AI said', answers)}${tab('related', 'Related keywords', searched.length + (related ? related.length : 0))}</div>
@@ -1310,28 +1276,26 @@ function fixPage(user, site, row, d) {
   const meta = draft.meta || {};
   const lockNote = d.limits.canApply ? '' : '<p class="tiny muted">Applying to Webflow is part of the paid plans. You can copy the values on the free plan.</p>';
   const applyBtn = (label) => `<button class="btn primary" type="submit"${d.limits.canApply ? '' : ' disabled'}>${label}</button>`;
-  const faqPairs = draft.faq && draft.faq.length ? draft.faq : (row.faq || []);
-  const existingTypes = d.existingTypes || [];
+  const faqPairs = draft.faq && draft.faq.length ? draft.faq : [];
+  const found = (row.faq || []).length;
+  const partial = (row.unknown || []).length ? '<p class="small muted">Part of this page\'s text is inside components, which this read does not open. What depends on that text is shown as not determined.</p>' : '';
   return layout('Fix ' + row.path + ' · AI SEO Deck', `${noticeHtml(d.notice)}
 <a class="back" href="${esc(siteHref(site, 'tab=audit'))}">${BACK_ICON} Site health</a>
-<div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div></div>${localeNote(site)}
+<div class="head"><div><h1>${row.path === '/' ? 'Fix the homepage' : 'Fix ' + esc(row.path)}</h1><p class="meta"><span>${esc(site.name)}</span><span>page score ${row.score == null ? '-' : row.score}/100</span><span>changes go to Webflow as unpublished edits</span></p></div>
+<form method="post" action="/app/fix/refresh" class="actions"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}"><span class="tiny muted" data-read-from-webflow>Read from Webflow ${esc(ago(row.metaAt || row.contentAt || d.readAt))}</span><button class="btn sm" type="submit">Refresh from Webflow</button></form></div>${localeNote(site)}${partial}
 <div class="stack">
 <section class="panel stack"><h2>Title and description</h2><p class="small muted">What search engines and AI assistants read first about this page.</p>
-<div class="cols"><div class="stack" style="gap:6px"><b class="small">Now</b><p>${esc(row.title || '(no title)')}</p><p class="small muted">${esc(row.description || '(no description)')}</p></div>
-<form method="post" action="/app/fix/meta" class="fields"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}">
-<div class="field"><label for="mt">New title</label><input type="text" id="mt" name="title" maxlength="90" value="${esc(meta.title || row.title || '')}">${counter('mt', 35, 60)}</div>
-<div class="field"><label for="md">New description</label><textarea id="md" name="description" style="min-height:90px" maxlength="200">${esc(meta.description || row.description || '')}</textarea>${counter('md', 120, 155)}</div>
+<div class="cols"><div class="stack" style="gap:6px"><b class="small">Now in Webflow</b><p>${esc(row.title || '(no title)')}</p><p class="small muted">${esc(row.description || '(no description)')}</p></div>
+<form method="post" action="/app/fix/meta" class="fields"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}"><input type="hidden" name="seen" value="1"><input type="hidden" name="seen_title" value="${esc(row.title || '')}"><input type="hidden" name="seen_description" value="${esc(row.description || '')}">
+<div class="field"><label for="mt">New title${meta.title ? ' (suggested by AI, change what you like)' : ''}</label><input type="text" id="mt" name="title" maxlength="90" value="${esc(meta.title || row.title || '')}">${counter('mt', LIMITS.title.aimMin, LIMITS.title.aimMax)}</div>
+<div class="field"><label for="md">New description${meta.description ? ' (suggested by AI, change what you like)' : ''}</label><textarea id="md" name="description" style="min-height:90px" maxlength="200">${esc(meta.description || row.description || '')}</textarea>${counter('md', LIMITS.description.aimMin, LIMITS.description.aimMax)}</div>
 <div class="actions">${applyBtn('Apply to Webflow')}</div>${lockNote}</form></div>
-<form method="post" action="/app/fix/suggest" class="actions"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}"><input type="hidden" name="what" value="meta"><button class="btn sm" type="submit">${meta.title ? 'Write another suggestion' : 'Write a suggestion with AI'}</button></form></section>
-<section class="panel stack"><h2>Questions and answers</h2><p class="small muted">${row.faq && row.faq.length ? `We found ${plural(row.faq.length, 'question')} answered on this page.` : 'No questions were found on this page.'} Clear answers to real questions are what AI assistants quote.</p>
+<form method="post" action="/app/fix/suggest" class="actions"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}"><input type="hidden" name="what" value="meta"><button class="btn sm" type="submit">${meta.title ? 'Write another suggestion' : 'Write a suggestion with AI'}</button><span class="tiny muted">The page's title, description and text go to our AI provider to write it.</span></form></section>
+<section class="panel stack"><h2>Questions and answers</h2><p class="small muted">${found ? `We found ${plural(found, 'question')} answered on this page.` : 'No questions were found on this page.'} Clear answers to real questions are what AI assistants quote.</p>
 <form method="post" action="/app/fix/faq" class="fields"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}">
-<div class="field"><label for="faq">Questions and answers (Q: and A: lines)</label><textarea id="faq" name="faq" style="min-height:220px" placeholder="Q: How long does delivery take?&#10;A: Most orders arrive in 2 to 4 working days.">${esc(faqLines(faqPairs))}</textarea><span class="hint">Every answer should also be visible on the page itself.</span></div>
-<div class="actions"><button class="btn" name="action" value="save" type="submit">Save and use in the schema below</button>${d.collections && d.collections.length ? `<select name="collection" aria-label="CMS collection" style="width:auto">${d.collections.map((c) => `<option value="${esc(c.id)}">${esc(c.displayName || c.slug)}</option>`).join('')}</select><button class="btn" name="action" value="cms" type="submit"${d.limits.canApply ? '' : ' disabled'}>Add to CMS as drafts</button>` : ''}</div></form>
+<div class="field"><label for="faq">Questions and answers (Q: and A: lines)</label><textarea id="faq" name="faq" style="min-height:220px" placeholder="Q: How long does delivery take?&#10;A: Most orders arrive in 2 to 4 working days.">${esc(faqLines(faqPairs))}</textarea><span class="hint">These are drafts. They go to your CMS as draft items, or you copy them into the page in Webflow.</span></div>
+<div class="actions"><button class="btn" name="action" value="save" type="submit">Save the draft</button>${d.collections && d.collections.length ? `<select name="collection" aria-label="CMS collection" style="width:auto">${d.collections.map((c) => `<option value="${esc(c.id)}">${esc(c.displayName || c.slug)}</option>`).join('')}</select><button class="btn" name="action" value="cms" type="submit"${d.limits.canApply ? '' : ' disabled'}>Add to CMS as drafts</button>` : ''}</div></form>
 <form method="post" action="/app/fix/suggest" class="actions"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}"><input type="hidden" name="what" value="faq"><button class="btn sm" type="submit">Write answers with AI from this page</button></form></section>
-<section class="panel stack"><h2>Structured data (JSON-LD)</h2><p class="small muted">${existingTypes.length ? 'This page already has: ' + esc(existingTypes.join(', ')) + '. We keep those and add or replace only the types below.' : 'This page has no structured data yet.'}</p>
-<form method="post" action="/app/fix/schema" class="fields"><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${path}">
-<div class="field"><label for="schema">What will be written to Webflow</label><textarea id="schema" name="schema" class="code" spellcheck="false">${esc(JSON.stringify(d.proposedSchema || {}, null, 2))}</textarea>${row.path === '/' ? '<span class="hint">Business details come from the Settings tab. Change them there and come back.</span>' : ''}</div>
-<div class="actions">${applyBtn('Apply to Webflow')}<button class="btn ghost" type="button" data-copy="schema">Copy</button></div>${lockNote}</form></section>
 </div>`, d.side ? { user, side: siteSide(user, site, 'audit', d), script: COUNT_JS } : { user, nav: 'sites', script: COUNT_JS });
 }
 
@@ -1411,7 +1375,7 @@ function settingsPage(user, sites, limits, notice, opts) {
       }
     }
     return `<div class="plan${current ? ' current' : ''}"><b>${esc(p.name)}${current ? ' <span class="pill good">Your plan</span>' : ''}</b><span class="price">${price}<span class="small muted" style="font-weight:500">${k === 'free' ? '' : ' a month'}</span></span>
-<span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? `Checked monthly on ${freeEnginesText()}. Audit and suggestions; apply by copying.` : `Checked weekly on all ${allEnginesCount()} AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
+<span class="small"><b>${p.keywords} keywords</b>, ${plural(p.sites, 'site')}</span><span class="small muted">${k === 'free' ? `Checked monthly on ${freeEnginesText()}. Site health and suggestions; apply by copying.` : `Checked weekly on all ${allEnginesCount()} AI engines. One-click fixes to Webflow. ${p.rechecks} keyword checks on demand a month.`}${k === 'studio' || k === 'agency' ? ' Client report links with your agency name.' : ''}</span>${btn}</div>`;
   }).join('');
   const conns = (user.connections || []).map((c) => `<li><span>${esc(c.label || 'Webflow')}<span class="tiny muted">, connected ${ago(c.authorizedAt)}</span></span><form method="post" action="/app/connection/remove"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn sm ghost" type="submit">Disconnect</button></form></li>`).join('');
   return layout('Account · AI SEO Deck', `${noticeHtml(notice)}
@@ -1432,7 +1396,7 @@ ${t && opts.billing && limits.plan === 'free' ? `<p class="small">Every paid pla
 <div class="actions"><button class="btn primary" type="submit">Save</button></div></form>
 <section class="panel stack"><h2>Webflow connections</h2><ul class="plain">${conns || '<li class="muted">None.</li>'}</ul><div class="actions"><a class="btn" href="/auth">Connect more sites</a></div></section>
 <section class="panel stack"><h2>Delete account</h2><p class="small muted">Cancels a paid plan at the end of its period, revokes Webflow access and deletes everything we stored. Changes already applied to your Webflow sites stay.</p>
-<form method="post" action="/app/delete" onsubmit="return this.querySelector('[name=sure]').checked"><label class="check"><input type="checkbox" name="sure" value="1"> Delete my account and all its data</label><button class="btn danger sm" type="submit" style="margin-top:10px">Delete account</button></form></section>
+<form method="post" action="/app/delete"><label class="check"><input type="checkbox" name="sure" value="1" required> Delete my account and all its data</label><button class="btn danger sm" type="submit" style="margin-top:10px">Delete account</button></form></section>
 </div>`, { user, nav: 'settings' });
 }
 
@@ -1446,4 +1410,4 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
   { plain: true, brandName: brandName || '', footer: brandName ? `<span>Prepared by ${esc(brandName)}</span>` : '<span>Made with AI SEO Deck</span><a href="/">aiseodeck.silitlabs.com</a>' });
 }
 
-module.exports = { issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, BUSINESS_TYPES, COUNTRIES, LANGS };
+module.exports = { issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, COUNTRIES, LANGS };

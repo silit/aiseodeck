@@ -6,14 +6,13 @@
 'use strict';
 
 const wf = require('./_lib/webflow');
+const health = require('./_lib/health');
 const store = require('./_lib/store');
 const jobs = require('./_lib/jobs');
 const html = require('./_lib/html');
 const engines = require('./_lib/engines');
 const fixes = require('./_lib/fixes');
 const llm = require('./_lib/llm');
-const auditLib = require('./_lib/audit');
-const fetcher = require('./_lib/fetcher');
 const billing = require('./_lib/billing');
 const email = require('./_lib/email');
 const kwLib = require('./_lib/keywords');
@@ -117,7 +116,6 @@ const tooMany = (res, back) => send(res, 429, html.errorPage('Too many requests'
 const LOGIN_TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const REPORT_TOKEN_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const hostOfUrl = (u) => { try { return new URL(u).host; } catch (e) { return ''; } };
-const siteHosts = (site) => [hostOfUrl(site.url)].concat(site.domains || []).filter(Boolean);
 const siteUrl = (site, extra) => '/app/site?id=' + encodeURIComponent(site.id) + (extra ? '&' + extra : '');
 
 /* ---------- auth ---------- */
@@ -317,9 +315,10 @@ async function runProgress(site) {
   return { progress: { total: active ? active.total : 0, done: await store.resultCount(site.sched.runId) }, running: active ? (active.keywords || []).map((k) => k.id) : [] };
 }
 // The page a keyword should rank with: the one the user chose, or the best match among the audited pages.
+
 function targetFor(k, audit) {
   if (!audit || k.page === 'new') return null;
-  const pages = audit.pages || [];
+  const pages = (audit.pages || []).filter((p) => !p.template);
   if (k.page) {
     const row = pages.find((p) => p.path === k.page);
     if (row) return { path: row.path, pageId: row.pageId || '', static: !!row.pageId, score: 1, row };
@@ -413,7 +412,9 @@ async function handleSiteRefresh(req, res, user) {
   redirect(res, back + '&' + noticeQuery(user, 'Read from Webflow just now.'));
 }
 
-// Keyword ideas from the homepage and the keywords where Google's AI Overviews already cite the site, with volumes.
+// Keyword ideas from the home page (read through the Webflow API) and the keywords where Google's AI Overviews
+// already cite the site, with volumes. It runs when the user asks for ideas on the setup page.
+
 async function discoverFor(site, user) {
   const t0 = Date.now();
   const out = { at: t0, cited: [], ideas: [], error: '' };
@@ -427,8 +428,19 @@ async function discoverFor(site, user) {
   })() : Promise.resolve();
   let ideas = [];
   if (llm.available() && (await store.rateOk('suggest:' + user.id, 20, 3600))) {
-    const r = site.url ? await fetcher.getText(site.url + '/', { allowedHosts: siteHosts(site), timeoutMs: 8000 }) : { ok: false };
-    const home = r.ok ? auditLib.readPage(r.text) : { title: site.name, description: '', text: '' };
+    // what the home page says, as the Webflow API returns it: its SEO title and description and its text
+    let home = { title: site.name, description: '', text: '' };
+    const token = store.tokenForSite(user, site);
+    if (token) {
+      try {
+        const pages = await wf.listPages(token, site.id, 200);
+        const meta = health.listed(pages).find((x) => x.publishedPath === '/' && !x.collectionId);
+        if (meta) {
+          const content = await health.readContent(token, meta.id, 300);
+          home = { title: String((meta.seo && meta.seo.title) || meta.title || site.name), description: String((meta.seo && meta.seo.description) || ''), text: content.text };
+        }
+      } catch (e) { if (!wf.isRevoked(e)) console.error('[aiseodeck] home page from Webflow', e.message); }
+    }
     try { ideas = await fixes.suggestKeywords(p, home, 12, { budgetMs: 30000 }); } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
   }
   await cited;
@@ -558,15 +570,7 @@ async function handleSiteSettings(req, res, user) {
   const b = await readBody(req);
   const site = await ownedSite(user, b.id);
   if (!site) return notFound(res);
-  const biz = {
-    type: html.BUSINESS_TYPES.some(([k]) => k === b.btype) ? b.btype : 'Organization',
-    phone: String(b.phone || '').trim().slice(0, 40),
-    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.bemail || '').trim()) ? String(b.bemail).trim().slice(0, 120) : '',
-    street: String(b.street || '').trim().slice(0, 160),
-    city: String(b.city || '').trim().slice(0, 80),
-    country: String(b.bcountry || '').trim().slice(0, 60)
-  };
-  await store.updateSite(site.id, (s) => { applyProjectFields(s, b); s.project.business = biz; });
+  await store.updateSite(site.id, (s) => { applyProjectFields(s, b); delete s.project.business; });
   redirect(res, siteUrl(site, 'tab=settings&saved=1'));
 }
 
@@ -625,7 +629,7 @@ async function handleKeywordPage(req, res, user) {
   if (token && (draft.at || k.page === 'new' || (audit && !target))) { try { collections = (await wf.listCollections(token, site.id)).slice(0, 30); } catch (e) { collections = []; } }
   send(res, 200, html.keywordPage(user, site, k, {
     notice: html.esc(noticeFrom(q, user)), limits, progress, running, run, results, target, draft, related: related ? related.list : null, collections,
-    pages: audit ? audit.pages : null, origin: audit ? audit.origin : (site.url || ''), engines: engines.forLimits(limits), locked: run ? [] : engines.lockedFor(limits),
+    pages: audit ? audit.pages : null, origin: audit ? audit.origin : (site.url || ''), readAt: audit ? audit.readAt || audit.at : null, engines: engines.forLimits(limits), locked: run ? [] : engines.lockedFor(limits),
     labs: kwLib.available(), canCheck: canCheckKeyword(site, limits, store.usageOf(user)), side: await sideData(user, audit)
   }));
 }
@@ -678,12 +682,47 @@ async function handleKeywordTarget(req, res, user) {
   if (!k) return redirect(res, siteUrl(site, 'tab=keywords'));
   const audit = await store.getAudit(site.id);
   const path = String(b.path || '');
-  const ok = path === 'new' || path === '' || ((audit && audit.pages) || []).some((p) => p.path === path);
+  const ok = path === 'new' || path === '' || ((audit && audit.pages) || []).some((p) => p.path === path && !p.template);
   if (!ok) return redirect(res, kwUrl(site, k));
   await store.updateSite(site.id, (s) => { const x = s.keywords.find((y) => y.id === k.id); if (x) x.page = path; });
   await store.saveDraft(site.id, 'kwfix:' + k.id, {});
   redirect(res, kwUrl(site, k));
 }
+
+// What a page says, read from Webflow now, for the writer and for the "Now" side of a fix: its SEO settings
+// (GET /v2/pages/:page_id) and its text (GET /v2/pages/:page_id/dom). The page has to belong to the site.
+async function pageForWriting(token, site, row) {
+  const meta = await wf.getPage(token, row.pageId);
+  if (!meta || !meta.id || meta.siteId !== site.id) throw Object.assign(new Error('This page is not part of this site.'), { status: 404 });
+  const content = await health.readContent(token, row.pageId);
+  const seo = meta.seo || {};
+  return { path: row.path, pageId: String(meta.id), meta, content, title: String(seo.title || '').trim(), description: String(seo.description || '').trim(), h1: content.h1, text: content.text, lang: (site.locale && site.locale.tag) || '', readAt: content.readAt };
+}
+// Keeps what was just read from Webflow in the page's row of Site health, so every screen shows the same values.
+async function keepRow(site, audit, row, page) {
+  const fresh = health.rowFor(Object.assign({}, page.meta, { publishedPath: row.path }), page.content);
+  for (const key of Object.keys(row)) delete row[key];
+  Object.assign(row, fresh);
+  audit.readAt = Date.now();
+  await store.saveAudit(site.id, audit);
+  return row;
+}
+// The title and description a page has in Webflow right now. A write goes ahead only when they are still the
+// ones the user was shown (the form sends them back as seen_title and seen_description): otherwise someone changed
+// the page in Webflow in the meantime and would be overwritten. `seen` is null only for a plain read.
+async function unchangedSince(token, site, row, seen) {
+  const meta = await wf.getPage(token, row.pageId);
+  if (!meta || !meta.id || meta.siteId !== site.id) throw Object.assign(new Error('This page is not part of this site.'), { status: 404 });
+  const now = { title: String((meta.seo && meta.seo.title) || '').trim(), description: String((meta.seo && meta.seo.description) || '').trim() };
+  const same = seen == null || (String(seen.title || '').trim() === now.title && String(seen.description || '').trim() === now.description);
+  return { same, now };
+}
+// The title and description Webflow answers after a write: they are what the page has now.
+function savedSeo(saved, title, description) {
+  const seo = (saved && saved.seo) || {};
+  return { title: typeof seo.title === 'string' ? seo.title.trim() : title, description: typeof seo.description === 'string' ? seo.description.trim() : description };
+}
+const CHANGED_IN_WEBFLOW = 'This page was changed in Webflow after you opened it, so nothing was written. The values from Webflow are shown now: check them and apply again.';
 
 // Writes the fixes for a keyword from the page itself (or a new page from the site's own text).
 async function handleKeywordPlan(req, res, user) {
@@ -695,26 +734,39 @@ async function handleKeywordPlan(req, res, user) {
   if (!llm.available()) return back('Writing fixes needs an AI provider, which is not connected yet.');
   if (!(await store.rateOk('fixai:' + user.id, 30, 3600))) return back('That is a lot of suggestions for one hour. Try again a bit later.');
   const audit = await store.getAudit(site.id);
-  if (!audit) return back('Run the site audit first, so we know your pages.');
+  if (!audit) return back('Read your pages from Webflow first, so we know them.');
+  const token = store.tokenForSite(user, site);
+  if (!token) return back('The Webflow connection for this site is missing. Connect again.');
   const target = targetFor(k, audit);
-  const allowed = siteHosts(site).concat(hostOfUrl(audit.origin));
   const draft = { at: Date.now() };
+  // what the page says comes from Webflow, read now
+  let page = null;
+  let source = '';
   try {
     if (!target) {
-      const paths = ['/'].concat((audit.pages || []).filter((p) => p.ok && p.path !== '/' && !p.noindex).slice(0, 3).map((p) => p.path));
-      const reads = await Promise.all(paths.map((p) => fetcher.getText(audit.origin + p, { allowedHosts: allowed, timeoutMs: 7000 })));
-      const source = reads.filter((r) => r.ok).map((r) => '\n' + auditLib.readPage(r.text).text.slice(0, 2500)).join('');
+      // a new page is drafted from what the site already says: the home page and up to three more pages
+      const rows = (audit.pages || []).filter((p) => p.pageId && !p.template);
+      const pick = rows.filter((p) => p.path === '/').concat(rows.filter((p) => p.path !== '/').slice(0, 3));
+      for (const p of pick) {
+        try { source += '\n' + (await health.readContent(token, p.pageId, 300)).text.slice(0, 2500); }
+        catch (e) { if (wf.isRevoked(e)) throw e; }
+      }
       if (source.trim().length < 200) return back('Your pages have too little text to draft from. Add content first.');
-      draft.newPage = await fixes.suggestNewPage(site.project, k.text, k.questions, source);
     } else {
-      const r = await fetcher.getText(audit.origin + target.path, { allowedHosts: allowed, timeoutMs: 9000 });
-      if (!r.ok) return back('The page could not be read right now (' + (r.error || 'HTTP ' + r.status) + ').');
-      const page = Object.assign(auditLib.readPage(r.text), { path: target.path });
+      if (!target.pageId) return back('Choose a static page for this keyword first.');
+      page = await pageForWriting(token, site, target.row);
+    }
+  } catch (e) { return webflowFailed(res, user, site, e, kwUrl(site, k), 'Webflow could not be read: '); }
+  try {
+    if (!page) draft.newPage = await fixes.suggestNewPage(site.project, k.text, k.questions, source);
+    else {
       const qs = (k.questions || []).concat(((site.kw[k.id] || {}).queries || []).slice(0, 3));
       const [meta, faq] = await Promise.all([fixes.suggestMeta(site.project, page, k.text), fixes.suggestFaq(site.project, page, qs).catch(() => [])]);
       draft.meta = meta; draft.faq = faq; draft.path = target.path;
+      draft.was = { title: page.title, description: page.description, readAt: page.readAt };
     }
   } catch (e) { return back('No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT)); }
+  if (page) await keepRow(site, audit, target.row, page);
   await store.saveDraft(site.id, 'kwfix:' + k.id, draft);
   redirect(res, kwUrl(site, k, noticeQuery(user, 'Fixes ready. Review them, change what you like, then apply.')));
 }
@@ -783,22 +835,23 @@ async function handleKeywordApply(req, res, user) {
         const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 90);
         const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
         if (title.length < 5 || description.length < 20) return back('Write a title of at least 5 characters and a description of at least 20.');
-        if (target.pageId) {
-          await wf.updatePageSeo(token, target.pageId, { title, description });
-          row.title = title; row.description = description;
-          row.issues = (row.issues || []).filter((x) => !/^(title|desc)_/.test(x));
-          done.push('the title and description');
+        if (!target.pageId) return back('Choose a static page for this keyword first.');
+        // the page as it is in Webflow now has to be the one the "Now" side showed
+        const check = await unchangedSince(token, site, row, { title: b.seen_title, description: b.seen_description });
+        if (!check.same) {
+          row.title = check.now.title; row.description = check.now.description;
+          Object.assign(row, health.check(row));
+          row.metaAt = Date.now();
+          audit.readAt = Date.now();
+          await store.saveAudit(site.id, audit);
+          return back(CHANGED_IN_WEBFLOW);
         }
+        const saved = await wf.updatePageSeo(token, target.pageId, { title, description });
+        Object.assign(row, savedSeo(saved, title, description));
+        Object.assign(row, health.check(row));
+        row.metaAt = Date.now();
+        done.push('the title and description');
         draft.meta = { title, description };
-      }
-      if (b.do_schema === '1' && pairs.length && target.pageId) {
-        if (pairs.length < 2) return back('FAQ schema needs at least two questions and answers.');
-        let existing = null;
-        try { const s = await wf.getSchema(token, target.pageId); existing = s && (s.jsonLdSchema || null); } catch (e) { existing = null; }
-        await wf.putSchema(token, target.pageId, fixes.mergeSchema(existing, [fixes.faqSchema(pairs)]));
-        row.schemaTypes = [...new Set((row.schemaTypes || []).concat('FAQPage'))];
-        row.issues = (row.issues || []).filter((x) => x !== 'schema_missing' && x !== 'faq_no_schema');
-        done.push('FAQ schema');
       }
       if (b.do_cms === '1' && pairs.length) {
         const r = await addCmsItems(token, site, b.collection, pairs.map((p) => ({ name: p.q, html: '<p>' + html.esc(p.a) + '</p>', text: p.a })));
@@ -806,7 +859,7 @@ async function handleKeywordApply(req, res, user) {
         done.push(`${r.made} answer${r.made === 1 ? '' : 's'} as drafts in ${r.name}`);
       }
       if (pairs.length) draft.faq = pairs;
-      if (audit) await store.saveAudit(site.id, audit);
+      if (audit) { audit.readAt = Date.now(); await store.saveAudit(site.id, audit); }
     }
   } catch (e) { return webflowFailed(res, user, site, e, kwUrl(site, k)); }
   if (!done.length) return back('Nothing was selected to apply.');
@@ -878,10 +931,11 @@ async function extContext(a, b) {
     ok: true,
     site: { name: site.project.brand || site.name, score: site.latest ? site.latest.score : null, keywords: (site.keywords || []).length, ready: !!site.project.ready, url: link(siteUrl(site)), setupUrl: link('/app/setup?id=' + encodeURIComponent(site.id)), healthUrl: link(siteUrl(site, 'tab=audit')), keywordsUrl: link(siteUrl(site, 'tab=keywords')) },
     plan: { name: owner._limits.name, canApply: !!owner._limits.canApply, upgradeUrl: link('/app/settings#plan') },
+    rules: health.LIMITS,
     page: {
       path, pageId: (row && row.pageId) || String(b.pageId || '') || null, audited: !!row, auditAt: audit ? audit.at : null, score: row ? row.score : null, template: !!(row && row.template),
-      title: row ? row.title || '' : '', description: row ? row.description || '' : '', faqFound: row ? (row.faq || []).length : 0, schemaTypes: row ? row.schemaTypes || [] : [],
-      issues: row ? (row.issues || []).map((code) => ({ code, label: html.issueLabel(code), text: (auditLib.PAGE_RULES[code] || {}).text || '', w: (auditLib.PAGE_RULES[code] || {}).w || 0 })) : []
+      title: row ? row.title || '' : '', description: row ? row.description || '' : '', faqFound: row ? (row.faq || []).length : 0, readAt: row ? row.contentAt || (audit && audit.readAt) || null : null,
+      issues: row ? (row.issues || []).map((code) => ({ code, label: html.issueLabel(code), text: (health.RULES[code] || {}).text || '', w: (health.RULES[code] || {}).w || 0 })) : []
     },
     keywords: pageKeywords(site, audit, path).slice(0, 3).map((k) => {
       const s = site.kw && site.kw[k.id];
@@ -894,69 +948,40 @@ async function extContext(a, b) {
 }
 
 async function extSuggest(a, b) {
-  const { site, owner } = a;
+  const { site, owner, token } = a;
   if (!llm.available()) return { error: 'Writing needs an AI provider, which is not connected yet.' };
   if (!(await store.rateOk('suggest:' + owner.id, 20, 3600))) return { status: 429, error: 'That is a lot of suggestions for one hour. Try again later.' };
   const audit = await store.getAudit(site.id);
   const row = extRow(audit, b);
-  const path = row ? row.path : extPath(b);
-  const origin = audit && audit.origin ? audit.origin : String(site.url || '').replace(/\/+$/, '');
-  const r = await fetcher.getText(origin + path, { allowedHosts: siteHosts(site).concat(hostOfUrl(origin)), timeoutMs: 9000 });
-  if (!r.ok) return { error: 'The published page could not be read. Publish it first, then try again.' };
-  const page = Object.assign(auditLib.readPage(r.text), { path });
-  const k = (site.keywords || []).find((x) => x.id === String(b.keywordId || '')) || pageKeywords(site, audit, path)[0] || null;
-  try {
-    if (b.what === 'faq') {
-      const qs = k ? (k.questions || []).concat(((site.kw && site.kw[k.id]) || {}).queries || []).slice(0, 6) : (site.keywords || []).flatMap((x) => x.questions || []).slice(0, 8);
-      const faq = await fixes.suggestFaq(site.project, page, qs);
-      if (!faq.length) return { error: 'The page does not have enough content to answer questions. Add content first.' };
-      return { ok: true, faq };
-    }
-    return { ok: true, meta: await fixes.suggestMeta(site.project, page, k ? k.text : undefined), keyword: k ? k.text : null };
-  } catch (e) { return { error: 'No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT) }; }
+  const pageId = String((row && row.pageId) || b.pageId || '');
+  if (!/^[A-Za-z0-9_-]{2,64}$/.test(pageId)) return { status: 400, error: 'This page cannot be read from here.' };
+  // the page's text comes from Webflow (the Pages API), and the page has to belong to this site
+  let page;
+  try { page = await pageForWriting(token, site, { pageId, path: row ? row.path : extPath(b) }); }
+  catch (e) { return wf.isRevoked(e) ? { status: 401, error: 'Webflow did not accept this session. Close and open the app again.' } : { status: e && e.status === 404 ? 404 : 502, error: e && e.status === 404 ? 'This page is not part of this site.' : 'Webflow could not be read. Try again in a minute.' }; }
+  const k = (site.keywords || []).find((x) => x.id === String(b.keywordId || '')) || pageKeywords(site, audit, page.path)[0] || null;
+  try { return { ok: true, meta: await fixes.suggestMeta(site.project, page, k ? k.text : undefined), keyword: k ? k.text : null, readAt: page.readAt }; }
+  catch (e) { return { error: 'No suggestion this time. ' + alerts.publicText(e, alerts.WRITING_TEXT) }; }
 }
 
-// FAQ schema goes through the Data API (the Designer has no schema call); the title and description are set by the
-// panel itself in the Designer and only reported here.
-async function extFaq(a, b) {
-  const { site, owner, token } = a;
-  if (!owner._limits.canApply) return { status: 402, error: 'Applying to Webflow is part of the paid plans.' };
-  const pairs = (Array.isArray(b.faq) ? b.faq : []).map((x) => ({ q: String((x && x.q) || '').replace(/\s+/g, ' ').trim().slice(0, 200), a: String((x && x.a) || '').replace(/\s+/g, ' ').trim().slice(0, 900) })).filter((x) => x.q && x.a).slice(0, 20);
-  if (pairs.length < 2) return { status: 400, error: 'FAQ schema needs at least two questions and answers.' };
-  const audit = await store.getAudit(site.id);
-  const row = extRow(audit, b);
-  const pageId = String(b.pageId || (row && row.pageId) || '');
-  if (!/^[A-Za-z0-9_-]{2,64}$/.test(pageId)) return { status: 400, error: 'This page cannot take schema from here.' };
-  if (!(row && row.pageId === pageId)) {
-    // a page the audit has not read yet: make sure it belongs to this site
-    try { const p = await wf.call(token, 'GET', '/pages/' + encodeURIComponent(pageId)); if (!p || p.siteId !== site.id) return { status: 403, error: 'This page belongs to another site.' }; }
-    catch (e) { return { status: 403, error: 'This page could not be checked.' }; }
-  }
-  try {
-    let existing = null;
-    try { const s = await wf.getSchema(token, pageId); existing = s && (s.jsonLdSchema || null); } catch (e) { existing = null; }
-    await wf.putSchema(token, pageId, fixes.mergeSchema(existing, [fixes.faqSchema(pairs)]));
-  } catch (e) { return { error: 'Webflow did not accept the change: ' + String(e.message || 'unknown error').slice(0, 160) }; }
-  if (row) {
-    row.schemaTypes = [...new Set((row.schemaTypes || []).concat('FAQPage'))];
-    row.issues = (row.issues || []).filter((x) => x !== 'schema_missing' && x !== 'faq_no_schema');
-    await store.saveAudit(site.id, audit);
-  }
-  await markFixed(site, b.keywordId);
-  return { ok: true };
-}
-
+// The panel sets the title and description itself, in the Designer (page.setTitle, page.setDescription), when the
+// user presses Apply. It then tells the server, which only updates its own row for the page.
 async function extApplied(a, b) {
-  const { site } = a;
+  const { site, token } = a;
   const audit = await store.getAudit(site.id);
   const row = extRow(audit, b);
-  const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 90);
-  const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-  if (row && title) {
-    row.title = title;
-    if (description) row.description = description;
-    row.issues = (row.issues || []).filter((x) => !/^(title|desc)_/.test(x));
-    await store.saveAudit(site.id, audit);
+  if (row && row.pageId) {
+    // not what the panel says it wrote: what the page has in Webflow now
+    try {
+      const meta = await wf.getPage(token, row.pageId);
+      if (meta && meta.id && meta.siteId === site.id) {
+        row.title = String((meta.seo && meta.seo.title) || '').trim();
+        row.description = String((meta.seo && meta.seo.description) || '').trim();
+        Object.assign(row, health.check(row));
+        audit.readAt = Date.now();
+        await store.saveAudit(site.id, audit);
+      }
+    } catch (e) { if (wf.isRevoked(e)) return { status: 401, error: 'Webflow did not accept this session. Close and open the app again.' }; }
   }
   await markFixed(site, b.keywordId);
   return { ok: true };
@@ -978,7 +1003,6 @@ async function handleExt(req, res, path, method) {
     let out;
     if (path === '/ext/context') out = await extContext(a, b);
     else if (path === '/ext/suggest') out = await extSuggest(a, b);
-    else if (path === '/ext/faq') out = await extFaq(a, b);
     else if (path === '/ext/applied') out = await extApplied(a, b);
     else return json(res, 404, { error: 'Unknown request.' });
     return json(res, out.status || 200, out);
@@ -1031,19 +1055,14 @@ async function handleAudit(req, res, user) {
   if (!site) return notFound(res);
   const k = b.back && (site.keywords || []).find((x) => x.id === String(b.back));
   const backTo = (extra) => (k ? kwUrl(site, k, extra) : siteUrl(site, 'tab=audit' + (extra ? '&' + extra : '')));
-  if (!(await store.rateOk('audit:' + site.id, 3, 600))) return redirect(res, backTo(noticeQuery(user, 'The audit ran a moment ago. Try again in a few minutes.')));
-  try { await jobs.runAudit(site, user, 40000); }
-  catch (e) { return redirect(res, backTo(noticeQuery(user, 'The audit could not finish: ' + e.message))); }
-  redirect(res, backTo(k ? noticeQuery(user, 'Your pages are read. The best page for this keyword is shown below.') : ''));
-}
-
-async function handleLlms(req, res, user) {
-  const q = queryOf(req);
-  const site = await ownedSite(user, q.id);
-  if (!site) return notFound(res);
-  const audit = await store.getAudit(site.id);
-  if (!audit) return redirect(res, siteUrl(site, 'tab=audit'));
-  send(res, 200, fixes.llmsTxt(site.project, audit), { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': 'attachment; filename="llms.txt"' });
+  const resume = b.resume === '1';
+  // a full read a few times in ten minutes; the next part of a long site as often as it takes
+  if (!(await store.rateOk((resume ? 'auditmore:' : 'audit:') + site.id, resume ? 40 : 6, 600))) return redirect(res, backTo(noticeQuery(user, 'Your pages were read a moment ago. Try again in a few minutes.')));
+  let audit;
+  try { audit = await jobs.runAudit(site, user, 40000, { resume }); }
+  catch (e) { return webflowFailed(res, user, site, e, backTo(''), 'Your pages could not be read from Webflow: '); }
+  const more = audit.pending ? ` ${audit.pagesChecked} of ${audit.pagesChecked + audit.pending} pages are read so far. Press "Read the rest" to go on.` : '';
+  redirect(res, backTo(noticeQuery(user, (k ? 'Your pages are read from Webflow. The best page for this keyword is shown below.' : 'Your pages are read from Webflow.') + more)));
 }
 
 /* ---------- fixes ---------- */
@@ -1052,7 +1071,7 @@ async function fixContext(user, siteId, path) {
   if (!site) return { error: 'site' };
   const audit = await store.getAudit(site.id);
   const row = audit && (audit.pages || []).find((p) => p.path === String(path || ''));
-  if (!row || !row.pageId) return { site, error: 'page' };
+  if (!row || !row.pageId || row.template) return { site, error: 'page' };
   return { site, audit, row, token: store.tokenForSite(user, site) };
 }
 const draftKey = (path) => 'fix:' + crypto.createHash('sha1').update(String(path)).digest('hex').slice(0, 16);
@@ -1067,35 +1086,45 @@ async function webflowFailed(res, user, site, e, back, lead) {
   return redirect(res, back + '&' + noticeQuery(user, (lead || 'Webflow did not accept the change: ') + e.message));
 }
 
-function proposedSchema(site, row, audit, faqPairs, existing) {
-  const nodes = [];
-  if (row.path === '/') {
-    const p = site.project;
-    const biz = p.business || {};
-    const info = { type: biz.type || 'Organization', name: p.brand || site.name, url: audit.origin + '/', logo: fixes.abs(audit.site.ogImage || audit.site.icon, audit.origin), description: row.description || '', phone: biz.phone, email: biz.email, street: biz.street, city: biz.city, country: biz.country, sameAs: audit.site.socials || [] };
-    nodes.push(fixes.orgSchema(info), fixes.websiteSchema(info));
-  }
-  if (faqPairs && faqPairs.length >= 2) nodes.push(fixes.faqSchema(faqPairs));
-  return fixes.mergeSchema(existing, nodes);
-}
-
 async function handleFixPage(req, res, user) {
   const q = queryOf(req);
   const ctx = await fixContext(user, q.id, q.page);
   if (ctx.error === 'site') return notFound(res);
-  if (ctx.error) return redirect(res, siteUrl(ctx.site, 'tab=audit&' + noticeQuery(user, 'Run the audit first, then open a static page to fix it.')));
+  if (ctx.error) return redirect(res, siteUrl(ctx.site, 'tab=audit&' + noticeQuery(user, 'Read your pages from Webflow first, then open a static page to fix it.')));
   const { site, audit, row, token } = ctx;
   const draft = (await store.getDraft(site.id, draftKey(row.path))) || {};
-  let existing = null;
-  let existingTypes = [];
   let collections = [];
+  let stale = '';
   if (token) {
-    try { const s = await wf.getSchema(token, row.pageId); existing = s && (s.jsonLdSchema || null); } catch (e) { existing = null; }
+    // the "Now" side is what the page has in Webflow at this moment, not what was read some time ago
+    try {
+      const check = await unchangedSince(token, site, row, null);
+      if (check.now.title !== row.title || check.now.description !== row.description) { row.title = check.now.title; row.description = check.now.description; Object.assign(row, health.check(row)); }
+      row.metaAt = Date.now();
+      audit.readAt = Date.now();
+      await store.saveAudit(site.id, audit);
+    } catch (e) {
+      if (wf.isRevoked(e)) return webflowFailed(res, user, site, e, siteUrl(site, 'tab=audit'), 'Webflow could not be read: ');
+      stale = 'Webflow could not be read just now, so these are the values from the last read.';
+    }
     try { collections = (await wf.listCollections(token, site.id)).slice(0, 30); } catch (e) { collections = []; }
   }
-  if (existing) existingTypes = auditLib.readPage('<script type="application/ld+json">' + JSON.stringify(existing) + '</script>').schemaTypes;
-  const faqPairs = draft.faq && draft.faq.length ? draft.faq : (row.faq || []);
-  send(res, 200, html.fixPage(user, site, row, { draft, limits: user._limits, notice: html.esc(noticeFrom(q, user)), existingTypes, collections, proposedSchema: proposedSchema(site, row, audit, faqPairs, existing), side: await sideData(user, audit) }));
+  send(res, 200, html.fixPage(user, site, row, { draft, limits: user._limits, notice: html.esc(noticeFrom(q, user)) || html.esc(stale), collections, readAt: audit.readAt || audit.at, side: await sideData(user, audit) }));
+}
+
+// "Refresh from Webflow" on a page's fix screen: reads its settings and its content again.
+async function handleFixRefresh(req, res, user) {
+  const b = await readBody(req);
+  const ctx = await fixContext(user, b.id, b.path);
+  if (ctx.error === 'site') return notFound(res);
+  if (ctx.error) return redirect(res, '/app');
+  const { site, audit, row, token } = ctx;
+  const back = fixUrl(site, row.path);
+  if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
+  if (!(await store.rateOk('fixread:' + site.id, 30, 600))) return redirect(res, back + '&' + noticeQuery(user, 'This page was read a moment ago. Try again in a few minutes.'));
+  try { await keepRow(site, audit, row, await pageForWriting(token, site, row)); }
+  catch (e) { return webflowFailed(res, user, site, e, back, 'Webflow could not be read: '); }
+  redirect(res, back + '&' + noticeQuery(user, 'Read from Webflow just now.'));
 }
 
 async function handleFixSuggest(req, res, user) {
@@ -1103,13 +1132,15 @@ async function handleFixSuggest(req, res, user) {
   const ctx = await fixContext(user, b.id, b.path);
   if (ctx.error === 'site') return notFound(res);
   if (ctx.error) return redirect(res, '/app');
-  const { site, audit, row } = ctx;
+  const { site, audit, row, token } = ctx;
   const back = fixUrl(site, row.path);
   if (!llm.available()) return redirect(res, back + '&' + noticeQuery(user, 'Suggestions need an AI provider, which is not connected yet.'));
   if (!(await store.rateOk('fixai:' + user.id, 30, 3600))) return redirect(res, back + '&' + noticeQuery(user, 'That is a lot of suggestions for one hour. Try again a bit later.'));
-  const r = await fetcher.getText(audit.origin + row.path, { allowedHosts: siteHosts(site).concat(hostOfUrl(audit.origin)), timeoutMs: 9000 });
-  if (!r.ok) return redirect(res, back + '&' + noticeQuery(user, 'The page could not be read right now (' + (r.error || 'HTTP ' + r.status) + ').'));
-  const page = Object.assign(auditLib.readPage(r.text), { path: row.path });
+  if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
+  // the page's text comes from Webflow, read now
+  let page;
+  try { page = await pageForWriting(token, site, row); await keepRow(site, audit, row, page); }
+  catch (e) { return webflowFailed(res, user, site, e, back, 'Webflow could not be read: '); }
   const key = draftKey(row.path);
   const draft = (await store.getDraft(site.id, key)) || {};
   try {
@@ -1139,14 +1170,26 @@ async function handleFixMeta(req, res, user) {
   const description = String(b.description || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (title.length < 5 || description.length < 20) return redirect(res, back + '&' + noticeQuery(user, 'Write a title of at least 5 characters and a description of at least 20.'));
   if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
-  try { await primaryLocale(token, site); await wf.updatePageSeo(token, row.pageId, { title, description }); }
-  catch (e) { return webflowFailed(res, user, site, e, back); }
-  // reflect the change in the stored audit until the next run
-  row.title = title; row.description = description;
-  row.issues = (row.issues || []).filter((k) => !/^(title|desc)_/.test(k));
-  if (title.length < 20 || title.length > 65) row.issues.push('title_length');
-  if (description.length < 60 || description.length > 165) row.issues.push('desc_length');
-  row.score = auditLib.checkPage({ title, description, h1: row.h1 || ['x'], schemaTypes: row.schemaTypes || [], schemaErrors: 0, faq: row.faq || [], og: { title: row.og && row.og.title, description: row.og && row.og.description, image: row.og && row.og.image }, words: row.words || 0, imagesNoAlt: row.imagesNoAlt || 0, lang: row.lang || 'x' }).score;
+  let saved;
+  try {
+    await primaryLocale(token, site);
+    // the page as it is in Webflow now has to be the one the "Now" side showed
+    const check = await unchangedSince(token, site, row, { title: b.seen_title, description: b.seen_description });
+    if (!check.same) {
+      row.title = check.now.title; row.description = check.now.description;
+      Object.assign(row, health.check(row));
+      row.metaAt = Date.now();
+      audit.readAt = Date.now();
+      await store.saveAudit(site.id, audit);
+      return redirect(res, back + '&' + noticeQuery(user, CHANGED_IN_WEBFLOW));
+    }
+    saved = await wf.updatePageSeo(token, row.pageId, { title, description });
+  } catch (e) { return webflowFailed(res, user, site, e, back); }
+  // the row now holds what Webflow answered to the write
+  Object.assign(row, savedSeo(saved, title, description));
+  Object.assign(row, health.check(row));
+  row.metaAt = Date.now();
+  audit.readAt = Date.now();
   await store.saveAudit(site.id, audit);
   redirect(res, back + '&' + noticeQuery(user, 'Saved to Webflow. Publish your site in Webflow to make it live.'));
 }
@@ -1176,11 +1219,12 @@ async function handleFixFaq(req, res, user) {
   const draft = (await store.getDraft(site.id, key)) || {};
   draft.faq = pairs;
   await store.saveDraft(site.id, key, draft);
-  if (b.action !== 'cms') return redirect(res, back + '&' + noticeQuery(user, pairs.length ? `${pairs.length} questions saved. The schema below now includes them.` : 'No questions found. Use lines starting with Q: and A:.'));
+  if (b.action !== 'cms') return redirect(res, back + '&' + noticeQuery(user, pairs.length ? `${pairs.length} questions saved. Add them to your CMS as drafts, or copy them into the page in Webflow.` : 'No questions found. Use lines starting with Q: and A:.'));
   if (!user._limits.canApply) return redirect(res, back + '&' + noticeQuery(user, 'Adding CMS items is part of the paid plans.'));
   if (!pairs.length) return redirect(res, back + '&' + noticeQuery(user, 'Write at least one question and answer first.'));
+  if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
   try {
-    const loc = await primaryLocale(token, site);
+    await primaryLocale(token, site);
     const cols = await wf.listCollections(token, site.id);
     const col = cols.find((c) => c.id === String(b.collection || ''));
     if (!col) return redirect(res, back + '&' + noticeQuery(user, 'Pick one of this site\'s CMS collections.'));
@@ -1198,30 +1242,6 @@ async function handleFixFaq(req, res, user) {
     }
     redirect(res, back + '&' + noticeQuery(user, `Added ${made} draft item${made === 1 ? '' : 's'} to ${col.displayName}. Review and publish them in Webflow.`));
   } catch (e) { return webflowFailed(res, user, site, e, back); }
-}
-
-async function handleFixSchema(req, res, user) {
-  const b = await readBody(req);
-  const ctx = await fixContext(user, b.id, b.path);
-  if (ctx.error === 'site') return notFound(res);
-  if (ctx.error) return redirect(res, '/app');
-  const { site, audit, row, token } = ctx;
-  const back = fixUrl(site, row.path);
-  if (!user._limits.canApply) return redirect(res, back + '&' + noticeQuery(user, 'Applying to Webflow is part of the paid plans. Copy the code into the page settings in Webflow instead.'));
-  const raw = String(b.schema || '');
-  if (raw.length > 60000) return redirect(res, back + '&' + noticeQuery(user, 'The structured data is too long (Webflow takes up to 60 KB).'));
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch (e) { return redirect(res, back + '&' + noticeQuery(user, 'That is not valid JSON: ' + e.message)); }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return redirect(res, back + '&' + noticeQuery(user, 'The structured data must be one JSON object.'));
-  if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
-  try { await wf.putSchema(token, row.pageId, parsed); }
-  catch (e) { return webflowFailed(res, user, site, e, back); }
-  const types = auditLib.readPage('<script type="application/ld+json">' + JSON.stringify(parsed) + '</script>').schemaTypes;
-  row.schemaTypes = types;
-  row.issues = (row.issues || []).filter((k) => !(k === 'schema_missing' || k === 'schema_invalid' || (k === 'faq_no_schema' && types.includes('FAQPage'))));
-  if (row.path === '/' && types.some((t) => fixes.ORG_TYPES.includes(t))) { audit.site.orgSchema = true; audit.siteIssues = (audit.siteIssues || []).filter((x) => x.code !== 'org_schema_missing'); }
-  await store.saveAudit(site.id, audit);
-  redirect(res, back + '&' + noticeQuery(user, 'Structured data saved to Webflow. Publish your site in Webflow to make it live.'));
 }
 
 /* ---------- site management ---------- */
@@ -1447,12 +1467,11 @@ module.exports = async function handler(req, res) {
       if (r === 'POST /app/site/audit') return await handleAudit(req, res, user);
       if (r === 'POST /app/site/report') return await handleReportLink(req, res, user);
       if (r === 'POST /app/site/remove') return await handleSiteRemove(req, res, user);
-      if (r === 'GET /app/llms') return await handleLlms(req, res, user);
       if (r === 'GET /app/fix') return await handleFixPage(req, res, user);
       if (r === 'POST /app/fix/suggest') return await handleFixSuggest(req, res, user);
       if (r === 'POST /app/fix/meta') return await handleFixMeta(req, res, user);
       if (r === 'POST /app/fix/faq') return await handleFixFaq(req, res, user);
-      if (r === 'POST /app/fix/schema') return await handleFixSchema(req, res, user);
+      if (r === 'POST /app/fix/refresh') return await handleFixRefresh(req, res, user);
       if (r === 'GET /app/settings') return await handleSettingsPage(req, res, user);
       if (r === 'POST /app/settings') return await handleSettingsSave(req, res, user);
       if (r === 'GET /app/start') return await handleStart(req, res, user);

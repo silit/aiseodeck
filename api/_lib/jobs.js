@@ -1,11 +1,12 @@
 'use strict';
 // Background work, driven by one cron address (every few minutes) and by the dashboard while a run is open:
-// start runs that are due, ask the engines, finish runs (summary, history, email), refresh old audits.
+// start runs that are due, ask the engines, finish runs (summary, history, email). Nothing here reads or writes a
+// Webflow site: Site health is read from Webflow only when the user asks for it (runAudit).
 const store = require('./store');
 const engines = require('./engines');
 const alerts = require('./alerts');
 const analyze = require('./analyze');
-const auditLib = require('./audit');
+const health = require('./health');
 const wf = require('./webflow');
 const email = require('./email');
 const { limitsFor, DAY } = require('./plans');
@@ -274,20 +275,23 @@ async function sendDigest(user, site, summary, prev) {
   await email.send({ to, subject: `AI visibility for ${site.project.brand || site.name}: ${summary.score}% of answers`, html: digestHtml(site, summary, prev), text: `AI visibility for ${site.project.brand || site.name}: named in ${summary.score}% of AI answers for ${summary.keywords || 0} keywords, cited in ${pct(summary.citationRate)}. ${appUrl()}/app/site?id=${site.id}` });
 }
 
-/* ---------- audits ---------- */
-async function runAudit(site, user, budgetMs) {
-  if (!site.url) throw new Error('This site has no published address yet. Publish it in Webflow first.');
+/* ---------- site health ---------- */
+// Reads the site's pages from Webflow (the page list, then the content of each static page) and keeps what to fix.
+// It runs only when the user presses the button. A site with more pages than fit in `budgetMs` is read in parts:
+// opts.resume continues the read that is not complete yet instead of starting again.
+async function runAudit(site, user, budgetMs, opts) {
   const limits = limitsFor(user);
   const token = store.tokenForSite(user, site);
-  let pages = [];
-  if (token) { try { pages = await wf.listPages(token, site.id, 500); } catch (e) { if (wf.isRevoked(e)) throw e; pages = []; } }
-  // the site's languages (Webflow Localization), for the notes next to every Apply button
-  let locale;
-  if (token) { try { locale = store.localeOf(await wf.getSite(token, site.id)); } catch (e) { if (wf.isRevoked(e)) throw e; } }
-  const audit = await auditLib.auditSite(site, pages, { maxPages: limits.auditPages, budgetMs: budgetMs || 35000 });
+  if (!token) throw new Error('The Webflow connection for this site is missing. Connect again.');
+  const meta = await wf.getSite(token, site.id);
+  const pages = await wf.listPages(token, site.id, 500);
+  const before = opts && opts.resume ? await store.getAudit(site.id) : null;
+  const resume = before && before.source === 'webflow-data-api' && !before.complete && Date.now() - (before.readAt || 0) < 6 * 3600000 ? before : null;
+  const fresh = Object.assign({}, site, meta && meta.id ? { url: store.primaryUrl(meta) || site.url, locale: store.localeOf(meta) } : {});
+  const audit = await health.auditSite(token, fresh, pages, { maxPages: limits.auditPages, budgetMs: budgetMs || 35000, resume });
   await store.saveAudit(site.id, audit);
-  const issues = audit.pages.reduce((a, p) => a + (p.issues || []).length, 0) + audit.siteIssues.length;
-  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, score: audit.score, issues, pages: audit.pagesChecked }; if (locale !== undefined) s.locale = locale; });
+  const issues = audit.pages.reduce((a, p) => a + (p.issues || []).length, 0);
+  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, readAt: audit.readAt, score: audit.score, issues, pages: audit.pagesChecked, complete: audit.complete }; if (meta && meta.id) store.refreshMeta(s, meta); });
   return audit;
 }
 
@@ -299,7 +303,7 @@ async function tick(opts) {
   const now = opts.now || startedAt;
   const deadline = startedAt + (opts.budgetMs || 45000);
   if (!(await store.lock('tick', 58))) return { skipped: 'another tick is running' };
-  const out = { started: 0, worked: 0, finished: 0, audits: 0 };
+  const out = { started: 0, worked: 0, finished: 0 };
   try {
     out.started = await scheduleDue(now, 20);
     let ids = await store.activeRunIds();
@@ -315,15 +319,6 @@ async function tick(opts) {
       out.worked += (r.ok || 0) + (r.failed || 0);
     }
     for (const id of await store.activeRunIds()) if (await maybeFinish(id, Date.now())) out.finished++;
-    // one audit older than a week, when there is time left
-    if (Date.now() < deadline - 25000) {
-      const sites = await store.getSites(await store.allSiteIds());
-      const due = sites.filter((s) => s.tracked && (!s.audit || now - s.audit.at > 7 * DAY)).sort((a, b) => ((a.audit && a.audit.at) || 0) - ((b.audit && b.audit.at) || 0))[0];
-      if (due) {
-        const user = await store.getUser(due.userId);
-        if (user) { try { await runAudit(due, user, Math.min(30000, deadline - Date.now() - 3000)); out.audits++; } catch (e) { console.error('[aiseodeck] audit failed', e.message); } }
-      }
-    }
   } finally {
     await store.unlock('tick');
   }
