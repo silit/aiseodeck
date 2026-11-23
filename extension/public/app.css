@@ -102,7 +102,7 @@ a {
   color: var(--blue);
 }
 :focus-visible {
-  outline: 2px solid var(--blue-line);
+  outline: 2px solid var(--blue);
   outline-offset: 1px;
   border-radius: 4px;
 }
@@ -448,9 +448,9 @@ textarea {
 }
 input[type='text']:focus,
 textarea:focus {
-  outline: 1px solid var(--blue-line);
+  outline: 1px solid var(--blue);
   outline-offset: 0;
-  border-color: var(--blue-line);
+  border-color: var(--blue);
 }
 /* how the values can show in a search result: always dark text on white, whatever the theme */
 .serp {

@@ -438,7 +438,27 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
       "text is Webflow's two sizes and two weights in Inter, and every corner is 4px (sizes: " + sizes.join(' | ') + '; corners: ' + radii.join(' | ') + ')');
 
     const states = [];
-    const audit = async (label) => { const low = await lowContrast(); states.push(label + (low.length ? ': ' + low.slice(0, 6).join('; ') : '')); return low.length; };
+    // The ring of the control the Tab key reaches, against what is behind it: at least 2px and 3 to 1. A field
+    // shows its focus with its border and a 1px ring of the same color, measured the same way.
+    const weakRing = () => page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return null; // past the last control of the panel
+      const parse = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+      const over = (top, under) => { const a = top[3]; return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)).concat([1]); };
+      const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+      const behind = (from) => { const layers = []; for (let e = from; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c[3] > 0) { layers.push(c); if (c[3] === 1) break; } } let out = [255, 255, 255, 1]; for (let i = layers.length - 1; i >= 0; i--) out = over(layers[i], out); return out; };
+      const cs = getComputedStyle(el);
+      const bg = behind(el.parentElement);
+      const ring = over(parse(cs.outlineColor), bg);
+      const x = lum(ring), y = lum(bg);
+      const r = (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+      const field = el.matches('input, textarea');
+      const wide = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= (field ? 1 : 2);
+      return wide && r >= 3 ? '' : el.tagName.toLowerCase() + ' "' + (el.textContent || el.id).trim().slice(0, 20) + '" ring ' + (cs.outlineStyle === 'none' ? 'none' : cs.outlineWidth) + ' at ' + r.toFixed(2);
+    });
+    let ringsMeasured = 0;
+    const tabThrough = async (label, n) => { let bad = 0; for (let i = 0; i < n; i++) { await page.keyboard.press('Tab'); const w = await weakRing(); if (w === null) continue; ringsMeasured++; if (w) { bad++; states.push(label + ' focus: ' + w); } } return bad; };
+    const audit = async (label) => { const low = await lowContrast(); states.push(label + (low.length ? ': ' + low.slice(0, 6).join('; ') : '')); return low.length + (await tabThrough(label, 4)); };
     const rounds = async (theme) => {
       let bad = 0;
       await switchTo('p1'); bad += await audit(theme + ' page');
@@ -468,7 +488,7 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
     assert(light.bg === 'rgb(255, 255, 255)' && light.ink === 'rgb(0, 0, 0)' && light.button === 'rgb(232, 232, 232)', "when the Designer provides its tokens the panel follows them: Webflow's light theme (" + JSON.stringify(light) + ')');
     const lightBad = await rounds('light');
     await setTheme(null);
-    assert(darkBad === 0 && lightBad === 0, 'text has a contrast of at least 4.5 to 1 and icons at least 3 to 1 in both themes (' + states.filter((x) => x.includes(':')).join(' || ') + ')');
+    assert(darkBad === 0 && lightBad === 0 && ringsMeasured >= 24, 'text has a contrast of at least 4.5 to 1, icons at least 3 to 1, and the focus ring of the controls the Tab key reaches at least 3 to 1, in both themes (' + ringsMeasured + ' rings measured' + states.filter((x) => x.includes(':')).map((x) => ' || ' + x).join('') + ')');
     const added = await page.evaluate(() => Object.getOwnPropertyNames(window).filter((k) => !window.__before.includes(k) && !/^__|^webflow$/.test(k)));
     assert(added.length === 0, 'the script of the panel leaves nothing on the window: no global variable (found: ' + added.join(', ') + ')');
     await switchTo('p1');
