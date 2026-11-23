@@ -1,36 +1,93 @@
-# Marketplace listing: the text to enter
+# Marketplace submission: what goes into each field of the form
 
-Every statement here was checked against the build on `marketplace-rework`. Change the listing only together with the app. Limits: app name 30 characters, publisher name 20, short description 100, long description 10,000 (Markdown, no links), 5 features, 5 categories.
+The form is at developers.webflow.com/submit (sign in to Webflow first). The fields below are in the order the form had on 16 November 2026; Webflow changed the form since, so read every field of the live form and tell Claude about any that is not here. Text fields are saved by the form as you type; files are not.
 
-## Fields
+Every statement here was checked against the build on `marketplace-rework`. Change this file only together with the app. Limits: app name 30 characters, short description 100, long description 10,000 (Markdown, no links), 5 features.
+
+Fields marked `[to fill]` wait for the last steps: the end-to-end run, the final bundle, Preflight, the video and the screenshots.
+
+## App info
 
 | Field | Value |
 | --- | --- |
+| App Review Preflight receipt | `[to fill: wfpre_... from the run on the final bundle.zip and review.zip]` |
+| Submission type | New App. The app was never approved, so this is not an App Update. If the form offers a choice for a resubmission after a review, take that one. |
 | App name | AI SEO Deck |
-| Publisher name | Silit Labs |
-| Short description | See if ChatGPT, Gemini, Claude, Grok and Google AI name your brand, keyword by keyword. |
-| Categories | SEO, AI, Marketing, Analytics |
+| App Client ID | Copy it in Webflow: Silit Labs Workspace, Apps & Integrations, Develop, the menu on the AI SEO Deck row, Edit App, Building blocks, Data Client, Client ID, Copy. Close the window with Cancel. |
+| App capabilities | Hybrid |
+| Install URL | `https://aiseodeck.silitlabs.com/auth` |
+| Scopes | Authorized user: read. Sites: read. Pages: read and write. CMS: read and write. Nothing else. |
+| App icon image | `assets/marketplace/ai-seo-deck-logo.png` (900 x 900) |
+| App icon image alt text | AI SEO Deck logo |
+| Payment type | Free and Paid (tick both) |
+| Marketplace visibility | Public |
+
+The Install URL is the address above and never a `webflow.com/oauth/authorize...` address. The same address has to be in the app's settings in Webflow (App installation URL) before the form is sent. The first submission had the authorize address here; that is one of the things a review now refuses.
+
+### Why each scope is asked for (for the scope fields of the form)
+
+- **Authorized user, read:** to make the account from the Webflow user (id, name, email) with `GET /v2/token/authorized_by`, to learn whether a stored token still works, and to resolve the ID token of the Designer panel with `POST /beta/token/resolve`.
+- **Sites, read:** the names, addresses (custom domains and the webflow.io address) and languages of the authorized sites, with `GET /v2/sites` and `GET /v2/sites/{site_id}`. Setup asks for no website address because of this.
+- **Pages, read:** Site health and the suggestions. `GET /v2/sites/{site_id}/pages` and `GET /v2/pages/{page_id}` give each page's SEO and Open Graph settings; `GET /v2/pages/{page_id}/dom` gives the text, headings and images of a static page. The app requests no published website.
+- **Pages, write:** only when the user presses Apply for one page: `PUT /v2/pages/{page_id}` with the SEO title and meta description. The change arrives unpublished.
+- **CMS, read:** `GET /v2/sites/{site_id}/collections` and `GET /v2/collections/{collection_id}`, so the user can choose the collection and the app can find its text field.
+- **CMS, write:** only when the user presses Apply or Add the draft to Webflow: `POST /v2/collections/{collection_id}/items` with `isDraft: true`. Draft items only, never published.
+
+## Creator info
+
+| Field | Value |
+| --- | --- |
+| Creator name | Silit Labs |
+| Webflow account email | The email you sign in to Webflow with |
+| Contact email | info@silitlabs.com |
+
+## App details
+
+| Field | Value |
+| --- | --- |
+| App category | AI and SEO (the form took two). If it takes more: Marketing, Analytics. |
+| App preview description (short) | See if ChatGPT, Gemini, Claude, Grok and Google AI name your brand, keyword by keyword. |
+| App detail description | The text under "Long description" below, between the two rules. |
+| App promo video URL | Leave empty (optional). |
+| App screenshots | `[to fill: five pictures of this build at 1280 x 846, each with its alt text]` |
+| Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. `[to fill: SHA-256 of both files]` |
 | Website URL | https://aiseodeck.silitlabs.com |
-| Install URL | https://aiseodeck.silitlabs.com/auth |
+| Additional notes | The text of `REVIEW.md`, from "The app" to the end, with its `[to fill]` fields filled. |
+| App access credentials | No credentials are needed. Reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For another email, write to info@silitlabs.com and we turn it on the same day. |
+| Published testing site | https://aiseodeck-demo.webflow.io `[to confirm after the end-to-end run: this build is installed on it]` |
+
+### Features overview (five lines)
+
+1. Six AI engines checked for every keyword, with live web search
+2. Who AI names instead of you: rivals, cited sites and its searches
+3. Site health for your pages, read through the Webflow API
+4. Titles, descriptions and CMS drafts you approve, applied unpublished
+5. A panel in the Designer for the page you are editing
+
+## Support info
+
+| Field | Value |
+| --- | --- |
+| Review team demo video URL | `[to fill: the new recording, 2 to 5 minutes, with the install approved and denied]` |
+| Documentation URL | https://aiseodeck.silitlabs.com/docs |
 | Privacy policy URL | https://aiseodeck.silitlabs.com/privacy |
-| Terms of service URL | https://aiseodeck.silitlabs.com/terms |
+| How can users reach support? | By email at info@silitlabs.com, answered within one business day. The address is on the website and in the AI SEO Deck guide. |
 | Support email | info@silitlabs.com |
+| Terms and conditions URL | https://aiseodeck.silitlabs.com/terms |
 
-## Features (five)
+## Acknowledgements
 
-The form takes up to five. Each is given as a short name; the sentence after it is for a description field, if the form has one.
-
-1. **Six AI engines, keyword by keyword.** See whether ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude and Grok name and cite you for each keyword.
-2. **The rivals named instead of you.** See which rivals the AI recommends, which websites it cites and which searches it ran.
-3. **Site health from your Webflow pages.** Titles, descriptions, Open Graph values, headings, text and image alt text, read through the Webflow API when you ask.
-4. **Fixes you approve.** Titles, descriptions and CMS drafts written by AI from your own pages, sent to Webflow only when you press Apply, never published for you.
-5. **A panel in the Designer.** The keyword, the engines and the fixes for the page you are working on.
+Tick the box yourself, check "Review your submission", then submit. Claude does not submit.
 
 ## Long description
 
+Copy everything between the two rules below into "App detail description". Section titles are bold lines and there are no links, because the field takes Markdown without links.
+
+---
+
 AI SEO Deck shows whether AI assistants name and cite your brand when people ask about what you sell. You choose the keywords. It asks ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude and Grok, and tells you keyword by keyword where you are named, where a rival is named instead, and what to improve on your Webflow pages.
 
-## What it does
+**What it does**
 
 **Checks every keyword on six AI engines.** Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, Claude and Grok, and as the search itself on Google AI Overviews and AI Mode. For each engine you see whether it names you, you can read every answer, and you follow your score from one check to the next.
 
@@ -44,7 +101,7 @@ AI SEO Deck shows whether AI assistants name and cite your brand when people ask
 
 **Sends a report after every scheduled check.** You get an email with your visibility and your keywords, and you can turn it off. You can also create a read-only report link for a client; on the Studio and Agency plans it shows your agency name.
 
-## What you need before you start
+**What you need before you start**
 
 - A Webflow site and the right to authorize apps for it. No particular Webflow Workspace plan or site plan is needed.
 - For CMS drafts: a site with the Webflow CMS and a collection that has a Rich text or Plain text field. Everything else works without the CMS.
@@ -52,21 +109,21 @@ AI SEO Deck shows whether AI assistants name and cite your brand when people ask
 - Nothing is installed on your site. AI SEO Deck adds no script, code or element to your pages.
 - No other account. Your AI SEO Deck account is made when you authorize the app, with the email of your Webflow account.
 
-## What setup asks for
+**What setup asks for**
 
 Your brand name as people say it, other names it goes by (optional), the country your customers are in, the language of your keywords, up to five rivals by name (optional), and the keywords to track. You can type keywords or ask for suggestions written from your home page. Setup does not ask for a website address: the addresses of your site come from Webflow. The first check starts when you save.
 
-## How people use it
+**How people use it**
 
 - A company that sells a bookkeeping app tracks "bookkeeping app for freelancers" and sees that two engines name a rival. Site health matches the keyword to its Freelancers page. The owner applies a clearer title and description, publishes in Webflow, and checks the keyword again the next week.
 - An agency tracks 30 keywords across five client sites and shares a report link with each client after the weekly check.
 - A designer opens the panel in the Designer on a service page, sees that the page has no meta description, writes one with AI and sets it on the page before publishing.
 
-## Languages
+**Languages**
 
 On a site with Webflow Localization, AI SEO Deck reads and writes the primary language only. The other languages keep their own text.
 
-## Prices
+**Prices**
 
 All prices are in US dollars (USD). Taxes may be added at checkout.
 
@@ -79,13 +136,15 @@ Every paid plan starts with a 7-day free trial, once per customer across the pro
 
 When a paid plan or a trial ends, your account moves to the free plan. Nothing is deleted in AI SEO Deck or in Webflow; Apply is off, and the keywords and sites over the free plan's limits are kept but not checked.
 
-## Removing the app
+**Removing the app**
 
 Disconnecting a site in AI SEO Deck deletes what it keeps about that site and changes nothing in Webflow. To remove the app's access, uninstall it in Webflow: AI SEO Deck then deletes the sites of that authorization and everything kept about them. Titles, descriptions and CMS drafts you applied stay in Webflow, because they are your content.
 
-## Documentation and support
+**Documentation and support**
 
 The AI SEO Deck guide covers setup, every screen, the panel in the Designer, what is written to Webflow and when, prices, and how to disconnect or uninstall. It is under Guide on aiseodeck.silitlabs.com, at aiseodeck.silitlabs.com/docs. Support: info@silitlabs.com, answered within one business day.
+
+---
 
 ## Before this text is entered
 
