@@ -116,6 +116,7 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
   await context.route('https://other.webflow-ext.com/**', servePanel);
   const calls = [];
   const others = [];
+  let tamper = null; // a test may change what the app answered before the panel gets it
   await context.route(APP + '/**', async (route) => {
     const req = route.request();
     const u = new URL(req.url());
@@ -123,6 +124,7 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
     try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (e) { body = req.postData(); }
     const res = await route.fetch({ url: 'http://127.0.0.1:' + appPort + u.pathname + u.search });
     calls.push({ method: req.method(), path: u.pathname, origin: req.headers().origin || '', body, status: res.status() });
+    if (tamper && u.pathname === '/ext/context') { const j = await res.json(); tamper(j); return route.fulfill({ response: res, json: j }); }
     await route.fulfill({ response: res });
   });
   // anything else the panel asks for is a finding of its own
@@ -282,6 +284,21 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
   await page.waitForFunction(() => /Connect this site/.test(document.body.textContent));
   await shot('10-connect');
   assert((await page.locator('a.btn.mark').getAttribute('href')) === APP + '/app?available=1' && (await text('.card h2')) === 'Connect this site to AI SEO Deck' && (await page.locator('.card button', { hasText: 'Try again' }).count()) === 1, 'a site the app cannot confirm gets a link to the Sites page, where it can be connected, and a way to try again');
+  {
+    // whatever address an answer carries, a link of the panel only ever leads to the app
+    const hrefs = [];
+    for (const bad of ['javascript:void(document.title=1)', 'https://evil.example/app?available=1', 'https://aiseodeck.silitlabs.com.evil.example/app', '//evil.example/x', 'data:text/html,x']) {
+      tamper = (j) => { j.connectUrl = bad; };
+      // Try again clears the card at once and draws it again when the app has answered
+      await page.locator('.card button', { hasText: 'Try again' }).click();
+      await page.waitForSelector('a.btn.mark');
+      hrefs.push(await page.locator('a.btn.mark').getAttribute('href'));
+    }
+    tamper = null;
+    assert(hrefs.length === 5 && hrefs.every((x) => x === APP + '/app'), 'a link of the panel can only lead to the app itself: any other address in an answer is replaced (got: ' + [...new Set(hrefs)].join(', ') + ')');
+    await page.locator('.card button', { hasText: 'Try again' }).click();
+    await page.waitForFunction((want) => { const a = document.querySelector('a.btn.mark'); return a && a.getAttribute('href') === want; }, APP + '/app?available=1');
+  }
   await wf(() => { window.__wf.siteId = 'siteA'; window.__wf.noPage = true; window.__wf.sub.cb(); });
   await page.waitForFunction(() => document.querySelector('.msg.err'));
   assert(/Switch to a page|Open a page/.test(await text('.msg.err')), 'with no page open the panel asks to open one');

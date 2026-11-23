@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI SEO Deck docs: how it works</title><meta name="description" content="How AI SEO Deck checks your keywords on six AI engines, what each screen shows, how fixes reach Webflow, and how plans and the free trial work."><link rel="canonical" href="https://aiseodeck.silitlabs.com/docs"><meta property="og:type" content="website"><meta property="og:title" content="AI SEO Deck docs: how it works"><meta property="og:description" content="How AI SEO Deck checks your keywords on six AI engines, what each screen shows, how fixes reach Webflow, and how plans and the free trial work."><meta property="og:url" content="https://aiseodeck.silitlabs.com/docs"><meta property="og:image" content="https://aiseodeck.silitlabs.com/og.png"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","name":"AI SEO Deck docs: how it works","description":"How AI SEO Deck checks your keywords on six AI engines, what each screen shows, how fixes reach Webflow, and how plans and the free trial work.","url":"https://aiseodeck.silitlabs.com/docs","isPartOf":{"@type":"WebSite","name":"AI SEO Deck","url":"https://aiseodeck.silitlabs.com/"},"publisher":{"@type":"Organization","name":"Silit Labs","url":"https://silitlabs.com"},"headline":"AI SEO Deck docs: how it works"}</script><link rel="icon" href="/favicon.png">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI SEO Deck guide: setup, use and removal on Webflow</title><meta name="description" content="The AI SEO Deck guide: what you need in Webflow, how keywords are checked on six AI engines, Site health, the Designer panel, what is written to Webflow, prices and how to uninstall."><link rel="canonical" href="https://aiseodeck.silitlabs.com/docs"><meta property="og:type" content="website"><meta property="og:title" content="AI SEO Deck guide: setup, use and removal on Webflow"><meta property="og:description" content="The AI SEO Deck guide: what you need in Webflow, how keywords are checked on six AI engines, Site health, the Designer panel, what is written to Webflow, prices and how to uninstall."><meta property="og:url" content="https://aiseodeck.silitlabs.com/docs"><meta property="og:image" content="https://aiseodeck.silitlabs.com/og.png"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","name":"AI SEO Deck guide: setup, use and removal on Webflow","description":"The AI SEO Deck guide: what you need in Webflow, how keywords are checked on six AI engines, Site health, the Designer panel, what is written to Webflow, prices and how to uninstall.","url":"https://aiseodeck.silitlabs.com/docs","isPartOf":{"@type":"WebSite","name":"AI SEO Deck","url":"https://aiseodeck.silitlabs.com/"},"publisher":{"@type":"Organization","name":"Silit Labs","url":"https://silitlabs.com"},"headline":"AI SEO Deck guide: setup, use and removal on Webflow"}</script><link rel="icon" href="/favicon.png">
 <meta name="theme-color" content="#222B5E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap"><style>
 :root{--bg:#222B5E;--panel:#2C3673;--line:#4A5699;--line2:#36417F;--ink:#F2F4FF;--muted:#C0C5EA;--faint:#9CA3D3;--mark:#FFE45C;--cite:#8DB4FF;color-scheme:dark}
@@ -19,80 +19,168 @@ code{font-family:"Martian Mono","Martian Mono Variable",ui-monospace,Menlo,monos
 .tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:15px}td,th{border-top:1px solid var(--line2);padding:10px 8px;text-align:left;vertical-align:top}th{color:var(--faint);font-size:13px;font-weight:600}
 mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 </style></head><body><main>
-<nav><a href="/">AI SEO Deck</a><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
-<h1>How AI SEO Deck works</h1>
-<p class="muted">AI SEO Deck checks, keyword by keyword, whether AI assistants name and cite your brand, and helps you fix your Webflow site so they do it more often.</p>
+<nav><a href="/">AI SEO Deck</a><a href="/docs">Guide</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+<h1>AI SEO Deck guide</h1>
+<p class="muted">Setup, use and removal on Webflow. AI SEO Deck checks, keyword by keyword, whether AI assistants name and cite your brand, and helps you improve the pages of your Webflow site so they do it more often. This guide covers the whole app: the web app at aiseodeck.silitlabs.com and the panel inside the Webflow Designer.</p>
 
-<h2>1. Connect Webflow</h2>
-<p>Press <b>Connect Webflow</b> and choose the sites or workspace to share. AI SEO Deck asks for these permissions:</p>
-<div class="tw"><table><tr><th>Permission</th><th>Why</th></tr>
-<tr><td><code>authorized_user:read</code></td><td>Your name and email, to create your account and send reports.</td></tr>
-<tr><td><code>sites:read</code></td><td>Site names and domains, so we know which website belongs to your brand.</td></tr>
-<tr><td><code>pages:read</code></td><td>Page titles, descriptions and existing structured data, to match keywords to pages and for the audit.</td></tr>
-<tr><td><code>pages:write</code></td><td>Only when you press <b>Apply</b>: saves a new title and description, or JSON-LD structured data, to that page.</td></tr>
-<tr><td><code>cms:read</code></td><td>Lists your CMS collections, so you can pick where drafts go.</td></tr>
-<tr><td><code>cms:write</code></td><td>Only when you press <b>Apply</b> or <b>Add the draft to Webflow</b>: creates draft items. Drafts are never published by us.</td></tr></table></div>
-<p>Nothing is ever published for you. Every change arrives in Webflow as an unpublished edit or a CMS draft; you publish when you are ready.</p>
-<p>On sites with several languages (Webflow Localization), fixes are written to the primary language only. The other languages keep their own text, and the app says so next to every Apply button.</p>
+<h2 id="requirements">What you need before you start</h2>
+<ul>
+<li><b>A Webflow site, and the right to authorize apps for it.</b> You authorize AI SEO Deck for single sites or for a whole Workspace on Webflow's own screen.</li>
+<li><b>No particular Webflow plan.</b> AI SEO Deck works through the Webflow API, which is open to every site, so no Workspace plan or site plan is required and a site without a paid site plan works too. Two features depend on what the site has: drafts in the CMS need a site with the Webflow CMS and a collection that has a Rich text or Plain text field, and the panel in the Designer needs access to the Designer of the site.</li>
+<li><b>Nothing to install on your site.</b> AI SEO Deck adds no script, no code and no element to your pages.</li>
+<li><b>No other account.</b> Your AI SEO Deck account is made from the Webflow authorization, with the email of your Webflow account. A card is asked only for a paid plan, by Polar, our payment provider.</li>
+</ul>
+<p>Setup asks for: your brand name as people say it, other names it goes by (optional), the country your customers are in, the language of your keywords, up to five rivals by name (optional) and the keywords to track. It does not ask for a website address: the addresses of your site come from Webflow.</p>
 
-<h2>2. Set up your brand and keywords</h2>
-<p>Enter your brand name as people say it, other names, your domains, your market and up to five rivals. Then pick the keywords to track. We suggest ideas written from your homepage, and the keywords where Google's AI Overviews already cite your site, each with its monthly searches.</p>
+<h2 id="install">1. Install and authorize</h2>
+<p>Install AI SEO Deck from the Webflow Marketplace, or press <b>Connect Webflow</b> on aiseodeck.silitlabs.com. Both open Webflow's authorization screen, where you choose the sites or the Workspace to authorize. If you approve, your account is made and you land on the setup of your site, or on your Sites page when you authorized several. If you cancel, AI SEO Deck gets no access and stores nothing.</p>
+<p>AI SEO Deck asks for these permissions and uses each one only as described:</p>
+<div class="tw"><table><tr><th>Permission</th><th>What it is used for</th></tr>
+<tr><td><code>authorized_user:read</code></td><td>Your Webflow user id, name and email, to make your account and send your reports. Also needed to confirm who opens the panel in the Designer.</td></tr>
+<tr><td><code>sites:read</code></td><td>The names, addresses (custom domains and the webflow.io address) and languages of the sites you authorized.</td></tr>
+<tr><td><code>pages:read</code></td><td>The page list with each page's SEO and Open Graph settings, and the text, headings and images of static pages, for Site health and for writing suggestions from your own pages.</td></tr>
+<tr><td><code>pages:write</code></td><td>Only when you press <b>Apply</b>: saves a new SEO title and meta description to that one page.</td></tr>
+<tr><td><code>cms:read</code></td><td>Lists your CMS collections and their fields, so you can choose where drafts go.</td></tr>
+<tr><td><code>cms:write</code></td><td>Only when you press <b>Apply</b> or <b>Add the draft to Webflow</b>: creates draft items in the collection you chose.</td></tr></table></div>
+<p>AI SEO Deck never publishes your site. Every change arrives in Webflow as an unpublished change or a CMS draft, and you publish in Webflow when you are ready.</p>
 
-<h2>3. How a keyword is checked</h2>
+<h2 id="setup">2. Set up a site</h2>
+<ol>
+<li><b>Your brand.</b> The name we look for in AI answers, other names, your market and the language of your keywords. The page shows the addresses of your site as read from Webflow, with the time they were read and a <b>Refresh from Webflow</b> button. An answer that links to one of these addresses counts as a citation.</li>
+<li><b>Your rivals.</b> Up to five businesses you compete with, by name. We show where AI names them instead of you.</li>
+<li><b>Your keywords.</b> Type your own, or press <b>Suggest keywords from my site</b>. That button reads your home page through Webflow and sends its title, description and text to our AI provider for ideas; it also lists the keywords where Google's AI Overviews already cite your site. Monthly searches are Google data from DataForSEO.</li>
+</ol>
+<p>Saving the setup starts the first check. You can change everything later in the site's Settings.</p>
+
+<h2 id="checks">3. How a keyword is checked</h2>
 <p>People ask AI assistants long questions, while the assistants search the web with short keywords before they answer. So every keyword is checked both ways:</p>
 <ul>
 <li><b>ChatGPT, Gemini, Claude and Grok</b> get two questions a customer would ask about the keyword, written in your language, through their official APIs with live web search on. You can read and edit the questions on the keyword's page.</li>
 <li><b>Google AI Overviews and AI Mode</b> get the keyword itself, from live Google results for your country and language.</li>
 </ul>
-<p>On paid plans that is 10 AI answers per keyword, every week. The free plan checks each keyword monthly on ChatGPT, Google AI Overviews and Gemini (5 answers). For every answer we record whether your brand is named, its place among the brands you track, whether your site is cited as a source, which rivals are named, which websites are cited and what the AI searched for.</p>
-<p><b>Visible</b> is the share of answers that name you. AI answers vary between runs and people, so read it as a trend across weeks rather than a promise about a single answer.</p>
+<p>On paid plans that is 10 AI answers per keyword, every week. The free plan checks each keyword once a month on ChatGPT, Google AI Overviews and Gemini (5 answers). For every answer we record whether your brand is named, its place among the brands you track, whether your site is cited as a source, which rivals are named, which websites are cited and what the AI searched for.</p>
+<p><b>Visible</b> is the share of answers that name you. AI answers vary between runs and people, so read it as a trend across weeks, not as a promise about a single answer.</p>
+<p>A check asks the AI engines and Google. It reads nothing from your site and writes nothing to Webflow. Before a scheduled check starts, AI SEO Deck asks Webflow one thing: whether the app is still authorized.</p>
 <h3>Checks on demand</h3>
 <ul>
 <li>A keyword you add is checked right away, up to your plan's number of keywords in new keywords each month. After that, new keywords wait for the next scheduled check.</li>
 <li>On paid plans you can check a keyword again from its page: 10 checks a month on Solo, 30 on Studio and 100 on Agency. <b>Check all keywords now</b> uses one check per keyword.</li>
 </ul>
-<h3>Fix next</h3>
-<p>Above your keywords, <b>Fix next</b> lists up to three keywords to work on first: the ones where the fewest engines name you, weighted by monthly searches and by rivals named in your place. Keywords you applied fixes to in the last two weeks move down until you check them again.</p>
 
-<h2>4. The keyword page</h2>
+<h2 id="keyword">4. The keyword page and its fixes</h2>
 <ul>
 <li><b>The answer:</b> yes, sometimes or no, how many engines name you, your visibility over time and the rivals named instead.</li>
 <li><b>What each engine said:</b> every answer, with your brand <mark>marked</mark>, the sources it cited and the searches it ran.</li>
-<li><b>What to do:</b> the page that should rank for the keyword (matched from your pages, or chosen by you), a new title and description, answers to the questions behind the keyword as FAQ schema on the page and as CMS drafts, and the sites the AI relies on. If no page fits, we draft a new page from what your site already says and add it to your CMS as a draft.</li>
+<li><b>Your fix plan:</b> the page that should win the keyword (matched from your pages by Site health, or chosen by you), a new title and description for it, answers to the questions behind the keyword, and the websites the AI relies on for this keyword.</li>
 <li><b>Related keywords:</b> the searches the AI ran and Google's related searches, with monthly searches. Track any of them in one click.</li>
 </ul>
+<h3>Title and description</h3>
+<p>Press <b>Write the fixes</b>. AI SEO Deck reads the page from Webflow at that moment and an AI provider writes a title and a description from it. The plan then shows two sides: <b>Now in Webflow</b>, with the time the values were read, and <b>Suggested</b>, which you can edit. Nothing is written until you press <b>Apply to Webflow</b>. Just before writing, the app checks that the page in Webflow still has the values you were shown. If someone changed the page in the meantime, nothing is written and the new values are shown.</p>
+<h3>Answers as CMS drafts</h3>
+<p>The answers are written from your own page for the questions behind the keyword. You can copy them into the page in Webflow, or tick <b>Add them to</b> a collection: each answer becomes a draft item there. Drafts are never published by AI SEO Deck.</p>
+<h3>A page for a keyword that has none</h3>
+<p>If no page fits a keyword, choose <b>A new page in the CMS</b>. AI SEO Deck drafts a title, an intro and answers from what your site already says, and adds it to the collection you choose as one draft item.</p>
+<p>Applying to Webflow is part of the paid plans. On the free plan you can read and copy every suggestion.</p>
 
-<h2>5. Discover</h2>
+<h2 id="discover">5. Discover</h2>
 <p>The keywords where Google's AI Overviews cite your site, keyword ideas for your site and the searches the AI ran for your keywords. Only the keywords you track count toward your plan.</p>
 
-<h2>6. Rivals and sources</h2>
+<h2 id="rivals">6. Rivals and sources</h2>
 <ul>
 <li><b>Where rivals win:</b> the keywords where an AI names a rival and not you, widest gaps first.</li>
 <li><b>How AI describes you:</b> whether the answers that name you sound positive, neutral or negative, the words they use for you, and claims worth checking, such as an old price.</li>
 <li><b>Websites the AI relies on</b> and <b>your pages the AI cites</b>, counted across all your keywords.</li>
 </ul>
 
-<h2>7. Site audit</h2>
-<p>The audit reads your published pages, <code>robots.txt</code>, <code>llms.txt</code> and <code>sitemap.xml</code> from your live domain and checks: titles and descriptions, H1 headings, JSON-LD structured data, questions answered without FAQ schema, social preview tags, thin content, image alt text, and AI crawlers blocked in robots.txt. It also matches each keyword to its best page.</p>
-<p id="bot">The audit identifies itself with the user agent <code>AISEODeck/1.0 (+https://aiseodeck.silitlabs.com/docs#bot)</code> and only reads the domains of the sites you connected.</p>
+<h2 id="health">7. Site health</h2>
+<p>Site health reads your pages through the Webflow API and nothing else. It does not request your published website. Press <b>Read my pages from Webflow</b> to start; it runs only when you press the button.</p>
+<p>What it reads: the page list with each page's SEO title, meta description and Open Graph title and description, and, for static pages, the text, headings and images as Webflow holds them. What it reports for each page:</p>
 <ul>
-<li><b>Page fixes:</b> titles and descriptions, Organization and WebSite schema for the homepage (from the business details in the site's Settings) and FAQPage schema. Existing schema on the page is kept; only the same types are replaced.</li>
-<li><b>robots.txt and llms.txt:</b> we show the lines to allow blocked AI search crawlers and give you an <code>llms.txt</code> to upload in Site settings &gt; SEO &gt; LLMs.txt.</li>
+<li>no SEO title, or a title shorter than 20 or longer than 65 characters;</li>
+<li>no meta description, or one shorter than 60 or longer than 165 characters;</li>
+<li>no Open Graph title or description (one that copies the SEO value counts as set);</li>
+<li>no H1 heading, or more than one;</li>
+<li>less than 300 words of text;</li>
+<li>images without alt text (an image marked decorative, or one that uses the alt text of its asset, is not a finding);</li>
+<li>the questions the page answers, and the best page for each of your keywords.</li>
 </ul>
-<p>Applying fixes to Webflow is part of the paid plans. On the free plan you can copy every suggestion.</p>
+<p>What it does not report, because Webflow's API does not provide it: structured data, robots.txt, llms.txt and the sitemap. Three more limits, shown where they apply:</p>
+<ul>
+<li><b>Collection pages.</b> For a Collection template, the SEO settings of the template are checked. Its text comes from CMS items and is not read.</li>
+<li><b>Components.</b> Text inside components is not read. On a page that uses components, or that is too long to read in full, "No H1" and "Thin content" are shown as <b>not determined</b> and take nothing off the page's score.</li>
+<li><b>Drafts and utility pages</b>, such as the 404, password and search pages, are left out.</li>
+</ul>
+<p>The screen says when the pages were read from Webflow and has a <b>Refresh from Webflow</b> button. Webflow limits how many API calls a site takes each minute, so a large site is read in parts: the screen shows which pages are not read yet and a <b>Read the rest</b> button. Site health covers 20 pages on Free, 100 on Solo, 150 on Studio and 250 on Agency.</p>
+<p>Open a static page with <b>Fix</b> to see what it has in Webflow now, write a suggestion with AI, and apply a title and description or add answers to your CMS as drafts.</p>
 
-<h2>Keyword data</h2>
-<p>Monthly searches, related searches and the keywords where Google's AI Overviews cite your site come from DataForSEO. Searches the AI ran come from the AI engines themselves.</p>
+<h2 id="designer">8. Inside the Webflow Designer</h2>
+<p>AI SEO Deck has a panel in the Designer. Open the <b>Apps</b> panel in the Designer and launch AI SEO Deck. The panel follows the page that is open:</p>
+<ul>
+<li><b>This page:</b> the keyword tracked for it, with a mark for each AI engine: names you, links your site, does not name you, no AI answer, not checked yet.</li>
+<li><b>Fix this page:</b> the title and description findings, made from the values the Designer has at that moment, and the headings, text and image findings from the last Site health read, with the time of that read.</li>
+<li><b>Title and description:</b> an editor that shows what the page has now next to the fields. <b>Write with AI</b> reads the page from Webflow and fills the fields with a suggestion, labelled <b>Suggested by AI</b> until you edit it. <b>Apply to this page</b> sets the two values on the open page through the Designer. Nothing is published.</li>
+</ul>
+<p>The panel changes nothing until you press Apply, uses no keyboard shortcuts and stores nothing in your browser. To know who is using it, it sends our server a short-lived Webflow ID token with the id of the site and of the page, and nothing else that identifies you. A site that is not connected yet gets a <b>Connect</b> button that opens your Sites page. On the free plan the panel shows everything and writes suggestions, and Apply is off.</p>
 
-<h2>Reports</h2>
-<p>After every scheduled check you get an email with your visibility and your keywords. Studio and Agency plans can share a read-only client report link with their agency name on it.</p>
+<h2 id="writes">9. What is written to Webflow, and when</h2>
+<div class="tw"><table><tr><th>What</th><th>When</th><th>How it arrives</th></tr>
+<tr><td>SEO title and meta description of one static page</td><td>When you press <b>Apply to Webflow</b> in the web app, or <b>Apply to this page</b> in the Designer</td><td>As an unpublished change to the page settings</td></tr>
+<tr><td>Draft items in a CMS collection you choose</td><td>When you press <b>Apply to Webflow</b> with the CMS box ticked, <b>Add to CMS as drafts</b> or <b>Add the draft to Webflow</b></td><td>As draft items, never published</td></tr></table></div>
+<p>Nothing else is written. Nothing is written on a schedule, and nothing is deleted from Webflow by AI SEO Deck. After an Apply the app tells you to publish your site in Webflow.</p>
 
-<h2>Plans and the free trial</h2>
-<p>Every paid plan starts with 7 days free. Pick a plan on the pricing page or on your Account page and connect Webflow; Polar, our payment provider, takes a card without charging it, and everything in the plan is open right away. Cancel from Settings &gt; Plan &gt; Manage billing before the trial ends and nothing is charged; otherwise the plan starts on day 8. Polar emails you a reminder before the trial ends. One trial per customer. The free plan needs no card.</p>
+<h2 id="languages">10. Sites with several languages</h2>
+<p>On a site with Webflow Localization, AI SEO Deck reads, checks and writes the primary language only. Titles, descriptions and CMS drafts go to the primary locale, and the other languages keep their own text. The app says so next to every Apply button on such a site.</p>
 
-<h2>Disconnect and delete</h2>
-<p>Account &gt; Webflow connections &gt; Disconnect revokes access and deletes the sites of that connection from AI SEO Deck. Account &gt; Delete account removes everything we stored. Changes you already applied to Webflow stay on your site.</p>
+<h2 id="reports">11. Reports</h2>
+<p>After every scheduled check you get an email with your visibility and your keywords; you can turn it off on your Account page. On every plan you can create a read-only report link for a client, in the Settings of the site. On the Studio and Agency plans the report shows your agency name. Anyone who has the link can open it, it is marked not to be indexed by search engines, and you can replace it at any time, which ends the old link.</p>
 
-<h2>Support</h2>
+<h2 id="plans">12. Plans, prices and the free trial</h2>
+<p>All prices are in US dollars (USD). Taxes may be added at checkout, depending on your country.</p>
+<div class="tw"><table><tr><th>Plan</th><th>Price</th><th>What you get</th></tr>
+<tr><td><b>Free</b></td><td>USD 0</td><td>3 keywords on 1 site, checked once a month on ChatGPT, Google AI Overviews and Gemini. Site health for 20 pages. Suggestions to copy; no Apply.</td></tr>
+<tr><td><b>Solo</b></td><td>USD 19 a month, or USD 190 a year</td><td>10 keywords on 1 site, checked every week on all 6 AI engines. Apply to Webflow. 10 keyword checks on demand a month. Site health for 100 pages.</td></tr>
+<tr><td><b>Studio</b></td><td>USD 49 a month, or USD 490 a year</td><td>30 keywords on 5 sites. Everything in Solo, 30 keyword checks on demand a month, client report links with your agency name. Site health for 150 pages.</td></tr>
+<tr><td><b>Agency</b></td><td>USD 149 a month, or USD 1,490 a year</td><td>100 keywords on 20 sites. Everything in Studio, 100 keyword checks on demand a month. Site health for 250 pages.</td></tr></table></div>
+<p><b>The free plan</b> needs no card and has no time limit.</p>
+<p><b>The free trial.</b> Every paid plan starts with 7 days free, once per customer. Polar, our payment provider, takes a card at the start and charges nothing during the trial, and everything in the plan is open right away. If you cancel in those 7 days from your Account page, under Manage billing, nothing is charged and your account moves to the free plan when the trial ends. If you do not cancel, the price of the plan is charged on day 8 and then every month or every year, until you cancel. Polar emails you a reminder before the trial ends.</p>
+<p><b>When a paid plan or a trial ends.</b> Your account moves to the free plan. Nothing is deleted, in AI SEO Deck or in Webflow: your sites, keywords and past answers stay, the keywords and sites beyond the free plan's limits wait and are not checked, and what you applied to Webflow stays as it is. Apply is off until you choose a paid plan again.</p>
+
+<h2 id="remove">13. Disconnect, uninstall and delete</h2>
+<h3>Disconnect a site</h3>
+<p>In the site's Settings, <b>Disconnect this site</b> deletes its keywords, answers and Site health results from AI SEO Deck. Nothing changes in Webflow and the app stays installed there. To connect the site again, open your Sites page and press <b>Add a site</b>: the sites you authorized are listed, read from Webflow, and <b>Connect</b> needs no new authorization. On your Account page, <b>Disconnect</b> does the same for all sites of one authorization.</p>
+<h3>Uninstall in Webflow</h3>
+<p>Access to Webflow is removed in Webflow, not in AI SEO Deck:</p>
+<ul>
+<li>if you authorized single sites: Site settings, Apps &amp; integrations, then <b>Revoke</b> next to AI SEO Deck;</li>
+<li>if you authorized a whole Workspace: Workspace settings, Apps &amp; integrations, then <b>Uninstall app</b>;</li>
+<li>in the Designer: the Apps panel, AI SEO Deck, then <b>Remove app</b>.</li>
+</ul>
+<p>After that, Webflow refuses AI SEO Deck's access token. AI SEO Deck notices at its next contact with Webflow, at the latest within a day, asks Webflow nothing more, and deletes the token and the sites of that authorization with everything kept about them. Your Sites page says what happened. To start again, install the app again.</p>
+<h3>What stays in Webflow, and how to remove it</h3>
+<p>AI SEO Deck adds no code and no element to your site, so there is nothing to clean up on your pages. What you applied stays, because it is your content:</p>
+<ul>
+<li><b>Titles and descriptions</b> you applied are in the page settings. Change them there: in the Designer, open the page's settings and edit the SEO title and meta description.</li>
+<li><b>CMS drafts</b> are draft items in the collection you chose. Open the collection in the CMS and delete the items you do not want. They were never published by AI SEO Deck.</li>
+</ul>
+<h3>Delete your account</h3>
+<p>Account, <b>Delete account</b> cancels a paid plan at the end of its period and deletes everything AI SEO Deck stored: your sites, keywords, answers, Site health results, settings and the Webflow access tokens. The app stays listed in Webflow until you remove it there, as described above.</p>
+
+<h2 id="api">14. The Webflow API calls behind each feature</h2>
+<p>AI SEO Deck reads and writes Webflow only through Webflow's official Data API and, in the panel, the Designer API.</p>
+<div class="tw"><table><tr><th>Feature</th><th>Webflow API call</th><th>Permission</th></tr>
+<tr><td>Your account</td><td><code>GET /v2/token/authorized_by</code></td><td><code>authorized_user:read</code></td></tr>
+<tr><td>Sites, their addresses and languages; the sites you can connect</td><td><code>GET /v2/sites</code>, <code>GET /v2/sites/{site_id}</code></td><td><code>sites:read</code></td></tr>
+<tr><td>Site health: pages and their SEO and Open Graph settings</td><td><code>GET /v2/sites/{site_id}/pages</code>, <code>GET /v2/pages/{page_id}</code></td><td><code>pages:read</code></td></tr>
+<tr><td>Site health and suggestions: text, headings and images of a static page</td><td><code>GET /v2/pages/{page_id}/dom</code></td><td><code>pages:read</code></td></tr>
+<tr><td>Apply a title and description</td><td><code>PUT /v2/pages/{page_id}</code></td><td><code>pages:write</code></td></tr>
+<tr><td>Choose a collection for drafts</td><td><code>GET /v2/sites/{site_id}/collections</code>, <code>GET /v2/collections/{collection_id}</code></td><td><code>cms:read</code></td></tr>
+<tr><td>Add draft items</td><td><code>POST /v2/collections/{collection_id}/items</code> with <code>isDraft: true</code></td><td><code>cms:write</code></td></tr>
+<tr><td>Confirm who opens the panel in the Designer</td><td><code>POST /beta/token/resolve</code>, the call Webflow provides for resolving the Designer's ID token</td><td><code>authorized_user:read</code></td></tr>
+<tr><td>The panel in the Designer</td><td>Designer API: the open page, its name, path, title and description, <code>setTitle</code>, <code>setDescription</code>, <code>getIdToken</code></td><td></td></tr></table></div>
+
+<h2 id="data">15. Your data and the services we use</h2>
+<p>Your keywords and the questions written for them go to the AI engines to get answers. When you ask for a suggestion, the title, description and text of that page, as Webflow returns them, go to an AI provider to write it. Keyword data comes from DataForSEO. Payments are handled by Polar. The <a href="/privacy">privacy policy</a> lists what is stored, for how long and where it goes.</p>
+
+<h2 id="support">Support</h2>
 <p>Write to <a href="mailto:info@silitlabs.com">info@silitlabs.com</a>. We answer within one business day.</p>
 </main></body></html>

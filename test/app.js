@@ -176,7 +176,15 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
       global.fetch = async () => { calls++; return new Response(JSON.stringify({ message: 'slow down' }), { status: 429 }); };
       let gaveUp = null;
       try { await wfLib.listSites('tok'); } catch (e) { gaveUp = e; }
-      assert(gaveUp && gaveUp.status === 429 && calls === 4, 'and after three more tries it gives up');
+      assert(gaveUp && gaveUp.status === 429 && calls === 4 && gaveUp.retryAfter === 60, 'and after three more tries it gives up');
+      // Webflow names the wait itself (Retry-After): a call is never tried again sooner than that
+      calls = 0;
+      global.fetch = async () => { calls++; return new Response(JSON.stringify({ message: 'slow down' }), { status: 429, headers: { 'Retry-After': '60', 'X-RateLimit-Remaining': '0' } }); };
+      gaveUp = null;
+      const t429 = Date.now();
+      try { await wfLib.listSites('tok-limited'); } catch (e) { gaveUp = e; }
+      assert(gaveUp && gaveUp.status === 429 && gaveUp.retryAfter === 60 && calls === 1 && Date.now() - t429 < 1000 && wfLib.callsLeft('tok-limited') === 0, 'when Webflow asks to wait a minute, the call is not tried again: it stops and says how long Webflow asked to wait');
+      assert(wfLib.callsLeft('a-token-never-used') === null, 'how many calls are left is known only after Webflow said so');
       // a long page comes from Webflow in parts of 100 nodes
       let offsets = [];
       global.fetch = async (url) => {
@@ -229,6 +237,11 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const betaPaths = code.flatMap((c) => (c.s.match(/\/beta\/[A-Za-z0-9_\/:{}$.-]*/g) || []).map((x) => c.f + ' ' + x));
     assert([...new Set(betaPaths)].join() === 'api/_lib/webflow.js /beta/token/resolve', 'no feature uses a beta endpoint of Webflow: the one beta path in the code resolves the ID token of the Designer panel (found: ' + betaPaths.join(', ') + ')');
     assert(!code.some((c) => /schema-markup|jsonLdSchema|ld\+json|robots\.txt|sitemap\.xml/i.test(c.s) && c.f !== 'api/_lib/html.js' && c.f !== 'api/_lib/health.js'), 'nothing in the app reads or writes schema markup, robots.txt or a sitemap');
+    const loggers = code.filter((c) => /\bconsole\.(log|error|warn|info|debug)\s*\(/.test(c.s)).map((c) => c.f);
+    const logLib = require('../api/_lib/log');
+    const logged = logLib.redact('login email failed for ada.l@agency.com with Bearer tok_abcdefghijklmnopqrstuvwxyz0123456789 and state Zm9vYmFyYmF6cXV4Zm9vYmFyYmF6cXV4Zm9vYmFy on site 62b720ef280c7a7a3be8cabe');
+    assert(loggers.join() === 'api/_lib/log.js' && !/agency\.com|tok_abc|Zm9v/.test(logged) && logged.includes('[email]') && logged.includes('[redacted]') && logged.includes('62b720ef280c7a7a3be8cabe') && logLib.redact(new Error('for owner@agency.com')).includes('[email]'),
+      'the app writes to its logs in one place, which takes out email addresses and anything long enough to be a token');
     assert(!fs.existsSync(pathLib.join(root, 'api/_lib/audit.js')) && !fs.existsSync(pathLib.join(root, 'api/_lib/fetcher.js')) && !fs.existsSync(pathLib.join(root, 'api/_lib/vr')), 'the reader of published websites is not part of the app');
     const wfLib = require('../api/_lib/webflow');
     assert(wfLib.SCOPES.join(' ') === 'authorized_user:read sites:read pages:read pages:write cms:read cms:write' && !wfLib.getSchema && !wfLib.putSchema && !wfLib.querySchemas, 'the scopes are the six the features use, and the Webflow client has no schema calls');
@@ -239,9 +252,63 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert((panel.match(/\bfetch\s*\(/g) || []).length === 1 && /fetch\(API \+ '\/ext\/' \+ route,/.test(panel) && /var API = 'https:\/\/aiseodeck\.silitlabs\.com';/.test(panel), 'the Designer panel calls one server, the app itself, over HTTPS');
     assert(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\s*\(|new Function|setInterval|setTimeout|importScripts|createElement\(\s*['"]script|javascript:/.test(panel), 'the Designer panel adds no HTML from strings, runs no generated code and has no timers');
     assert(!/keydown|keyup|keypress|accesskey|localStorage|sessionStorage|indexedDB|document\.cookie|postMessage|window\.open|location\.(href|assign|replace)/i.test(panel), 'the Designer panel has no keyboard shortcuts, stores nothing in the browser, opens no windows and sends no messages');
+    assert(!/\bon(click|dblclick|submit|input|change|load|error|focus|blur|key[a-z]+|mouse[a-z]+|pointer[a-z]+|touch[a-z]+|message)\b/i.test(panel) && /else if \(EVENTS\[k\] === true\) el\.addEventListener\(k, v\);/.test(panel) && !/setAttribute\(\s*['"]on/i.test(panel),
+      'the Designer panel binds its events with addEventListener: no handler attribute is named anywhere in the script');
+    assert((panel.match(/h\(\s*'a'/g) || []).length === 1 && /var href = typeof url === 'string' && url\.indexOf\(API \+ '\/'\) === 0 \? url : API \+ '\/app';\s+return h\('a', \{ class: cls, href: href, target: '_blank', rel: 'noopener noreferrer' \}, text\);/.test(panel) && !/\.href\s*=|setAttribute\(\s*'href'/.test(panel),
+      'every link of the Designer panel is made in one place, which lets it lead only to the app itself, in a new tab');
     assert(!/\son[a-z]+\s*=|javascript:|<script(?![^>]*\ssrc="app\.js")|style\s*=/i.test(panelPage) && /<script src="app\.js"><\/script>/.test(panelPage), 'the page of the panel has no inline scripts, handlers or styles');
     const usesWebflow = [...new Set(panel.match(/\bwebflow\.[A-Za-z]+/g) || [])].sort();
     assert(usesWebflow.join() === 'webflow.getCurrentPage,webflow.getIdToken,webflow.getSiteInfo,webflow.notify,webflow.setExtensionSize,webflow.subscribe', 'the Designer API calls of the panel are the ones the review notes list (found: ' + usesWebflow.join(', ') + ')');
+    // what the two documents a reviewer reads say about the panel is what the code does: the review notes and the
+    // README that goes into the review ZIP
+    const pageCalls = [...new Set((panel.match(/\bpage\.(?:get|set|is)[A-Z][A-Za-z]+/g) || []).map((x) => x.split('.')[1]))].sort();
+    const panelRoutes = [...new Set((panel.match(/\bcall\('([a-z]+)'/g) || []).map((x) => x.slice(6, -1)))].sort();
+    const serverRoutes = [...new Set((code.find((c) => c.f === 'api/index.js').s.match(/path === '\/ext\/([a-z]+)'/g) || []).map((x) => x.slice(15, -1)))].sort();
+    assert(pageCalls.join() === 'getCollectionId,getDescription,getName,getPublishPath,getSlug,getTitle,isHomepage,setDescription,setTitle' && panelRoutes.join() === 'applied,context,suggest' && serverRoutes.join() === panelRoutes.join(),
+      'the panel reads and sets the title and description of the open page, and calls the three routes the server has (page calls: ' + pageCalls.join(', ') + '; routes: ' + panelRoutes.join(', ') + ' / ' + serverRoutes.join(', ') + ')');
+    for (const [docName, docPath] of [['the review notes', 'REVIEW.md'], ['the README of the review ZIP', 'extension/README.md']]) {
+      const doc = fs.readFileSync(pathLib.join(root, docPath), 'utf8');
+      const named = [...new Set(doc.match(/\bwebflow\.[A-Za-z]+/g) || [])].filter((x) => !/^webflow\.(json|js|io|com)$/.test(x)).sort();
+      const missing = usesWebflow.filter((x) => !named.includes(x)).concat(pageCalls.filter((x) => !new RegExp('\\b' + x + '\\b').test(doc))).concat(panelRoutes.filter((x) => !new RegExp('/ext/' + x + '\\b|`' + x + '`').test(doc)));
+      const extra = named.filter((x) => !usesWebflow.includes(x)).concat((doc.match(/\/ext\/[a-z]+/g) || []).map((x) => x.slice(5)).filter((x) => !panelRoutes.includes(x)));
+      assert(missing.length === 0 && extra.length === 0, docName + ': every Designer API call and every route of the panel is named, and none that the code does not use (missing: ' + (missing.join(', ') || 'none') + '; not in the code: ' + (extra.join(', ') || 'none') + ')');
+    }
+  }
+
+  console.log('unit: the extension bundle and the review ZIP');
+  {
+    const pk = require('../scripts/package-extension');
+    // two ZIP files made by another program: stored entries, a deflated one and a folder
+    const stored = pk.readZip(Buffer.from('UEsDBAoAAAAAAIq4d12jogmfMAAAADAAAAAFAAAAYS50eHRoZWxsbyBoZWxsbyBoZWxsbyBoZWxsbyBoZWxsbyBoZWxsbyBoZWxsbyBoZWxsbwpQSwMECgAAAAAAirh3XQ60qxwHAAAABwAAAAYAAABiLmpzb257ImsiOjF9UEsBAh4DCgAAAAAAirh3XaOiCZ8wAAAAMAAAAAUAAAAAAAAAAAAAAKSBAAAAAGEudHh0UEsBAh4DCgAAAAAAirh3XQ60qxwHAAAABwAAAAYAAAAAAAAAAAAAAKSBUwAAAGIuanNvblBLBQYAAAAAAgACAGcAAAB+AAAAAAA=', 'base64'));
+    const deflated = pk.readZip(Buffer.from('UEsDBBQAAgAIAIq4d12jogmfDAAAADAAAAAFAAAAYS50eHTLSM3JyVfIIJbkAgBQSwMECgACAAAAirh3XQ60qxwHAAAABwAAAAYAAABiLmpzb257ImsiOjF9UEsDBAoAAAAAAIq4d10AAAAAAAAAAAAAAAAEAAAAc3ViL1BLAwQKAAIAAACKuHddgxbcjAEAAAABAAAACQAAAHN1Yi9jLnR4dHhQSwECHgMUAAIACACKuHddo6IJnwwAAAAwAAAABQAAAAAAAAABAAAApIEAAAAAYS50eHRQSwECHgMKAAIAAACKuHddDrSrHAcAAAAHAAAABgAAAAAAAAABAAAApIEvAAAAYi5qc29uUEsBAh4DCgAAAAAAirh3XQAAAAAAAAAAAAAAAAQAAAAAAAAAAAAQAO1BWgAAAHN1Yi9QSwECHgMKAAIAAACKuHddgxbcjAEAAAABAAAACQAAAAAAAAABAAAApIF8AAAAc3ViL2MudHh0UEsFBgAAAAAEAAQA0AAAAKQAAAAAAA==', 'base64'));
+    const hello = 'hello hello hello hello hello hello hello hello\n';
+    assert(stored.map((f) => f.name).join() === 'a.txt,b.json' && stored[0].data.toString() === hello && stored[1].data.toString() === '{"k":1}', 'a ZIP made by another program is read: stored files');
+    assert(deflated.map((f) => f.name + (f.dir ? '(folder)' : '')).join() === 'a.txt,b.json,sub/(folder),sub/c.txt' && deflated[0].data.toString() === hello && deflated[3].data.toString() === 'x', 'and compressed files and folders');
+    assert(pk.crc32(Buffer.from(hello)) === 0x9f09a2a3 && pk.crc32(Buffer.from('{"k":1}')) === 0x1cabb40e && pk.crc32(Buffer.alloc(0)) === 0, 'the checksum of a file is the one other ZIP programs compute');
+    let damaged = null;
+    try { const bad = Buffer.from(pk.writeZip([{ name: 'a.txt', data: Buffer.from(hello.repeat(40)) }])); bad[40] ^= 0xff; pk.readZip(bad); } catch (e) { damaged = e; }
+    assert(damaged, 'a ZIP whose content was changed is refused');
+    const src = { 'webflow.json': Buffer.from(JSON.stringify(pk.MANIFEST, null, 2) + '\n'), 'index.html': Buffer.from('<!doctype html>\n'), 'app.css': Buffer.from('body{}\n'), 'app.js': Buffer.from('var a = 1;\n') };
+    const zipOf = (o) => pk.writeZip(Object.entries(o).map(([name, data]) => ({ name, data })));
+    const good = pk.checkBundle(zipOf(src), src);
+    const again = pk.readZip(pk.writeZip(good.files.concat([{ name: 'README.md', data: Buffer.from('# read me\n') }])));
+    assert(good.problems.length === 0 && good.files.map((f) => f.name).join() === 'app.css,app.js,index.html,webflow.json' && good.sums['app.js'] === crypto.createHash('sha256').update(src['app.js']).digest('hex'), 'a bundle that holds the four files of the extension, byte for byte, passes');
+    assert(again.map((f) => f.name).join() === 'app.css,app.js,index.html,webflow.json,README.md' && again.every((f) => f.name === 'README.md' || f.data.equals(src[f.name])) && pk.writeZip(good.files).equals(pk.writeZip(good.files)), 'the review ZIP holds those same bytes and the README, and the same input gives the same file');
+    const problemsOf = (o) => pk.checkBundle(zipOf(o), src).problems.join(' | ');
+    assert(/app\.js in bundle\.zip is not the same bytes/.test(problemsOf(Object.assign({}, src, { 'app.js': Buffer.from('var a = 2;\n') }))), 'a file that differs from the source by one character is refused');
+    assert(/not part of the extension: app\.js\.map/.test(problemsOf(Object.assign({}, src, { 'app.js.map': Buffer.from('{}') }))) && /holds a source map/.test(problemsOf(Object.assign({}, src, { 'app.js.map': Buffer.from('{}') }))), 'a source map in the bundle is refused');
+    assert(/not part of the extension: node_modules\/x\/index\.js/.test(problemsOf(Object.assign({}, src, { 'node_modules/x/index.js': Buffer.from('1') }))) && /not part of the extension: \.env/.test(problemsOf(Object.assign({}, src, { '.env': Buffer.from('A=1') }))), 'any other file in the bundle is refused');
+    { const less = Object.assign({}, src); delete less['app.css']; assert(/does not hold app\.css/.test(problemsOf(less)), 'a missing file is refused'); }
+    {
+      const mapped = Object.assign({}, src, { 'app.js': Buffer.from('var a = 1;\n//# sourceMappingURL=data:application/json;base64,e30=\n') });
+      assert(/app\.js carries a source map reference/.test(pk.checkBundle(zipOf(mapped), mapped).problems.join(' | ')), 'a source map written into a file is refused');
+      const other = Object.assign({}, src, { 'webflow.json': Buffer.from(JSON.stringify(Object.assign({}, pk.MANIFEST, { name: 'Another' }))) });
+      assert(/not the manifest of the repository/.test(pk.checkBundle(zipOf(other), other).problems.join(' | ')), 'a manifest other than the one of the repository is refused');
+      assert(/cannot be read/.test(pk.checkBundle(Buffer.from('this is not a zip file at all, just text'), src).problems.join(' | ')), 'a file that is not a ZIP is refused');
+    }
+    const fsx = require('fs'), px = require('path');
+    assert(JSON.stringify(JSON.parse(fsx.readFileSync(pk.SOURCES['webflow.json'], 'utf8'))) === JSON.stringify(pk.MANIFEST) && Object.values(pk.SOURCES).every((f) => fsx.existsSync(f)) && Object.keys(pk.SOURCES).sort().join() === 'app.css,app.js,index.html,webflow.json' && fsx.readdirSync(px.dirname(pk.SOURCES['app.js'])).sort().join() === 'app.css,app.js,index.html',
+      'the extension is four files: the manifest and the three files of public/, and nothing else is in that folder');
   }
 
   const app = startApp();
@@ -481,8 +548,15 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(wfState.domCalls.slice(domAtPlan).join() === 'p2' && decodeURIComponent(r.headers.location).includes('Fixes ready'), 'the writer gets the text of the page from Webflow, read when the user asks for the fixes');
   r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kVen.id, { headers: { cookie } });
   assert(r.body.includes('Veneers and smile design in Antalya | Lumen Dental') && r.body.includes('Q: Do UK visitors need a visa?') && r.body.includes('Apply to Webflow') && r.body.includes('value="colFaq"'), 'the fixes are written from the page, with the keyword, ready to apply');
-  assert(r.body.includes('<span class="l">Now in Webflow</span><b>' + ABOUT_TITLE + '</b>') && r.body.includes('<span class="l">Suggested</span>') && /data-read-from-webflow>Read from Webflow just now\.</.test(r.body) && r.body.includes('name="seen_title" value="' + ABOUT_TITLE + '" form="applyform"'), 'what the page has in Webflow now stands apart from the suggestion, with the time it was read');
+  assert(r.body.includes('<span class="l">Now in Webflow</span><b>' + ABOUT_TITLE + '</b>') && r.body.includes('<span class="l">Suggested</span>') && /data-read-from-webflow>Read from Webflow just now\. <button/.test(r.body) && r.body.includes('name="seen_title" value="' + ABOUT_TITLE + '" form="applyform"'), 'what the page has in Webflow now stands apart from the suggestion, with the time it was read');
   assert(!r.body.includes('do_schema') && !/schema/i.test(r.body), 'no schema markup is offered or mentioned');
+  {
+    // the fix plan can read its page from Webflow again, and comes back to the keyword
+    assert(r.body.includes('<button class="wfbtn" type="submit" form="kwrefresh">Refresh from Webflow</button>') && r.body.includes('<form id="kwrefresh" method="post" action="/app/fix/refresh" hidden>'), 'the fix plan has a Refresh from Webflow button next to the values it shows');
+    const domAtRefresh = wfState.domCalls.length;
+    const back = await post('/app/fix/refresh', cookie, { id: 'siteA', path: '/about', k: kVen.id });
+    assert(back.status === 302 && back.headers.location.startsWith('/app/keyword?id=siteA&k=' + kVen.id + '&') && /Read%20from%20Webflow%20just%20now/.test(back.headers.location) && wfState.domCalls.slice(domAtRefresh).join() === 'p2', 'it reads that page from Webflow and returns to the keyword');
+  }
   const metaGen = engineCalls.filter((c) => c.e === 'gen' && /meta descriptions/.test(c.ins)).length;
   assert(metaGen >= 1, 'the title and description were written by the AI');
   const NEW_DESC = 'Emax veneers and digital smile design in Antalya for patients from the UK and Ireland, planned in one visit.';
@@ -558,14 +632,26 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     audit = getJ('audit:siteA');
     about = audit.pages.find((p) => p.path === '/about');
     assert(!audit.complete && audit.pending === 1 && audit.pagesChecked === 2 && about.state === 'pending' && about.words === null && about.content === false && !about.issues.includes('thin') && !about.issues.includes('h1_missing'), 'when Webflow asks to slow down, the page that was not read is marked as not read: no finding is made up for it');
-    assert(wfState.domCalls.slice(at).filter((x) => x === 'p2').length === 4 && decodeURIComponent(r.headers.location).includes('2 of 3 pages are read so far. Press "Read the rest" to go on.'), 'the rate-limited call is tried three more times, then the read stops and says how far it got');
+    assert(wfState.domCalls.slice(at).filter((x) => x === 'p2').length === 4 && decodeURIComponent(r.headers.location).includes('2 of 3 pages are read so far. Webflow limits how fast its API may be read. Press "Read the rest" in a minute.') && audit.slowed === 60, 'the rate-limited call is tried three more times, then the read stops and says how far it got and why');
     r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie } });
-    assert(r.body.includes('>Read the rest</button>') && r.body.includes('Text not read yet') && r.body.includes('The text of 1 page is not read yet.'), 'Site health shows what is not read yet and offers to read the rest');
+    assert(r.body.includes('>Read the rest</button>') && r.body.includes('Text not read yet') && r.body.includes('The text of 1 page is not read yet: Webflow limits how fast its API may be read'), 'Site health shows what is not read yet and offers to read the rest');
     delete wfState.domFail.p2;
     const at2 = wfState.domCalls.length;
     r = await post('/app/site/audit', cookie, { id: 'siteA', resume: '1' });
     audit = getJ('audit:siteA');
     assert(audit.complete && audit.pending === 0 && audit.pagesChecked === 3 && wfState.domCalls.slice(at2).join() === 'p2' && audit.pages.find((p) => p.path === '/about').faq.length === 2, '"Read the rest" reads only the pages that were left');
+    {
+      // Webflow says with every answer how many calls it still takes this minute: the read stops short of the limit
+      wfState.remaining = 7; // two calls list the site and its pages: five are left, fewer than the app keeps back
+      const at3 = wfState.domCalls.length, refusedAt = wfState.refused.length;
+      r = await post('/app/site/audit', cookie, { id: 'siteA' });
+      audit = getJ('audit:siteA');
+      assert(wfState.domCalls.length === at3 && audit.pending === 2 && audit.slowed === 60 && !audit.complete && wfState.remaining === 5 && wfState.refused.length === refusedAt && decodeURIComponent(r.headers.location).includes('Webflow limits how fast its API may be read'), 'near the rate limit of Webflow the read stops before the limit is reached, and says so');
+      wfState.remaining = 120; // a minute later Webflow takes calls again
+      r = await post('/app/site/audit', cookie, { id: 'siteA', resume: '1' });
+      assert(getJ('audit:siteA').complete && getJ('audit:siteA').slowed === 0 && wfState.domCalls.slice(at3).sort().join() === 'p1,p2', 'and reads the rest when asked again');
+      wfState.remaining = null;
+    }
     wfState.domFail.p2 = 500;
     r = await post('/app/site/audit', cookie, { id: 'siteA' });
     audit = getJ('audit:siteA');
@@ -692,11 +778,11 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 302 && decodeURIComponent(r.headers.location).includes('no longer tracked'), 'an unknown keyword goes back to the deck');
   r = await request(port, 'GET', '/app/settings', { headers: { cookie } });
   assert(r.status === 200 && r.body.includes('name="plan" value="solo"') && r.body.includes('10 keywords') && r.body.includes('$19'), 'settings show upgrade buttons and keyword plans');
-  assert(r.body.includes('Try free for 7 days') && r.body.includes('$0 today, then $19 a month'), 'settings offer the 7 day trial on paid plans');
+  assert(r.body.includes('Try free for 7 days') && r.body.includes('US$0 today, then US$19 a month or US$190 a year') && r.body.includes('All prices are in US dollars (USD)'), 'settings offer the 7 day trial on paid plans, with every price in US dollars and the yearly price named');
   {
     const card = (name) => r.body.split('<div class="plan').find((c) => c.includes('<b>' + name));
     const studio = card('Studio'), agency = card('Agency');
-    assert(studio && studio.includes('value="monthly"') && !studio.includes('value="yearly"') && studio.includes('$0 today, then $49 a month. Cancel') && agency && !agency.includes('/app/billing/checkout'),
+    assert(studio && studio.includes('value="monthly"') && !studio.includes('value="yearly"') && studio.includes('US$0 today, then US$49 a month. Cancel') && agency && !agency.includes('/app/billing/checkout'),
       'settings show a button only for a plan and billing period that has a Polar product');
   }
   r = await request(port, 'GET', '/app/start?plan=studio&interval=yearly', { headers: { cookie } });
@@ -709,7 +795,7 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.headers.location === 'https://polar.test/checkout/1' && polarState.checkouts[0].products[0] === 'p_solo_y' && polarState.checkouts[0].metadata.app === 'aiseodeck', 'checkout uses the AI SEO Deck yearly product, never the Flowdeck one');
   assert(polarState.checkouts[0].trial_interval === 'day' && polarState.checkouts[0].trial_interval_count === 7 && polarState.checkouts[0].success_url === 'https://app.test/app/billing/return?next=settings&checkout_id={CHECKOUT_ID}', 'checkout carries a 7 day trial and returns with the checkout id');
   r = await request(port, 'GET', '/app/start?plan=studio&interval=monthly', { headers: { cookie } });
-  assert(r.status === 200 && r.body.includes('Try Studio free for 7 days') && r.body.includes('<dd>$0</dd>') && r.body.includes('Not now, continue on the free plan') && r.body.includes('name="from" value="start"'), 'start page shows the trial, today and the first charge');
+  assert(r.status === 200 && r.body.includes('Try Studio free for 7 days') && r.body.includes('<dd>US$0</dd>') && r.body.includes('Not now, continue on the free plan') && r.body.includes('name="from" value="start"'), 'start page shows the trial, today and the first charge');
   const billingLib = require('../api/_lib/billing');
   const store = require('../api/_lib/store');
   process.env.ENGINES = 'none';
@@ -968,6 +1054,25 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   console.log('uninstalled in Webflow');
   await store.endRun(firstRun);
   await store.updateSite('siteA', (s) => { s.sched.runId = ''; s.sched.firstRunDone = true; s.sched.nextRunAt = Date.now() - 1000; });
+  {
+    // Webflow does not say whether the token works when scheduled checks are due: the checks run all the same,
+    // since they ask the AI engines only, nothing is removed, and Webflow is asked once in that pass, not per site
+    const jobsLib = require('../api/_lib/jobs');
+    await store.saveSite(Object.assign({}, getJ('site:siteA'), { id: 'siteZ', kw: {} }));
+    assert(db.get('sites:all').has('siteZ') && getJ('site:siteZ').sched.nextRunAt < Date.now(), 'a second site of the same authorization is due as well');
+    wfState.authStatus = 503;
+    const callsBefore = wfState.authCalls;
+    const t0 = Date.now();
+    const startedRuns = await jobsLib.scheduleDue(Date.now(), 20);
+    wfState.authStatus = 0;
+    const due = getJ('site:siteA'), dueZ = getJ('site:siteZ');
+    assert(startedRuns >= 1 && due && !!due.sched.runId && getJ('user:user_1').connections.length === 1 && !(getJ('user:user_1').notice || '').includes('uninstalled'), 'a scheduled check starts all the same when Webflow does not answer about the token, and nothing is removed');
+    assert(wfState.authCalls === callsBefore + 1 && Date.now() - t0 < 3000, 'Webflow is asked once in that pass, with no second try: a Webflow that is not answering never holds up the checks');
+    for (const x of [due, dueZ]) if (x && x.sched.runId) await store.endRun(x.sched.runId);
+    db.delete('site:siteZ'); db.get('sites:all').delete('siteZ');
+    await store.updateSite('siteA', (s) => { s.sched.runId = ''; s.sched.firstRunDone = true; s.sched.nextRunAt = Date.now() - 1000; });
+    assert(!db.has('site:siteZ') && !getJ('site:siteA').sched.runId, 'the test site is gone again');
+  }
   wfState.revoked = true;
   wfState.refused.length = 0;
   r = await request(port, 'GET', '/cron/tick?key=cronkey', {});
@@ -992,14 +1097,70 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     a = await request(port, 'GET', '/auth', { headers: { cookie: cookie2 } });
     a = await request(port, 'GET', '/callback?code=good-code&state=' + new URL(a.headers.location).searchParams.get('state'), { headers: { cookie: cookie2 + '; ' + cookiesFrom(a) } });
     const jobsLib = require('../api/_lib/jobs');
-    const clearChecks = () => { for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); } };
+    const clearChecks = () => { for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k === 'conncursor' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); } };
+    const markOf = (id) => 'connchk:' + id;
+    const conn1 = getJ('user:user_1').connections[0].id;
     clearChecks();
     let seen = await jobsLib.checkConnections(Date.now(), 8000);
-    assert(seen.asked === 1 && seen.removed === 0 && getJ('site:siteA'), 'once a day each stored token is asked whether Webflow still accepts it; a working one changes nothing');
+    const markLeft = ttl.get(markOf(conn1)) - Date.now();
+    assert(seen.asked === 1 && seen.removed === 0 && getJ('site:siteA') && markLeft > 19.9 * 3600000 && markLeft <= 20 * 3600000, 'each stored token is asked whether Webflow still accepts it, and not again for 20 hours; a working one changes nothing');
     seen = await jobsLib.checkConnections(Date.now(), 8000);
     db.delete('lock:conncheck');
     const seen2 = await jobsLib.checkConnections(Date.now(), 8000);
-    assert(seen.asked === 0 && seen2.asked === 0, 'the look runs at most once an hour, and a token is asked about at most once in 24 hours');
+    assert(seen.asked === 0 && seen2.asked === 0 && ttl.get('lock:conncheck') - Date.now() > 3590000, 'the look starts at most once an hour, and a token is asked about at most once in 20 hours');
+    {
+      // the hourly job of its own
+      clearChecks();
+      let j = await request(port, 'GET', '/cron/tokens', {});
+      assert(j.status === 401 && !db.has(markOf(conn1)), 'the hourly look at the tokens needs the cron secret');
+      j = await request(port, 'GET', '/cron/tokens', { headers: { authorization: 'Bearer cronkey' } });
+      assert(j.status === 200 && JSON.parse(j.body).asked === 1 && JSON.parse(j.body).removed === 0 && db.has(markOf(conn1)), 'and with it, it asks about every token that is due');
+      j = await request(port, 'GET', '/cron/nothing', { headers: { authorization: 'Bearer cronkey' } });
+      assert(j.status === 404, 'an unknown job does nothing');
+    }
+    {
+      // Webflow does not say whether the token works: nothing is removed, and it is asked again an hour later
+      for (const status of [503, 429]) {
+        clearChecks();
+        wfState.authStatus = status;
+        const callsBefore = wfState.authCalls;
+        const t0 = Date.now();
+        seen = await jobsLib.checkConnections(Date.now(), 8000);
+        const again = ttl.get(markOf(conn1)) - Date.now();
+        assert(seen.asked === 1 && seen.removed === 0 && seen.unsure === 1 && getJ('site:siteA') && getJ('user:user_1').connections.length === 1 && again > 3590000 && again <= 3600000 && wfState.authCalls === callsBefore + 1 && Date.now() - t0 < 1500 && db.has('lock:conncheck'),
+          'when Webflow answers ' + status + ' about a token, nothing is removed: it is asked once, not again in a row, and again an hour later');
+        wfState.authStatus = 0;
+      }
+    }
+    {
+      // more accounts than fit in one pass: the next pass continues where this one stopped
+      const extra = ['user_2', 'user_3'].map((id) => { const u = store.newUser({ id, email: id + '@agency.com' }); const c = store.addConnection(u, 'tok_abc', 'Other', []); return { u, c }; });
+      for (const e of extra) await store.saveUser(e.u);
+      const order = ['user_1', 'user_2', 'user_3'];
+      const connOf = { user_1: conn1, user_2: extra[0].c.id, user_3: extra[1].c.id };
+      const asked = () => order.filter((id) => db.has(markOf(connOf[id]))).join();
+      clearChecks();
+      wfState.authDelayMs = 700;
+      seen = await jobsLib.checkConnections(Date.now(), 300);
+      wfState.authDelayMs = 0;
+      assert(seen.asked === 1 && seen.more === true && asked() === 'user_1' && getJ('conncursor').id === 'user_1' && !db.has('lock:conncheck'), 'a pass that runs out of time remembers the account it reached and lets the next tick continue');
+      const visited = [];
+      const realGetUser = store.getUser;
+      store.getUser = async (id) => { visited.push(id); return realGetUser(id); };
+      seen = await jobsLib.checkConnections(Date.now(), 8000);
+      store.getUser = realGetUser;
+      assert(seen.asked === 2 && !seen.more && asked() === 'user_1,user_2,user_3' && !db.has('conncursor') && db.has('lock:conncheck'), 'the next pass asks about the accounts that were not reached, and then the hour starts');
+      assert(visited.join() === 'user_2,user_3,user_1', 'it starts after the account the pass before stopped at, so the accounts at the end are reached however many there are (visited: ' + visited.join() + ')');
+      // a pass cut while Webflow is not answering waits its hour
+      clearChecks();
+      wfState.authStatus = 503;
+      wfState.authDelayMs = 700;
+      seen = await jobsLib.checkConnections(Date.now(), 300);
+      wfState.authStatus = 0;
+      wfState.authDelayMs = 0;
+      assert(seen.asked === 1 && seen.unsure === 1 && seen.more === true && db.has('lock:conncheck') && getJ('conncursor').id === 'user_1', 'a pass that stopped while Webflow was not answering is not continued at once: the next one waits its hour');
+      for (const e of extra) { db.delete('user:' + e.u.id); db.get('users:all').delete(e.u.id); }
+    }
     clearChecks();
     wfState.revoked = true;
     wfState.refused.length = 0;

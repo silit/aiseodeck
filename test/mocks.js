@@ -164,7 +164,7 @@ const resend = http.createServer(async (req, res) => { const body = await readJS
 /* ---- mock Webflow ---- */
 // tokenRequests: code exchanges at /oauth/access_token. refused: calls answered 401. resolveStatus: makes the ID token
 // endpoint fail with that status. revokeCalls: calls to /oauth/revoke_authorization, which the app must never make.
-const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [], tokenRequests: [], refused: [], resolveStatus: 0 };
+const wfState = { sites: [], pages: {}, dom: {}, domCalls: [], domFail: {}, paths: [], pageUpdates: [], items: [], revoked: false, revokeCalls: [], tokenRequests: [], refused: [], resolveStatus: 0, remaining: null, authStatus: 0, authDelayMs: 0, authCalls: 0 };
 let nodeSeq = 0;
 // a text node as GET /v2/pages/:page_id/dom returns it: the HTML of the element and its plain text
 const textNode = (html) => ({ id: 'n' + (++nodeSeq), type: 'text', text: { html, text: html.replace(/<[^>]+>/g, '') }, attributes: {} });
@@ -184,8 +184,15 @@ const webflow = http.createServer(async (req, res) => {
   if (wfState.revoked || (req.headers.authorization || '') !== 'Bearer tok_abc') { wfState.refused.push(req.method + ' ' + u.pathname); return json(res, 401, { message: 'Request not authorized' }); }
   const p = u.pathname;
   wfState.paths.push(req.method + ' ' + p);
+  // like Webflow: every answer says how many more calls this minute takes (remaining: null leaves the header out)
+  if (wfState.remaining != null) { wfState.remaining = Math.max(0, wfState.remaining - 1); res.setHeader('X-RateLimit-Remaining', String(wfState.remaining)); }
   let m;
-  if (p === '/v2/token/authorized_by') return json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' });
+  if (p === '/v2/token/authorized_by') {
+    // authStatus: Webflow answers with an error instead (503, 429); authDelayMs: it answers late
+    wfState.authCalls++;
+    const answer = () => (wfState.authStatus ? json(res, wfState.authStatus, { message: 'mock: Webflow is not answering this now' }) : json(res, 200, { id: 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L' }));
+    return wfState.authDelayMs ? void setTimeout(answer, wfState.authDelayMs) : answer();
+  }
   if (p === '/beta/token/resolve' && req.method === 'POST' && wfState.resolveStatus) return json(res, wfState.resolveStatus, { message: 'mock: the ID token endpoint is failing' });
   if (p === '/beta/token/resolve' && req.method === 'POST') { const t = String((body && body.idToken) || ''); return t.startsWith('idt:') ? json(res, 200, { id: t.split(':')[2] || 'user_1', email: 'owner@agency.com', firstName: 'Ada', lastName: 'L', siteId: t.split(':')[1] }) : json(res, 401, { message: 'Invalid ID token' }); }
   if ((m = p.match(/^\/v2\/pages\/(\w+)$/)) && req.method === 'GET') { const f = findPage(m[1]); return f ? json(res, 200, Object.assign({ siteId: f.sid }, f.pg)) : json(res, 404, { message: 'mock: no page' }); }

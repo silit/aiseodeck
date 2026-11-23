@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // Email via Resend. When RESEND_API_KEY is missing the message is logged and dropped.
 
 function enabled() { return !!process.env.RESEND_API_KEY; }
@@ -16,7 +17,7 @@ async function send({ to, subject, html, text, as }) {
   const from = sender(as);
   if (!process.env.RESEND_API_KEY) {
     // no address and no subject in the log: an address is personal data
-    console.log('[aiseodeck] an email was not sent: no mail provider is set up');
+    log.info('[aiseodeck] an email was not sent: no mail provider is set up');
     return { skipped: true };
   }
   const base = (process.env.RESEND_API_BASE || 'https://api.resend.com').replace(/\/+$/, '');

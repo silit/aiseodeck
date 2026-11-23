@@ -3,6 +3,7 @@
 // keyword, page titles and meta descriptions, answers to customer questions and a draft of a new page.
 // Each is written by an AI provider from what the Webflow API returned for the page, when the user asks for it.
 const llm = require('./llm');
+const { LIMITS } = require('./health');
 
 const clean = (s, max) => String(s || '').replace(/[–—]/g, ', ').replace(/\s+/g, ' ').trim().slice(0, max || 500);
 const LANG_NAMES = { en: 'English', tr: 'Turkish', de: 'German', fr: 'French', es: 'Spanish', it: 'Italian', nl: 'Dutch', pt: 'Portuguese', pl: 'Polish', ar: 'Arabic', ru: 'Russian', sv: 'Swedish', da: 'Danish', no: 'Norwegian', fi: 'Finnish', cs: 'Czech', hu: 'Hungarian', ro: 'Romanian', el: 'Greek', ja: 'Japanese', ko: 'Korean', zh: 'Chinese' };
@@ -66,7 +67,7 @@ async function suggestMeta(project, page, keyword) {
   const j = await llm.generateJSON({
     system: `You write search and AI-friendly page titles and meta descriptions. ${RULES}`,
     prompt: `Brand: ${project.brand}\nPage URL path: ${page.path}\nCurrent title: ${clean(page.title, 200) || '(none)'}\nCurrent description: ${clean(page.description, 300) || '(none)'}\nMain heading: ${clean((page.h1 || [])[0], 200)}\nPage text: ${clean(page.text, 3000)}\n\n${focus}` +
-      `Write in ${lang}: a title of 35 to 60 characters that says what the page offers (add " | ${project.brand}" only if it fits), and a meta description of 120 to 155 characters that answers what the page is about and who it is for. Return {"title": "...", "description": "..."}.`,
+      `Write in ${lang}: a title of ${LIMITS.title.aimMin} to ${LIMITS.title.aimMax} characters that says what the page offers (add " | ${project.brand}" only if it fits), and a meta description of ${LIMITS.description.aimMin} to ${LIMITS.description.aimMax} characters that answers what the page is about and who it is for. Return {"title": "...", "description": "..."}.`,
     maxTokens: 400
   });
   return { title: clean(j.title, 70), description: clean(j.description, 170) };

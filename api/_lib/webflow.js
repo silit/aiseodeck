@@ -11,22 +11,46 @@ const SCOPES = ['authorized_user:read', 'sites:read', 'pages:read', 'pages:write
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = () => parseInt(process.env.WEBFLOW_RETRY_BASE_MS || '', 10) || 2000;
+const MAX_WAIT_MS = 10000; // the longest a request waits before trying again
+
+// How many more calls Webflow takes this minute for a token, as its last answer said (X-RateLimit-Remaining).
+// Kept in memory for a minute. null when Webflow has not said.
+const budget = new Map();
+function noteBudget(token, res) {
+  const n = parseInt(res.headers.get('x-ratelimit-remaining') || '', 10);
+  if (!Number.isFinite(n)) return;
+  if (budget.size > 500) budget.clear();
+  budget.set(token, { n, at: Date.now() });
+}
+function callsLeft(token) {
+  const b = budget.get(token);
+  return b && Date.now() - b.at < 60000 ? b.n : null;
+}
 
 // path starts with /v2/ (the one exception is named where it is used: resolveIdToken)
-async function request(token, method, path, body, attempt) {
+// opts.once: one attempt, no waiting when Webflow asks to slow down. opts.timeoutMs: how long to wait for the answer.
+async function request(token, method, path, body, attempt, opts) {
   attempt = attempt || 0;
+  opts = opts || {};
   const res = await fetch(API_BASE() + path, {
     method,
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/json', 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(20000)
+    signal: AbortSignal.timeout(opts.timeoutMs || 20000)
   });
-  // Rate limited: wait as long as Webflow says, or twice as long as the time before (2, 4, 8 seconds), and give
-  // up after three more tries.
-  if (res.status === 429 && attempt < MAX_RETRIES) {
-    const wait = parseInt(res.headers.get('retry-after') || '0', 10) * 1000 || RETRY_BASE_MS() * Math.pow(2, attempt);
-    await sleep(Math.min(wait, 10000));
-    return request(token, method, path, body, attempt + 1);
+  noteBudget(token, res);
+  // Rate limited (429). Webflow says how long to wait (Retry-After); without that, twice as long as the time
+  // before (2, 4, 8 seconds). The call is never tried again sooner than Webflow asks: when the wait is longer than
+  // ten seconds, or after three more tries, it stops and the error says how long Webflow asked to wait.
+  let retryAfter = 0;
+  if (res.status === 429) {
+    const asked = parseInt(res.headers.get('retry-after') || '', 10);
+    retryAfter = Number.isFinite(asked) && asked > 0 ? asked : 0;
+    const wait = retryAfter ? retryAfter * 1000 : RETRY_BASE_MS() * Math.pow(2, attempt);
+    if (!opts.once && attempt < MAX_RETRIES && wait <= MAX_WAIT_MS) {
+      await sleep(wait);
+      return request(token, method, path, body, attempt + 1, opts);
+    }
   }
   const text = await res.text();
   let data = null;
@@ -35,6 +59,7 @@ async function request(token, method, path, body, attempt) {
     const err = new Error((data && (data.message || data.msg || data.error)) || ('Webflow API error ' + res.status));
     err.status = res.status;
     err.data = data;
+    if (res.status === 429) err.retryAfter = retryAfter || 60;
     throw err;
   }
   return data;
@@ -74,8 +99,15 @@ const authorizedBy = (token) => call(token, 'GET', '/token/authorized_by');
 // can resolve. Answers { id, email, firstName, lastName, siteId }.
 // Webflow offers this endpoint on the /beta path only; it is the documented way for a Hybrid App to verify the ID token.
 const resolveIdToken = (token, idToken) => request(token, 'POST', '/beta/token/resolve', { idToken });
+// Does Webflow still accept this token? One short question (GET /v2/token/authorized_by: one attempt, at most
+// eight seconds). 'ok', 'revoked' (Webflow answered 401), or 'unknown' when Webflow did not say: no answer, an
+// error, or a request to slow down. 'unknown' never removes anything.
+const TOKEN_STATUS_TIMEOUT_MS = 8000;
 async function tokenStatus(token) {
-  try { await authorizedBy(token); return 'ok'; } catch (e) { return isRevoked(e) ? 'revoked' : 'unknown'; }
+  try {
+    await request(token, 'GET', '/v2/token/authorized_by', null, 0, { once: true, timeoutMs: TOKEN_STATUS_TIMEOUT_MS });
+    return 'ok';
+  } catch (e) { return isRevoked(e) ? 'revoked' : 'unknown'; }
 }
 const listSites = async (token) => ((await call(token, 'GET', '/sites')) || {}).sites || [];
 const getSite = (token, siteId) => call(token, 'GET', '/sites/' + siteId);
@@ -141,6 +173,6 @@ const getCollection = (token, collectionId) => call(token, 'GET', `/collections/
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
-  SCOPES, call, authorizeUrl, exchangeCode, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
+  SCOPES, call, callsLeft, authorizeUrl, exchangeCode, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
   listPages, getPage, pageDom, updatePageSeo, listCollections, getCollection, createDraftItem
 };

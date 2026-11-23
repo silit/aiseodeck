@@ -95,6 +95,10 @@
     {
       "path": "/cron/tick",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/cron/tokens",
+      "schedule": "23 * * * *"
     }
   ]
 }

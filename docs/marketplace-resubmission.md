@@ -51,7 +51,7 @@ Two skills, `webflow-app-preflight` and `webflow-app-review-remediation`, with c
 2. Disconnect does not revoke. "Disconnect ends that account link only. Do not call `POST /oauth/revoke_authorization` from it: users remove Webflow access by uninstalling. After Disconnect, the user must be able to connect again without redoing Webflow OAuth."
    - We called `revoke_authorization` from Disconnect, from account deletion and when a new authorization replaced an older one. Fixed: the app calls it nowhere. Disconnect deletes what we keep about the sites and leaves the authorization; the Sites page connects a site again from `GET /v2/sites`.
 3. Revocation. "A persistent 401 on a previously valid token is revocation. Stop calling; do not retry past it." 429 and passing 5xx are the opposite case. There is no uninstall webhook. Uninstall should delete or anonymize what our backend stores.
-   - Ours: a 401 is settled with one call to `GET /v2/token/authorized_by`; refused there too, the token is forgotten and the sites are deleted at once (`jobs.accessRemoved`). Every stored token is checked once a day (`jobs.checkConnections`).
+   - Ours: a 401 is settled with one call to `GET /v2/token/authorized_by`; refused there too, the token is forgotten and the sites are deleted at once (`jobs.accessRemoved`). Every stored token is asked about once every 20 hours (`jobs.checkConnections`, started by the hourly job `/cron/tokens` and by a quiet tick), so an uninstall is noticed within a day. An answer other than 401 removes nothing; that token is asked about again an hour later.
 4. Backend endpoints are verified by calling them. Identity is resolved on the server from the Webflow ID token (`webflow.getIdToken()`, valid about 15 minutes, "fetch it just in time rather than persisting it"). Never authorize on a client-supplied id. Object-level authorization with a non-enumerating failure. CORS is defence in depth, not authorization.
    - Ours: `/ext/*` answered "not connected" and "token not valid" differently. Fixed: one answer for every caller that cannot be confirmed. The panel asks for an ID token for every call.
    - This settles the open question on `POST /beta/token/resolve`: it is the only way to resolve the ID token the toolkit tells us to resolve, so it stays. The review notes name it as the one beta path, used for identity and for no feature. (The toolkit itself notes that generally available scopes can have endpoints under `/beta/`.)
@@ -160,7 +160,8 @@ Goes (until Webflow offers a stable way)
 3. DECIDED: an image whose alt text is inherited from its asset counts as having one (`assets:read` is not requested). Only an image with an empty alt on the page is a finding; one marked decorative is not.
 4. DECIDED: the Open Graph finding is about the title and description only.
 5a. TO CHECK in the end-to-end run, on the real API: that `POST /beta/token/resolve` answers with `siteId` (the panel is confirmed only when it does and it is the same site); what `GET /v2/pages/:id/dom` returns for an image with no alt text and for a page it cannot serve; the real `publishedPath` of a Collection template; that Webflow sends `error=access_denied` to the callback when the user cancels; the panel's real origin.
-5. The yearly prices and trial terms as sold at Polar, for the listing: exact amounts in USD.
+   - Also to check there: the "Designer Extension URI" shown in the app's settings is `https://<client id>.webflow-ext.com` (the deployed version answered every origin, so the exact address was never tested against the real Designer); the two cron jobs appear in Vercel after the deploy (`/cron/tick`, `/cron/tokens`); how production calls `/cron/tick` today. The cron routes also take the secret as `?key=`, which puts a secret into request logs: once the Vercel logs show that only the `Authorization` header is used, remove that option from `cronAuthorized`.
+5. TO CHECK at Polar before the listing is entered: a monthly and a yearly product for Solo, Studio and Agency at the prices in `docs/listing.md` (USD 19 and 190, 49 and 490, 149 and 1,490); "Prevent trial abuse" on; the customer notification that reminds before a trial ends on (the guide and the app say Polar sends it).
 
 ## 7. Order of work
 
@@ -180,7 +181,15 @@ Done
 - 23 Nov: `/ext/*` answers only the panel's own origin (`https://<client id>.webflow-ext.com`, plus `EXT_ORIGINS`); any other origin, or none, gets 403 and one log line `[aiseodeck] panel: refused origin ...`. CHECK in the end-to-end run that the panel's real origin is the one assumed: if the panel shows no data, read that log line and set `EXT_ORIGINS`.
 - 23 Nov: Webflow 429s back off 2, 4, 8 seconds and stop after three more tries (`MAX_RETRIES` in `api/_lib/webflow.js`).
 
-Still to do, in this order: step 6 (texts, with the lifecycle guide and the pricing in USD), step 7 (the report leaves), then the end-to-end run of section 7.
+- 23 Nov, evening: step 6 is done. The guide, the privacy policy, the terms, the home page, `llms.txt`, `REVIEW.md`, `README.md`, `.env.example`, `extension/README.md` and the listing text (`docs/listing.md`) describe this build. Prices name the currency everywhere (US$ in the app, USD in the texts). Tests check that the review notes and the README of the review ZIP name exactly the Designer API calls and routes the panel uses.
+- 23 Nov, evening: what the texts promise was made strictly true in the code.
+  - "An uninstall is noticed within a day": each token is asked about every 20 hours, by an hourly job of its own (`/cron/tokens`) as well as by a quiet tick; a pass that runs out of time is continued from the account it stopped at; an answer other than 401 (no answer, 5xx, 429) removes nothing and is asked again an hour later. The question to Webflow is one attempt of at most eight seconds, so a Webflow that is not answering cannot hold up a tick or the scheduled checks.
+  - Client report links exist on every plan; the agency name on them is Studio and Agency. The guide said otherwise and was corrected, not the app.
+  - The panel binds events with `addEventListener` under plain names (`click`, `submit`): no handler attribute name appears in the bundle. Every link is made by one function that lets it point only to the app's own address.
+- 23 Nov, evening: `scripts/package-extension.js` checks `bundle.zip` (exactly the four files, the same bytes as the source, no source map, the manifest of the repository) and writes `extension/review.zip` from the files inside the bundle plus the README. A trial with Webflow CLI 2.16.0 gave a four-file bundle identical to the source; the CLI did not touch `webflow.json`.
+- `npm test`: `test/app.js` 359, `test/panel.js` 46.
+
+Still to do, in this order: step 7 (the report leaves), the deploy, then the end-to-end run of section 7, the final bundle and review ZIP, Preflight, the video and screenshots.
 
 The steps as they were planned (1 to 5 are done)
 1. Domains and rivals (finding 3).

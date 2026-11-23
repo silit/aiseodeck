@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // The paid services behind AI SEO Deck (the AI engines, keyword data and the writing of fixes) can fail. Customers get
 // plain words for each failure, never a provider's own message. When a service refuses our account (the credit ran
 // out, a key stopped working), the owner gets an email, at most once every 6 hours per service.
@@ -62,7 +63,7 @@ async function report(service, e, where) {
   if (kind !== 'account') return kind;
   const s = SERVICES[service] || { name: String(service), fix: '' };
   const detail = String((e && e.message) || e || '').replace(/\s+/g, ' ').slice(0, 300);
-  console.error('[aiseodeck] ' + s.name + ' refused our account (' + (where || 'call') + '): ' + detail);
+  log.error('[aiseodeck] ' + s.name + ' refused our account (' + (where || 'call') + '): ' + detail);
   try {
     if (!(await kv.setNX('alert:' + service, { at: Date.now(), where: where || '' }, EVERY_S))) return kind; // told already
     const lines = [
@@ -78,7 +79,7 @@ async function report(service, e, where) {
       text: lines.join('\n\n'),
       html: lines.map((l, i) => (i === 1 ? '<p><code>' + escHtml(l) + '</code></p>' : '<p>' + escHtml(l).replace(/(https:\/\/\S+?)([.:]?)$/, '<a href="$1">$1</a>$2') + '</p>')).join('')
     });
-  } catch (err) { console.error('[aiseodeck] alert email failed', err && err.message); }
+  } catch (err) { log.error('[aiseodeck] alert email failed', err && err.message); }
   return kind;
 }
 

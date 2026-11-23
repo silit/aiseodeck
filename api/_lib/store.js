@@ -77,8 +77,17 @@ async function takeOauthState(state, browser) {
   if (Date.now() - rec.at > OAUTH_STATE_TTL * 1000) return false;
   return timingEqual(rec.b, sha256(String(browser)));
 }
-// True once in 24 hours for a connection: the moment to ask Webflow whether its token still works.
-async function dueForTokenCheck(connId) { return kv.setNX('connchk:' + connId, { at: Date.now() }, 86400); }
+// How often Webflow is asked whether a stored token still works: every 20 hours. The passes that ask start at most
+// an hour apart, so each token is asked within a day of the time before.
+const TOKEN_CHECK_EVERY = 20 * 3600; // seconds
+const TOKEN_CHECK_RETRY = 3600; // seconds: when Webflow did not say, the token is asked about again an hour later
+// True once in 20 hours for a connection: the moment to ask Webflow whether its token still works.
+async function dueForTokenCheck(connId) { return kv.setNX('connchk:' + connId, { at: Date.now() }, TOKEN_CHECK_EVERY); }
+// Webflow did not say whether the token works (no answer, an error, a request to slow down): due again in an hour.
+async function tokenCheckAgainSoon(connId) { return kv.setJSON('connchk:' + connId, { at: Date.now(), again: true }, TOKEN_CHECK_RETRY); }
+// Where the last pass over the stored tokens stopped when it ran out of time ('' when it reached the end).
+async function tokenCheckCursor() { const c = await kv.getJSON('conncursor'); return c && typeof c.id === 'string' ? c.id : ''; }
+async function setTokenCheckCursor(id) { return id ? kv.setJSON('conncursor', { id, at: Date.now() }, 86400) : kv.del('conncursor'); }
 
 function newUser(info) {
   return {
@@ -366,7 +375,7 @@ async function unlock(name) { return kv.del('lock:' + name); }
 
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
-  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, newUser, addConnection, tokenOf, tokenForSite,
+  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, tokenCheckAgainSoon, tokenCheckCursor, setTokenCheckCursor, TOKEN_CHECK_EVERY, newUser, addConnection, tokenOf, tokenForSite,
   primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, disconnectSites, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock

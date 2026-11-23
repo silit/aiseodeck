@@ -20,6 +20,9 @@
   var SVG_NS = document.getElementById('svgns').namespaceURI;
 
   /* ---------- small helpers ---------- */
+  // The events the interface listens to. In h() a key with one of these names adds a listener with
+  // addEventListener; it is never written to the element as an attribute.
+  var EVENTS = { click: true, submit: true };
   function h(tag, attrs) {
     var el = document.createElement(tag);
     attrs = attrs || {};
@@ -28,7 +31,7 @@
       if (v == null || v === false) return;
       if (k === 'class') el.className = v;
       else if (k === 'text') el.textContent = v;
-      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else if (EVENTS[k] === true) el.addEventListener(k, v);
       else el.setAttribute(k, v === true ? '' : v);
     });
     for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
@@ -112,9 +115,11 @@
   function andList(a) {
     return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
   }
-  // Links to AI SEO Deck open in a new browser tab only when the user clicks them.
+  // Links to AI SEO Deck open in a new browser tab only when the user clicks them. A link can only point to the
+  // app's own address: anything else is replaced by the address of the app.
   function link(url, cls, text) {
-    return h('a', { class: cls, href: url, target: '_blank', rel: 'noopener noreferrer' }, text);
+    var href = typeof url === 'string' && url.indexOf(API + '/') === 0 ? url : API + '/app';
+    return h('a', { class: cls, href: href, target: '_blank', rel: 'noopener noreferrer' }, text);
   }
   function notify(type, message) {
     try {
@@ -242,7 +247,7 @@
             class: 'back',
             type: 'button',
             'aria-label': 'Back to this page',
-            onclick: function () {
+            click: function () {
               S.view = 'page';
               S.msg = null;
               draw();
@@ -297,7 +302,7 @@
               'div',
               { class: 'row' },
               link(c.connectUrl, 'btn mark', 'Connect'),
-              h('button', { class: 'btn', type: 'button', onclick: load }, 'Try again')
+              h('button', { class: 'btn', type: 'button', click: load }, 'Try again')
             )
           )
         )
@@ -310,7 +315,7 @@
           'div',
           { class: 'body' },
           h('div', { class: 'msg err', role: 'alert', text: c.error }),
-          h('button', { class: 'btn', type: 'button', onclick: load }, 'Try again')
+          h('button', { class: 'btn', type: 'button', click: load }, 'Try again')
         )
       ]);
     }
@@ -512,7 +517,7 @@
             it.note ? h('span', { class: 'nt', text: it.note }) : null
           ),
           it.cta
-            ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', onclick: it.run }, it.cta)
+            ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', click: it.run }, it.cta)
             : null
         );
       })
@@ -540,7 +545,7 @@
             : 'Headings, text and images are checked by Site health, which has not read this page yet. ',
           link(c.site.healthUrl, '', p.audited ? 'Refresh in Site health' : 'Open Site health'),
           ' ',
-          h('button', { class: 'linkbtn', type: 'button', onclick: load }, 'Read this page again')
+          h('button', { class: 'linkbtn', type: 'button', click: load }, 'Read this page again')
         )
       )
     );
@@ -605,7 +610,7 @@
         class: 'btn',
         type: 'button',
         disabled: !!busy || template,
-        onclick: async function () {
+        click: async function () {
           S.busy = 'write';
           S.msg = { kind: 'info', text: 'Writing from this page, this takes a few seconds…' };
           drawMeta();
@@ -634,7 +639,7 @@
         class: 'btn mark',
         type: 'button',
         disabled: !!busy || !c.plan.canApply || template,
-        onclick: async function () {
+        click: async function () {
           var t = title.value.replace(/\s+/g, ' ').trim(),
             d = desc.value.replace(/\s+/g, ' ').trim();
           if (t.length < 5 || d.length < 20) {
@@ -677,7 +682,7 @@
       'form',
       {
         class: 'body',
-        onsubmit: function (e) {
+        submit: function (e) {
           e.preventDefault();
         }
       },
@@ -731,11 +736,7 @@
             'div',
             { class: 'msg info' },
             'Applying is part of the paid plans. Copy the text into Page settings, or ',
-            h(
-              'a',
-              { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener noreferrer' },
-              'see the plans'
-            ),
+            link(c.plan.upgradeUrl, '', 'see the plans'),
             '.'
           )
         : null

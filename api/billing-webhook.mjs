@@ -2,6 +2,7 @@
 // (Standard Webhooks headers: webhook-id, webhook-timestamp, webhook-signature).
 import billing from './_lib/billing.js';
 import store from './_lib/store.js';
+import log from './_lib/log.js';
 
 export async function POST(request) {
   const raw = await request.text();
@@ -11,7 +12,7 @@ export async function POST(request) {
     const r = await billing.handleWebhook(raw, request.headers, deps);
     return Response.json(r.body, { status: r.status });
   } catch (e) {
-    console.error('[billing webhook]', e && e.stack);
+    log.error('[billing webhook]', e && e.stack);
     return Response.json({ error: 'failed' }, { status: 500 });
   }
 }

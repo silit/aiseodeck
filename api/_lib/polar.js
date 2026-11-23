@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // Paid plans through Polar (merchant of record), the payment account for every Silit Labs product.
 // Env: POLAR_ACCESS_TOKEN (organization access token), POLAR_WEBHOOK_SECRET (whsec_...),
 //      POLAR_API_BASE (optional; https://sandbox-api.polar.sh for the sandbox), POLAR_PORTAL_URL (optional fallback)
@@ -92,7 +93,7 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
       if (!Object.keys(map).some((k) => !k.startsWith('_'))) return 'off';
       return isSandbox() ? 'test' : 'live';
     } catch (e) {
-      console.error('[billing] polar mode', e.message);
+      log.error('[billing] polar mode', e.message);
       return 'off';
     }
   }
@@ -100,7 +101,7 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
   // The plan:interval pairs that have a product (solo:monthly, solo:yearly, ...), so no button leads to a missing one.
   async function offers() {
     try { return Object.keys(await products()).filter((k) => !k.startsWith('_')); }
-    catch (e) { console.error('[billing] polar products', e.message); return []; }
+    catch (e) { log.error('[billing] polar products', e.message); return []; }
   }
 
   // opts: { trialDays (0 for none), next: 'setup' after the start page or 'settings', kw: a keyword to carry to setup }
@@ -278,7 +279,7 @@ module.exports = function polarProvider({ PLANS, ACTIVE, sign, isTester, kv }) {
         if (appUrl) body.return_url = appUrl + '/app/settings#plan';
         const d = await api('POST', '/v1/customer-sessions/', body);
         if (d.customer_portal_url) return d.customer_portal_url;
-      } catch (e) { console.error('[billing] polar portal', e.message); }
+      } catch (e) { log.error('[billing] polar portal', e.message); }
     }
     return cfg().portal;
   }

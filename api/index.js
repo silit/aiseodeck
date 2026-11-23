@@ -4,6 +4,7 @@
  * every non-static path here with the original path in req.query.path.
  */
 'use strict';
+const log = require('./_lib/log');
 
 const wf = require('./_lib/webflow');
 const health = require('./_lib/health');
@@ -164,7 +165,7 @@ async function handleAuth(req, res) {
   const kw = kwLib.clean(q.kw || '');
   const want = wantedPlan(q.plan, q.interval);
   if ((kw || want) && (await currentUser(req))) return redirect(res, want ? startUrl(want, kw) : '/app?kw=' + encodeURIComponent(kw));
-  if (!env.clientId || !env.appUrl) { console.error('[aiseodeck] WEBFLOW_CLIENT_ID or APP_URL is missing'); return send(res, 503, html.errorPage('Connecting is paused', 'Connecting to Webflow is not available right now. Try again in a few minutes.', '/')); }
+  if (!env.clientId || !env.appUrl) { log.error('[aiseodeck] WEBFLOW_CLIENT_ID or APP_URL is missing'); return send(res, 503, html.errorPage('Connecting is paused', 'Connecting to Webflow is not available right now. Try again in a few minutes.', '/')); }
   if (!localRateOk('auth:' + clientIp(req), 30, 60000)) return tooMany(res, '/');
   // what ties the request to this browser: a random value only this browser holds, in a cookie scripts cannot read
   const had = parseCookies(req).ad_oauth || '';
@@ -287,12 +288,12 @@ async function prepareKeywords(siteId, user, ids) {
   if (llm.available()) {
     for (let i = 0; i < kws.length; i += 20) {
       const batch = kws.slice(i, i + 20).map((k) => k.text);
-      asks.push(fixes.questionsFor(site.project, batch, QUESTIONS, { budgetMs: 30000 }).then((f) => { Object.assign(qs, f); }, (e) => { console.error('[aiseodeck] questions', e.message); }));
+      asks.push(fixes.questionsFor(site.project, batch, QUESTIONS, { budgetMs: 30000 }).then((f) => { Object.assign(qs, f); }, (e) => { log.error('[aiseodeck] questions', e.message); }));
     }
   }
   const needVol = kws.filter((k) => k.volume == null).map((k) => k.text);
   if (needVol.length && kwLib.available() && (await store.rateOk('labs:' + user.id, 80, 86400))) {
-    asks.push(kwLib.volumes(needVol, site.project.country, site.project.language).then((v) => { vols = v; }, async (e) => { console.error('[aiseodeck] volumes', e.message); await alerts.report('dataforseo', e, 'monthly searches'); }));
+    asks.push(kwLib.volumes(needVol, site.project.country, site.project.language).then((v) => { vols = v; }, async (e) => { log.error('[aiseodeck] volumes', e.message); await alerts.report('dataforseo', e, 'monthly searches'); }));
   }
   await Promise.all(asks);
   await store.updateSite(siteId, (s) => {
@@ -510,9 +511,9 @@ async function discoverFor(site, user) {
           const content = await health.readContent(token, meta.id, 300);
           home = { title: String((meta.seo && meta.seo.title) || meta.title || site.name), description: String((meta.seo && meta.seo.description) || ''), text: content.text };
         }
-      } catch (e) { if (!wf.isRevoked(e)) console.error('[aiseodeck] home page from Webflow', e.message); }
+      } catch (e) { if (!wf.isRevoked(e)) log.error('[aiseodeck] home page from Webflow', e.message); }
     }
-    try { ideas = await fixes.suggestKeywords(p, home, 12, { budgetMs: 30000 }); } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
+    try { ideas = await fixes.suggestKeywords(p, home, 12, { budgetMs: 30000 }); } catch (e) { log.error('[aiseodeck] keyword ideas', e.message); }
   }
   await cited;
   if (ideas.length) {
@@ -522,7 +523,7 @@ async function discoverFor(site, user) {
       const left = 50000 - (Date.now() - t0);
       if (labs && ideas.length && left > 4000) { try { vols = await kwLib.volumes(ideas, p.country, p.language, Math.min(20000, left)); } catch (e) { await alerts.report('dataforseo', e, 'monthly searches'); vols = {}; } }
       out.ideas = ideas.filter((k) => !out.cited.some((c) => c.keyword === k)).map((k) => ({ keyword: k, volume: vols[k] ? vols[k].volume : null }));
-    } catch (e) { console.error('[aiseodeck] keyword ideas', e.message); }
+    } catch (e) { log.error('[aiseodeck] keyword ideas', e.message); }
   }
   return out;
 }
@@ -1069,7 +1070,8 @@ async function extApplied(a, b) {
 async function handleExt(req, res, path, method) {
   if (!extHeaders(req, res)) {
     // one line, so that a changed panel address shows up in the logs instead of as a silent failure
-    console.log('[aiseodeck] panel: refused origin ' + String(req.headers.origin || '(none)').slice(0, 120));
+    // (a long label, such as the client id in the panel's address, is shortened here so the log keeps enough of it to compare)
+    log.info('[aiseodeck] panel: refused origin ' + String(req.headers.origin || '(none)').slice(0, 160).replace(/[A-Za-z0-9_-]{32,}/g, (m) => m.slice(0, 8) + '...' + m.slice(-4) + ' (' + m.length + ' characters)'));
     return json(res, 403, { error: 'This address may not call the panel.' });
   }
   if (method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
@@ -1087,7 +1089,7 @@ async function handleExt(req, res, path, method) {
     else return json(res, 404, { error: 'Unknown request.' });
     return json(res, out.status || 200, out);
   } catch (e) {
-    console.error('[aiseodeck] panel', e && e.stack);
+    log.error('[aiseodeck] panel', e && e.stack);
     return json(res, 500, { error: 'Something went wrong on our side. Try again in a minute.' });
   }
 }
@@ -1141,7 +1143,7 @@ async function handleAudit(req, res, user) {
   let audit;
   try { audit = await jobs.runAudit(site, user, 40000, { resume }); }
   catch (e) { return webflowFailed(res, user, site, e, backTo(''), 'Your pages could not be read from Webflow: '); }
-  const more = audit.pending ? ` ${audit.pagesChecked} of ${audit.pagesChecked + audit.pending} pages are read so far. Press "Read the rest" to go on.` : '';
+  const more = !audit.pending ? '' : ` ${audit.pagesChecked} of ${audit.pagesChecked + audit.pending} pages are read so far. ` + (audit.slowed ? 'Webflow limits how fast its API may be read. Press "Read the rest" in a minute.' : 'Press "Read the rest" to go on.');
   redirect(res, backTo(noticeQuery(user, (k ? 'Your pages are read from Webflow. The best page for this keyword is shown below.' : 'Your pages are read from Webflow.') + more)));
 }
 
@@ -1200,7 +1202,9 @@ async function handleFixRefresh(req, res, user) {
   if (ctx.error === 'site') return notFound(res);
   if (ctx.error) return redirect(res, '/app');
   const { site, audit, row, token } = ctx;
-  const back = fixUrl(site, row.path);
+  // from a keyword's fix plan the way back is that keyword
+  const kBack = b.k ? (site.keywords || []).find((x) => x.id === String(b.k)) : null;
+  const back = kBack ? kwUrl(site, kBack) : fixUrl(site, row.path);
   if (!token) return redirect(res, back + '&' + noticeQuery(user, 'The Webflow connection for this site is missing. Connect again.'));
   if (!(await store.rateOk('fixread:' + site.id, 30, 600))) return redirect(res, back + '&' + noticeQuery(user, 'This page was read a moment ago. Try again in a few minutes.'));
   try { await keepRow(site, audit, row, await pageForWriting(token, site, row)); }
@@ -1381,7 +1385,7 @@ async function handleCheckout(req, res, user) {
   if (billing.hasLiveSubscription(user)) return redirect(res, '/app/billing/portal');
   const opts = b.from === 'start' ? { next: 'setup', kw: kwLib.clean(b.kw || '') } : { next: 'settings' };
   try { redirect(res, await billing.checkoutUrl(user, String(b.plan || ''), String(b.interval || ''), ENV().appUrl, opts)); }
-  catch (e) { console.error('[billing] checkout', e.message); send(res, 502, html.errorPage('Could not open checkout', 'The payment page could not be opened right now. Try again in a minute, or write to info@silitlabs.com.', '/app/settings')); }
+  catch (e) { log.error('[billing] checkout', e.message); send(res, 502, html.errorPage('Could not open checkout', 'The payment page could not be opened right now. Try again in a minute, or write to info@silitlabs.com.', '/app/settings')); }
 }
 
 // Polar's success page sends the customer here with the checkout id. The plan is switched on from the checkout
@@ -1393,7 +1397,7 @@ async function handleBillingReturn(req, res, user) {
   const paid = () => user.plan && user.plan !== 'free' && billing.hasLiveSubscription(user);
   if (!paid() && q.checkout_id) {
     try { await billing.syncCheckout(user, String(q.checkout_id), { saveUser: store.saveUser, enforce: (u) => store.enforceLimit(u) }); }
-    catch (e) { console.error('[billing] return', e.message); }
+    catch (e) { log.error('[billing] return', e.message); }
   }
   if (!paid() && q.checkout_id && tries < 5) {
     const again = new URLSearchParams();
@@ -1460,7 +1464,7 @@ async function handleLoginPost(req, res) {
         await email.send({ to: user.email, subject: 'Your AI SEO Deck sign in link',
           html: `<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#10162B"><p>Click to sign in to AI SEO Deck. The link works once and expires in 15 minutes.</p><p><a href="${html.esc(link)}" style="display:inline-block;background:#10162B;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600">Sign in to AI SEO Deck</a></p><p style="color:#5C6478;font-size:13px">If you did not ask for this, ignore this email.</p></div>`,
           text: 'Sign in to AI SEO Deck (works once, expires in 15 minutes): ' + link });
-      } catch (e) { console.error('[aiseodeck] login email failed', e.message); }
+      } catch (e) { log.error('[aiseodeck] login email failed', e.message); }
     }
   }
   redirect(res, '/login?sent=1');
@@ -1523,6 +1527,8 @@ module.exports = async function handler(req, res) {
     if (path.startsWith('/cron/')) {
       if (!cronAuthorized(req)) return json(res, 401, { error: 'unauthorized' });
       if (path === '/cron/tick') return json(res, 200, await jobs.tick({ budgetMs: 45000 }));
+      // the hourly look at the stored Webflow tokens (how an uninstall is noticed for a site nobody opens)
+      if (path === '/cron/tokens') return json(res, 200, await jobs.checkConnections(Date.now(), 30000));
       return json(res, 404, { error: 'unknown job' });
     }
     if (path === '/app' || path.startsWith('/app/')) {
@@ -1571,7 +1577,7 @@ module.exports = async function handler(req, res) {
     }
     return send(res, 404, html.errorPage('Not found', 'There is nothing at this address.', '/'));
   } catch (e) {
-    console.error('[aiseodeck]', e && e.stack);
+    log.error('[aiseodeck]', e && e.stack);
     return send(res, 500, html.errorPage('Something went wrong', 'Something went wrong on our side. Please try again in a minute.', '/'));
   }
 };

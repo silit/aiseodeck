@@ -24,6 +24,8 @@ const RULES = {
   alt_missing: { w: 6, text: 'Images without alt text' }
 };
 const THIN_WORDS = 300;
+// Calls kept back from Webflow's limit for a minute, for what the user does next (opening a fix reads Webflow too).
+const RESERVE = 6;
 // Pages Webflow makes for itself: nobody searches for them.
 const UTILITY = /^\/(401|404|search|password|style-?guide|licen[cs]es?|changelog)(\/|$)/i;
 const INHERIT = '__wf_reserved_inherit';
@@ -131,7 +133,10 @@ async function auditSite(token, site, pages, opts) {
   const before = new Map(((opts.resume && opts.resume.pages) || []).filter((r) => r.content || r.state === 'unreadable').map((r) => [r.pageId, r]));
   const rows = new Array(picked.length).fill(null);
   let next = 0;
-  let stop = false; // out of time, or Webflow asked to slow down more often than the client retries
+  let stop = false; // out of time, or Webflow's rate limit is reached or near
+  let slowed = 0; // seconds Webflow asked to wait, when its rate limit is what stopped the read
+  // Webflow says with every answer how many calls it still takes this minute. The read stops short of that limit.
+  const nearLimit = () => { const n = wf.callsLeft(token); return n != null && n < RESERVE; };
   async function worker() {
     while (next < picked.length) {
       const i = next++;
@@ -139,11 +144,12 @@ async function auditSite(token, site, pages, opts) {
       if (meta.collectionId) { rows[i] = rowFor(meta, null); continue; }
       const kept = before.get(String(meta.id));
       if (kept) { rows[i] = kept.content ? rowFor(meta, kept) : rowFor(meta, null, 'unreadable'); continue; }
+      if (!stop && nearLimit()) { stop = true; slowed = slowed || 60; }
       if (stop || Date.now() - started > budget) { stop = true; rows[i] = rowFor(meta, null, 'pending'); continue; }
       try { rows[i] = rowFor(meta, await readContent(token, meta.id)); }
       catch (e) {
         if (wf.isRevoked(e)) throw e;
-        if (e && e.status === 429) { stop = true; rows[i] = rowFor(meta, null, 'pending'); } else rows[i] = rowFor(meta, null, 'unreadable');
+        if (e && e.status === 429) { stop = true; slowed = e.retryAfter || 60; rows[i] = rowFor(meta, null, 'pending'); } else rows[i] = rowFor(meta, null, 'unreadable');
       }
     }
   }
@@ -163,6 +169,7 @@ async function auditSite(token, site, pages, opts) {
     pagesListed: all.length,
     pagesChecked: rows.length - pending,
     pending,
+    slowed: pending && slowed ? slowed : 0, // seconds to wait before reading the rest, when Webflow's rate limit stopped the read
     overPlan: Math.max(0, all.length - picked.length),
     complete: pending === 0,
     pages: rows

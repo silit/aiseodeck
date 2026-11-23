@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // Background work, driven by one cron address (every few minutes) and by the dashboard while a run is open:
 // start runs that are due, ask the engines, finish runs (summary, history, email). Nothing here reads or writes a
 // Webflow site: Site health is read from Webflow only when the user asks for it (runAudit).
@@ -81,28 +82,49 @@ async function accessRemoved(user, connId, known) {
   return removed;
 }
 
-// There is no uninstall webhook, and the checks of this app ask the AI engines, not Webflow. So once a day every
-// stored token is asked whether Webflow still accepts it (GET /v2/token/authorized_by): that is how an uninstall
-// is noticed for a site nobody opens. It runs at most once an hour and stops after `budgetMs`.
+// There is no uninstall webhook, and the checks of this app ask the AI engines, not Webflow. So every stored token
+// is asked whether Webflow still accepts it (GET /v2/token/authorized_by) once every 20 hours: that is how an
+// uninstall is noticed, within a day, for a site nobody opens.
+// A pass starts at most once an hour (the hourly job /cron/tokens, and the tick when it has time left) and stops
+// after `budgetMs`. A pass that ran out of time is continued by the next tick from the account it stopped at, so
+// every account is reached however many there are. When Webflow did not say whether a token works (no answer, an
+// error, a request to slow down), nothing is removed, that token is asked about again an hour later, and the next
+// pass waits its hour.
 async function checkConnections(now, budgetMs) {
   if (!(await store.lock('conncheck', 3600))) return { asked: 0, removed: 0 };
   const started = Date.now();
+  const budget = budgetMs || 8000;
   const out = { asked: 0, removed: 0 };
-  for (const id of await store.allUserIds()) {
-    if (Date.now() - started > (budgetMs || 8000)) break;
+  const ids = (await store.allUserIds()).slice().sort();
+  const from = await store.tokenCheckCursor();
+  const order = from ? ids.filter((id) => id > from).concat(ids.filter((id) => id <= from)) : ids;
+  let last = '', cut = false, unsure = 0;
+  for (const id of order) {
+    if (Date.now() - started > budget) { cut = true; break; }
     const seen = await store.getUser(id);
+    let whole = true;
     for (const c of (seen && seen.connections) || []) {
-      if (Date.now() - started > (budgetMs || 8000)) break;
+      if (Date.now() - started > budget) { whole = false; break; }
       if (!(await store.dueForTokenCheck(c.id))) continue;
       const token = store.tokenOf(c);
       const st = token ? await wf.tokenStatus(token) : 'revoked';
       out.asked++;
+      if (st === 'unknown') { unsure++; await store.tokenCheckAgainSoon(c.id); continue; }
       if (st !== 'revoked') continue;
       // the record as it is now: it may have changed while Webflow was asked
       const user = await store.getUser(id);
       if (user && (await accessRemoved(user, c.id, 'revoked'))) out.removed++;
     }
+    if (!whole) { cut = true; break; }
+    last = id;
   }
+  if (cut) {
+    await store.setTokenCheckCursor(last || from);
+    out.more = true;
+    // continue at the next tick, unless Webflow is not answering: then the next pass waits its hour
+    if (!unsure) await store.unlock('conncheck');
+  } else await store.setTokenCheckCursor('');
+  if (unsure) out.unsure = unsure;
   return out;
 }
 
@@ -110,6 +132,7 @@ async function scheduleDue(now, max) {
   const ids = await store.allSiteIds();
   const sites = await store.getSites(ids);
   let started = 0;
+  let silent = false; // Webflow did not answer about a token in this pass
   for (const site of sites) {
     if (started >= (max || 20)) break;
     if (!site.tracked || !site.project || !site.project.ready || !(site.keywords || []).length) continue;
@@ -118,8 +141,11 @@ async function scheduleDue(now, max) {
     const user = await store.getUser(site.userId);
     if (!user) continue;
     // Our checks do not touch Webflow, so an uninstalled app would never be noticed: ask Webflow first.
+    // When Webflow does not say (no answer, an error), the check runs all the same, since it asks the AI engines
+    // only, and Webflow is not asked again in this pass.
     const token = store.tokenForSite(user, site);
-    const st = token ? await wf.tokenStatus(token) : 'revoked';
+    const st = !token ? 'revoked' : silent ? 'unknown' : await wf.tokenStatus(token);
+    if (st === 'unknown') silent = true;
     if (st === 'revoked') { await accessRemoved(user, site.connectionId, 'revoked'); continue; }
     const r = await startRun(site, user, site.sched.firstRunDone ? 'scheduled' : 'first');
     if (r.run) started++;
@@ -242,7 +268,7 @@ async function finishRun(run, now) {
   const sums = {};
   for (const k of run.keywords || []) sums[k.id] = analyze.keywordSummary(run.project, run.engines, list.filter((r) => r.k === k.id));
   let described = null;
-  if (!run.partial) { try { described = await insights.describe(run, list); } catch (e) { console.error('[aiseodeck] insights', e.message); } }
+  if (!run.partial) { try { described = await insights.describe(run, list); } catch (e) { log.error('[aiseodeck] insights', e.message); } }
   run.status = 'done';
   run.finishedAt = now;
   run.summary = { keywords: Object.keys(sums).length, ok: list.filter((r) => r.ok && !r.none).length, total: list.length };
@@ -280,9 +306,9 @@ async function finishRun(run, now) {
   if (run.partial) await store.expireRun(run.id, 90);
   else await store.pushHistory(site.id, { runId: run.id, at: run.at, finishedAt: now, score: l.score, mentionRate: l.mentionRate, citationRate: l.citationRate, avgRank: l.avgRank, ok: l.ok, total: l.total, keywords: l.keywords, kwNamed: l.kwNamed, engines: run.engines, reason: run.reason }, keep);
   // keywords added while this check was running
-  if (pending.length && user) { try { await startRun(site, user, 'new', { keywordIds: pending }); } catch (e) { console.error('[aiseodeck] pending keywords', e.message); } }
+  if (pending.length && user) { try { await startRun(site, user, 'new', { keywordIds: pending }); } catch (e) { log.error('[aiseodeck] pending keywords', e.message); } }
   if (!run.partial && user && user.settings && user.settings.digest && run.reason !== 'manual' && !(await store.digestDone(run.id))) {
-    try { await sendDigest(user, site, l, prev); } catch (e) { console.error('[aiseodeck] digest email failed', e.message); }
+    try { await sendDigest(user, site, l, prev); } catch (e) { log.error('[aiseodeck] digest email failed', e.message); }
   }
   return l;
 }
@@ -357,7 +383,7 @@ async function tick(opts) {
       out.worked += (r.ok || 0) + (r.failed || 0);
     }
     for (const id of await store.activeRunIds()) if (await maybeFinish(id, Date.now())) out.finished++;
-    // with time left, the daily look at the stored Webflow tokens
+    // with time left, the look at the stored Webflow tokens (the hourly job /cron/tokens does the same)
     if (!out.budget && Date.now() < deadline - 12000) {
       const c = await checkConnections(now, 8000);
       if (c.asked) out.tokens = c;

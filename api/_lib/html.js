@@ -35,7 +35,7 @@ function until(ts, now) {
 const hostOf = (u) => { try { return new URL(u).host.replace(/^www\./, ''); } catch (e) { return String(u || ''); } };
 // "November 21" for a timestamp or an ISO date
 const longDay = (ts) => { const d = new Date(typeof ts === 'number' ? ts : Date.parse(ts)); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }); };
-const money = (cents) => '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const money = (cents) => 'US$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
 const trialLeft = (user) => {
   const b = user && user.billing;
   const end = b && b.status === 'on_trial' && b.trialEnd ? Date.parse(b.trialEnd) : 0;
@@ -1074,7 +1074,7 @@ ${readForm('Read my pages from Webflow', 'primary')}<p class="tiny muted">Takes 
 <td>${p.template ? '' : `<a class="btn sm" href="/app/fix?id=${id}&page=${encodeURIComponent(p.path)}">Fix</a>`}</td></tr>`;
   }).join('');
   const read = `Read from Webflow ${ago(audit.readAt || audit.at)}.`;
-  const part = audit.pending ? ` The text of ${plural(audit.pending, 'page')} is not read yet.` : '';
+  const part = audit.pending ? ` The text of ${plural(audit.pending, 'page')} is not read yet${audit.slowed ? ': Webflow limits how fast its API may be read, so wait a minute before reading the rest' : ''}.` : '';
   const over = audit.overPlan ? ` Your plan covers ${plural((audit.pages || []).length, 'page')}; ${audit.overPlan} more are not listed.` : '';
   return `<div class="cols" style="margin-bottom:18px"><div class="panel stack"><div class="actions" style="justify-content:space-between"><h2>Page health ${audit.score == null ? '' : `<span class="score ${scoreClass(audit.score)}">${audit.score}/100</span>`}</h2>
 <div class="actions">${audit.pending ? readForm('Read the rest', 'sm primary', true) : ''}${readForm('Refresh from Webflow', 'sm')}</div></div>
@@ -1211,9 +1211,12 @@ function fixPlanBody(site, k, d) {
   const meta = draft.meta || null;
   const faq = draft.faq || [];
   const isStatic = !!target.pageId;
+  // reads this page from Webflow again and comes back here
+  const refreshBtn = isStatic ? '<button class="wfbtn" type="submit" form="kwrefresh">Refresh from Webflow</button>' : '';
+  const refreshFormHtml = isStatic ? `<form id="kwrefresh" method="post" action="/app/fix/refresh" hidden><input type="hidden" name="id" value="${id}"><input type="hidden" name="path" value="${esc(target.path)}"><input type="hidden" name="k" value="${esc(k.id)}"></form>` : '';
   const titleItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Title and description</h3><p class="d">The first thing search engines and AI read about the page.</p>
-${meta ? `<div class="diff2"><div class="was"><span class="l">Now in Webflow</span><b>${esc(row.title || '(no title)')}</b><span>${esc(row.description || 'No description')}</span><span class="tiny muted" data-read-from-webflow>Read from Webflow ${esc(ago(row.metaAt || row.contentAt || d.readAt))}.</span><input type="hidden" name="seen" value="1" form="applyform"><input type="hidden" name="seen_title" value="${esc(row.title || '')}" form="applyform"><input type="hidden" name="seen_description" value="${esc(row.description || '')}" form="applyform"></div><div class="now"><span class="l">Suggested</span><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:84px" aria-label="New description">${esc(meta.description)}</textarea></div></div>
-<label class="include"><input type="checkbox" name="do_meta" value="1" form="applyform" checked> Apply the new title and description</label>` : `<p class="small" style="margin-top:8px">Now in Webflow: <b>${esc(row.title || '(no title)')}</b> <span class="tiny muted" data-read-from-webflow>Read ${esc(ago(row.metaAt || row.contentAt || d.readAt))}.</span></p>`}</div></li>`;
+${meta ? `<div class="diff2"><div class="was"><span class="l">Now in Webflow</span><b>${esc(row.title || '(no title)')}</b><span>${esc(row.description || 'No description')}</span><span class="tiny muted" data-read-from-webflow>Read from Webflow ${esc(ago(row.metaAt || row.contentAt || d.readAt))}. ${refreshBtn}</span><input type="hidden" name="seen" value="1" form="applyform"><input type="hidden" name="seen_title" value="${esc(row.title || '')}" form="applyform"><input type="hidden" name="seen_description" value="${esc(row.description || '')}" form="applyform"></div><div class="now"><span class="l">Suggested</span><input type="text" name="title" form="applyform" maxlength="90" value="${esc(meta.title)}" aria-label="New title"><textarea name="description" form="applyform" maxlength="200" style="min-height:84px" aria-label="New description">${esc(meta.description)}</textarea></div></div>
+<label class="include"><input type="checkbox" name="do_meta" value="1" form="applyform" checked> Apply the new title and description</label>` : `<p class="small" style="margin-top:8px">Now in Webflow: <b>${esc(row.title || '(no title)')}</b> <span class="tiny muted" data-read-from-webflow>Read from Webflow ${esc(ago(row.metaAt || row.contentAt || d.readAt))}. ${refreshBtn}</span></p>`}</div></li>`;
   const faqItem = `<li><span class="tick" aria-hidden="true"></span><div><h3>Answers to what people ask</h3><p class="d">Answers written from your own page for the questions behind this keyword. ${collections ? 'They can go to your CMS as draft items; you place them on the page in Webflow.' : 'Copy them into the page in Webflow.'}</p>
 ${faq.length ? `<textarea name="faq" form="applyform" style="min-height:160px;margin-top:10px" aria-label="Questions and answers">${esc(faqLines(faq))}</textarea><span class="hint">Lines start with Q: and A:. Every answer should also be visible on the page.</span>
 ${collections ? `<label class="include"><input type="checkbox" name="do_cms" value="1" form="applyform"> Add them to <select name="collection" form="applyform" style="width:auto;padding:4px 8px;font-size:13px" aria-label="CMS collection">${collections}</select> as drafts</label>` : ''}` : ''}</div></li>`;
@@ -1222,7 +1225,7 @@ ${collections ? `<label class="include"><input type="checkbox" name="do_cms" val
     ? `<form method="post" action="/app/keyword/apply" class="plan-foot" id="applyform"><input type="hidden" name="id" value="${id}"><input type="hidden" name="k" value="${esc(k.id)}"><input type="hidden" name="what" value="page">
 <p>${k.fixedAt ? `Applied ${esc(ago(k.fixedAt))}. Publish in Webflow, then check the keyword again.` : 'Everything lands in Webflow as unpublished changes. Nothing goes live until you publish.'}</p>${localeNote(site)}<button class="btn mark" type="submit"${can ? '' : ' disabled'}>Apply to Webflow</button></form>${writeBtn('Write new suggestions').replace('class="actions"', 'class="actions" style="padding:0 22px 18px"')}`
     : `<div class="plan-foot"><p>We write the title, description and answers from the page itself. You review everything before it goes to Webflow.</p>${writeBtn('Write the fixes')}</div>`;
-  return `<section class="panel plan-card">${head}<ul class="fx">${titleItem}${faqItem}${whereItem}</ul>${cmsNote}${foot}${can ? '' : '<p class="tiny muted" style="padding:0 22px 16px">Applying to Webflow is part of the paid plans. You can copy everything on the free plan.</p>'}</section>`;
+  return `<section class="panel plan-card">${head}<ul class="fx">${titleItem}${faqItem}${whereItem}</ul>${cmsNote}${foot}${can ? '' : '<p class="tiny muted" style="padding:0 22px 16px">Applying to Webflow is part of the paid plans. You can copy everything on the free plan.</p>'}${refreshFormHtml}</section>`;
 }
 
 // Tabs on the keyword page: every panel is in the page, so it reads in full without JavaScript; with it, one panel
@@ -1328,7 +1331,7 @@ function trialNote(user) {
   const b = user.billing || {};
   if (!trialLeft(user)) return '';
   const p = PLANS[b.plan] || {};
-  const charge = b.amount != null ? money(b.amount) : '$' + (b.interval === 'yearly' ? p.yearly : p.monthly);
+  const charge = b.amount != null ? money(b.amount) : 'US$' + (b.interval === 'yearly' ? p.yearly : p.monthly);
   const per = b.interval === 'yearly' ? 'a year' : 'a month';
   return noticeHtml(`Your ${esc(p.name || '')} trial runs until ${esc(longDay(b.trialEnd))}. ${b.cancelAtPeriodEnd
     ? 'You cancelled it, so nothing is charged and the account moves to the free plan then.'
@@ -1348,13 +1351,13 @@ function startPage(user, d) {
   const pick = Object.entries(PLANS).map(([k, x]) => (k === d.plan ? `<span aria-current="true">${esc(x.name)}</span>` : `<a href="${href(k, d.interval)}">${esc(x.name)}</a>`)).join('');
   // the other billing period, when it can be bought
   const canOther = !d.offers || d.offers.includes(d.plan + ':' + (yearly ? 'monthly' : 'yearly'));
-  const other = !canOther ? '' : yearly ? `<a class="small" href="${href(d.plan, 'monthly')}">Pay monthly instead, $${num(p.monthly)} a month</a>` : `<a class="small" href="${href(d.plan, 'yearly')}">Pay yearly and get 2 months free, $${num(p.yearly)} a year</a>`;
+  const other = !canOther ? '' : yearly ? `<a class="small" href="${href(d.plan, 'monthly')}">Pay monthly instead, US$${num(p.monthly)} a month</a>` : `<a class="small" href="${href(d.plan, 'yearly')}">Pay yearly and get 2 months free, US$${num(p.yearly)} a year</a>`;
   return layout((t ? 'Start your free trial' : 'Start ' + p.name) + ' · AI SEO Deck', `${noticeHtml(d.notice)}
 <div class="panel stack startbox">
 <div class="planpick" role="group" aria-label="Plan">${pick}</div>
 <h1>${t ? `Try ${esc(p.name)} free for ${t} days` : `Start ${esc(p.name)}`}</h1>
 <p class="muted">${p.keywords} keywords on ${plural(p.sites, 'site')}, checked every week on all ${allEnginesCount()} AI engines, with one-click fixes to Webflow and ${p.rechecks} keyword checks on demand a month${p.sites > 1 ? ', plus client report links with your agency name' : ''}.</p>
-<dl class="bill"><div class="now"><dt>Today</dt><dd>$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>$${num(price)}<small> ${per}</small></dd></div></dl>
+<dl class="bill"><div class="now"><dt>Today</dt><dd>US$${t ? 0 : num(price)}</dd></div><div><dt>${t ? 'From ' + esc(firstCharge) : 'Then'}</dt><dd>US$${num(price)}<small> ${per}</small></dd></div></dl>
 <p class="small muted">${t ? `Polar, our payment provider, asks for your card now and charges it on ${esc(firstCharge)}. Cancel any time before then from your Account page and you pay nothing. Polar emails you a reminder before the trial ends.` : 'Polar, our payment provider, handles the payment. Cancel any time from your Account page.'}</p>
 <form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${esc(d.plan)}"><input type="hidden" name="interval" value="${esc(d.interval)}"><input type="hidden" name="from" value="start"><input type="hidden" name="kw" value="${esc(d.kw || '')}"><button class="btn mark" type="submit">${t ? 'Start free trial' : 'Continue to payment'}</button>${other}</form>
 <p class="small" style="border-top:1px solid var(--line2);padding-top:14px"><a href="${esc(d.next)}">Not now, continue on the free plan</a><span class="muted">: 3 keywords, checked every month on ${freeEnginesText()}.</span></p>
@@ -1375,7 +1378,7 @@ function settingsPage(user, sites, limits, notice, opts) {
   const t = opts.trialDays || 0;
   const planCards = [['free', FREE]].concat(Object.entries(PLANS)).map(([k, p]) => {
     const current = limits.plan === k;
-    const price = k === 'free' ? '$0' : '$' + p.monthly;
+    const price = k === 'free' ? 'US$0' : 'US$' + p.monthly;
     let btn = '';
     if (k !== 'free' && !current && !limits.complimentary) {
       // with a subscription running, a plan change goes through Polar's portal so there is never a second subscription
@@ -1388,9 +1391,9 @@ function settingsPage(user, sites, limits, notice, opts) {
         if (hasM || hasY) {
           btn = `<form method="post" action="/app/billing/checkout" class="actions"><input type="hidden" name="plan" value="${k}">`
             + (hasM ? `<button class="btn ${k === 'solo' ? 'mark' : ''} sm" name="interval" value="monthly" type="submit">${t ? `Try free for ${t} days` : 'Monthly'}</button>` : '')
-            + (hasY ? `<button class="btn ${!hasM && k === 'solo' ? 'mark' : ''} sm" name="interval" value="yearly" type="submit">${!hasM && t ? `Try free for ${t} days, yearly` : 'Yearly, 2 months free'}</button>` : '')
+            + (hasY ? `<button class="btn ${!hasM && k === 'solo' ? 'mark' : ''} sm" name="interval" value="yearly" type="submit">${!hasM && t ? `Try free for ${t} days, yearly` : `Yearly, US$${num(p.yearly)}`}</button>` : '')
             + '</form>'
-            + (t ? `<span class="tnote">$0 today, then ${[hasM ? `$${num(p.monthly)} a month` : '', hasY ? `$${num(p.yearly)} a year` : ''].filter(Boolean).join(' or ')}. Cancel in the first ${t} days and pay nothing.</span>` : '');
+            + (t ? `<span class="tnote">US$0 today, then ${[hasM ? `US$${num(p.monthly)} a month` : '', hasY ? `US$${num(p.yearly)} a year` : ''].filter(Boolean).join(' or ')}. Cancel in the first ${t} days and pay nothing.</span>` : '');
         }
       }
     }
@@ -1411,7 +1414,7 @@ ${trialNote(user)}
 ${b.subscriptionId && !trialLeft(user) ? `<p class="small">Subscription: <b>${esc(STATUS_WORDS[b.status] || b.status || '')}</b>${b.renewsAt ? ', renews ' + esc(longDay(b.renewsAt)) : ''}${b.endsAt && !b.renewsAt ? ', ends ' + esc(longDay(b.endsAt)) : ''}. <a href="/app/billing/portal">Manage billing</a></p>` : ''}
 ${opts.billing || limits.plan !== 'free' ? '' : '<p class="small muted">Paid plans open soon. Write to info@silitlabs.com if you need more now.</p>'}
 ${t && opts.billing && limits.plan === 'free' ? `<p class="small">Every paid plan starts with ${t} days free. Polar asks for a card and charges nothing until day ${t + 1}.</p>` : ''}
-<div class="plans">${planCards}</div><p class="tiny muted">Payments are handled by ${esc(opts.providerName || 'Polar')}. Prices in US dollars; taxes may apply.</p></section>
+<div class="plans">${planCards}</div><p class="tiny muted">Payments are handled by ${esc(opts.providerName || 'Polar')}. All prices are in US dollars (USD). Taxes may be added at checkout. Yearly: Solo US$190, Studio US$490, Agency US$1,490.</p></section>
 <form class="panel stack" method="post" action="/app/settings"><h2>Emails and reports</h2>
 <div class="field"><label for="reportEmail">Send reports to</label><input type="email" id="reportEmail" name="reportEmail" maxlength="254" value="${esc((user.settings && user.settings.reportEmail) || user.email || '')}"></div>
 <label class="check"><input type="checkbox" name="digest" value="1"${user.settings && user.settings.digest ? ' checked' : ''}> Email me after every scheduled check</label>

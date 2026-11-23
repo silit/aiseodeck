@@ -1,32 +1,141 @@
-# Webflow Marketplace review notes
+# AI SEO Deck: review notes for the resubmission
 
-App type: hybrid. A Data Client (OAuth, server side) plus a Designer Extension (the panel in `extension/`, a static bundle with no framework). No custom code on sites.
+Reply to the review of 23 November 2026 (ticket #1221544). This file is the source of the notes that go into the submission form. Everything in it describes the build on the branch `marketplace-rework`.
 
-Scopes and why:
-- authorized_user:read: create the account, send reports.
-- sites:read: site names and domains (the brand's website for citation checks).
-- pages:read: page titles, descriptions and existing JSON-LD, to match each keyword to its best page and for the audit.
-- pages:write: only when the user presses Apply: PUT /v2/pages/{id} (seo title and description) and PUT /beta/pages/{id}/schema-markup.
-- cms:read: list collections for the drafts picker (FAQ answers, a new page for a keyword).
-- cms:write: only when the user presses Apply or "Add the draft to Webflow": items are created with isDraft true.
+Status: **NOT READY TO RESUBMIT.** Still open, in order: the AI Visibility Report moves to its own project; this build goes to production; the end-to-end run on the published test site; App Review Preflight on the final bundle and review ZIP; the new demo video and screenshots. The fields marked `[to fill]` below are filled from those steps. The owner submits.
 
-Webflow stays the source of truth: every fix is shown with the current value read live from Webflow, written only on Apply, as an unpublished change. Existing JSON-LD nodes are kept; only the same types are replaced. Nothing is published by the app.
+## The app
 
-Reviewers: any @webflow.com account gets the Agency plan for free.
+- **Type:** Hybrid. A Data Client (OAuth, server side) and a Designer Extension (the panel in `extension/`, three static files with no build step).
+- **No code on customer sites.** The app registers and injects no script, uses no Custom Code API and adds no element to a site.
+- **Install URL:** `https://aiseodeck.silitlabs.com/auth`
+- **Redirect URI:** `https://aiseodeck.silitlabs.com/callback`
+- **Documentation:** the AI SEO Deck guide, `https://aiseodeck.silitlabs.com/docs`
+- **Privacy policy:** `https://aiseodeck.silitlabs.com/privacy` **Terms:** `https://aiseodeck.silitlabs.com/terms`
+- **Support:** info@silitlabs.com
+- **Test site:** `[to fill: the published .webflow.io site]`
+- **Demo video:** `[to fill]`
+- **Preflight receipt:** `[to fill: wfpre_...]`
+- **Bundle and review ZIP:** `[to fill: file names and SHA-256]`
 
-Test flow: Connect Webflow > set up a site (brand, rivals, keywords; ideas are suggested) > the first check runs and the site opens on its Overview (Do these next) > Keywords > open a keyword (which engines name you, then the Fix plan, What AI said and Related keywords tabs) > Site health: run the audit > Write the fixes > Apply to Webflow (title and description, FAQ schema, optional CMS drafts) > publish in Webflow > Check again.
+## The five findings
 
-Designer Extension: open a page of the connected site in the Designer > Apps > AI SEO Deck. The panel shows the page, the keyword that belongs to it with each engine, and what to fix. Title and description: Write with AI, change anything, Apply to this page (set with the Designer API: page.setTitle, page.setDescription). FAQ schema: Write answers with AI, Add FAQ schema (written by the server through the schema markup API, since the Designer API has none). A site that is not connected yet gets a Connect button.
+| # | Finding | What was done | Evidence |
+| --- | --- | --- | --- |
+| 1 | The site audit read the published site outside the Webflow API. | The audit is gone. **Site health** is built on the Data API alone: `GET /v2/sites/{site_id}/pages` for the page list with SEO and Open Graph settings, `GET /v2/pages/{page_id}/dom` for the text, headings and images of static pages. Suggestions are written from the same two calls. The code that requested published websites is deleted from the repository (`api/_lib/audit.js`, `api/_lib/fetcher.js`). The app requests no website of a customer anywhere. | `api/_lib/health.js`, `api/_lib/pagetext.js`, `api/_lib/webflow.js`. `node test/app.js`: a stand-in for the customer's published site runs through the whole test and must receive no request; every request of the run must go to Webflow's API, an AI or keyword data provider, mail, billing or the database; a static check lists the only modules that may send requests. |
+| 2 | Dependence on beta endpoints (the three schema-markup calls). | Every schema feature is removed: reading JSON-LD, the schema findings, and writing FAQ, Organization and WebSite schema, in the web app and in the panel. No feature uses a beta endpoint. One call outside `/v2` remains, for identity only: `POST /beta/token/resolve`, the call Webflow provides for resolving the Designer's ID token (see "The panel" below). | `api/_lib/webflow.js` has no schema call. `node test/app.js` checks the code for beta paths and lists every Webflow endpoint called during the run. |
+| 3 | Setup asked users to enter their domains. | Setup and Settings show the site's addresses as read from `GET /v2/sites/{site_id}` (custom domains and the webflow.io address), read-only, with the time they were read and a Refresh button. No screen asks for a website address. Rivals are asked for by name only. | `api/_lib/store.js` (`domainsOf`, `refreshMeta`), `api/_lib/html.js` (`webflowDomains`). Tests: "setup asks for no website address", "the addresses of the site are the ones Webflow gives, not the ones typed into the form". |
+| 4 | The listing description did not meet the requirements. | Rewritten (see `docs/listing.md`): what the app does, each feature, what is needed before starting and what setup asks, prices in US dollars with the yearly amounts and the trial terms, and the documentation by name. The sentence on token encryption moved here. Every statement was checked against this build. | `docs/listing.md` |
+| 5 | The documentation did not cover the Designer Extension or the Webflow plan. | The guide is rewritten and covers the whole app: what is needed in Webflow (no particular plan; what the CMS drafts and the panel need), install, setup, checks, fixes, Site health, the panel in the Designer, what is written to Webflow and when, languages, prices, and disconnect, uninstall and delete. | `public/docs.html`, sections "What you need before you start" and "8. Inside the Webflow Designer" |
 
-How the panel authenticates: it calls webflow.getIdToken() and sends the ID token with the site id to /ext/*. The server resolves it with POST /beta/token/resolve using the stored Data Client token of that site, and answers only when the token names the same site. No cookies cross over; the panel's requests carry no session of the app. CORS on /ext/* only (Access-Control-Allow-Origin *, POST), since the ID token is what proves the user.
+What the API does not provide for a Webflow site, and the app therefore no longer reports: structured data, robots.txt, llms.txt, the sitemap, and the text of CMS item pages. Text inside components is not read: on such a page "No H1" and "Thin content" are shown as "not determined" and take nothing off the score.
 
-Localization: before every write the app reads the site's locales (GET /v2/sites/{id}) and names the primary locale. Titles and descriptions: PUT /v2/pages/{id}?localeId=<primary locale id>. CMS drafts: cmsLocaleId=<primary cmsLocaleId>. Schema markup is written without localeId, which the schema markup API documents as the primary locale (its localeId names a secondary locale). Secondary locales are never written. On sites with more than one language, the keyword and fix pages say next to Apply that fixes go to the primary language only.
+## Scopes and the endpoints that use them
 
-Security:
-- OAuth tokens are encrypted at rest (AES-256-GCM) in the app's server-side database and never reach the browser.
-- Tokens are deleted on Disconnect and on account deletion (both also call /oauth/revoke_authorization), and when Webflow answers 401 (uninstall or revocation), which is checked before every scheduled check and on every write.
-- The state parameter is created and verified for every sign in the app starts. Installs started from the Marketplace arrive without state and are exchanged without redirect_uri.
-- Authorization codes are used once and never stored or logged.
-- CORS headers are sent only on /ext/* (the Designer panel), which answers only to a valid Webflow ID token for the site; every other route sends none.
-- Every site route checks that the site belongs to the signed in user.
-- The site audit only fetches the connected site's own domains (an allowlist), refuses private and special IP addresses inside the DNS lookup, and caps response size.
+| Scope | Endpoint | Used for |
+| --- | --- | --- |
+| `authorized_user:read` | `GET /v2/token/authorized_by` | The account (Webflow user id, name, email). Also asked to learn whether a token still works. |
+| `authorized_user:read` | `POST /beta/token/resolve` | Resolving the ID token of the Designer panel. |
+| `sites:read` | `GET /v2/sites`, `GET /v2/sites/{site_id}` | Site names, addresses and locales; the sites that can be connected. |
+| `pages:read` | `GET /v2/sites/{site_id}/pages`, `GET /v2/pages/{page_id}`, `GET /v2/pages/{page_id}/dom` | Site health; the text a suggestion is written from; the values a fix shows as "Now in Webflow". |
+| `pages:write` | `PUT /v2/pages/{page_id}` | The SEO title and meta description of one page, when the user presses Apply. |
+| `cms:read` | `GET /v2/sites/{site_id}/collections`, `GET /v2/collections/{collection_id}` | The collection picker for drafts, and its text field. |
+| `cms:write` | `POST /v2/collections/{collection_id}/items` with `isDraft: true` | Draft items, when the user presses Apply or Add the draft to Webflow. |
+
+The Install URL asks for exactly these six scopes, the ones configured for the app.
+
+## Authorization (OAuth)
+
+- Every authorization starts at the Install URL, `/auth`. It creates a random `state` for that one request, stores its hash on the server together with the hash of a value held by the starting browser in an HttpOnly, Secure, SameSite=Lax cookie, for ten minutes, and then redirects to `webflow.com/oauth/authorize`.
+- `/callback` reads and deletes that record in one operation before the code is used. A callback with no `state`, a changed `state`, a `state` given twice, one used before, one older than ten minutes or one started in another browser is refused, and no code exchange happens.
+- The Install button under Apps & Integrations in the developer Workspace sends no `state`, so it ends on that refusal. It is not a customer path; the app is installed from the Install URL.
+- The code is exchanged once, with the redirect URI, and is never stored or logged. A cancelled request ends on a page that says nothing was stored.
+- OAuth runs at install and when the user chooses to authorize another site or Workspace. Signing in again is by an emailed one-time link, not by OAuth.
+
+Tests in `node test/app.js`, section "the install address and the OAuth state": two requests carry different states; no state, a changed state, a repeated state, a state from another browser, a used state, an expired state and a denied request are each refused with no code exchange.
+
+## Tokens
+
+- The access token is encrypted at rest (AES-256-GCM) in the server-side database.
+- It is used on the server only. It never reaches the browser or the Designer panel, and it is never logged.
+- It is deleted when Webflow no longer accepts it (the app was uninstalled or its access removed), and when the user deletes the account.
+
+## Disconnect, uninstall and delete
+
+- **The app never calls `/oauth/revoke_authorization`.** Access to Webflow ends when the user removes the app in Webflow.
+- **Disconnect** (a site in its Settings, or all sites of one authorization on the Account page) deletes what the app keeps about those sites and leaves the authorization alone. The Sites page lists the sites the authorization covers, read from `GET /v2/sites`, and **Connect** brings one back with no new authorization.
+- **Uninstall.** There is no uninstall webhook, so the app learns of it from a 401. One call to `GET /v2/token/authorized_by` settles it: refused there too, the app stops asking Webflow anything with that token, forgets the token and deletes the sites of that authorization with everything kept about them. This happens at the next thing the user does, before the next scheduled check, and at the latest within a day: an hourly job (`/cron/tokens`) asks about every stored token once every 20 hours. When Webflow does not say whether a token works (no answer, a 5xx, a 429), nothing is removed and that token is asked about again an hour later.
+- **A 401 is never retried.** A 429 is: the app waits as long as `Retry-After` says, never less, at most three more times, and stops instead of retrying when the wait is longer than ten seconds. Site health stops short of the limit Webflow reports in `X-RateLimit-Remaining` and reads the rest when the user asks.
+- **What stays in Webflow** after any of these: the titles and descriptions the user applied, and the CMS draft items. The app adds nothing else to a site. The guide says how to change or delete them.
+- **Delete account** deletes the account, its sites, answers, Site health results and tokens, and cancels a paid plan.
+- **When a plan or a trial ends**, the account moves to the free plan. Nothing is deleted in the app or in Webflow; Apply is off.
+
+## What is written to Webflow
+
+Two things, and only when the user presses a button for that page or that draft:
+
+1. `PUT /v2/pages/{page_id}` with `seo.title` and `seo.description`. The screen shows "Now in Webflow" (read at that moment, with the time) next to the suggestion. Just before writing, the app reads the page again; if the title or description is no longer what the user was shown, nothing is written and the new values are shown.
+2. `POST /v2/collections/{collection_id}/items` with `isDraft: true`.
+
+Nothing is written on a schedule or on page load. Nothing is published or deleted by the app. After an Apply the app tells the user to publish in Webflow. Suggestions written by AI are labelled as suggestions and stay apart from the values read from Webflow. Setup, Settings, Site health, each page's fix and each keyword's fix plan say when their Webflow data was read and have a Refresh from Webflow button; the panel says it too and has "Read this page again".
+
+## Localization
+
+The app reads, checks and writes the primary locale only, and says so next to every Apply button on a site with more than one language.
+
+| Operation | Locale |
+| --- | --- |
+| Read pages and their content | No `localeId`: Webflow answers with the primary locale. |
+| `PUT /v2/pages/{page_id}` | No `localeId`: Webflow writes the primary locale. Webflow refuses a primary locale id on this endpoint ("The provided locale must be a secondary locale"), so none is sent. |
+| `POST /v2/collections/{collection_id}/items` | No `cmsLocaleId`: the draft is created in the primary locale. |
+| Secondary locales | Never read and never written. |
+
+## The panel in the Designer
+
+- Files: `extension/public/index.html`, `app.css`, `app.js`, and `extension/webflow.json`. Plain HTML, CSS and JavaScript written by hand, shipped as they are: no framework, no dependency, no bundler, no minifier, so there are no source maps. The review ZIP holds these files byte for byte and a README.
+- Designer API calls: `webflow.getSiteInfo`, `webflow.getCurrentPage`, the page getters (`getName`, `isHomepage`, `getPublishPath`, `getSlug`, `getTitle`, `getDescription`, `getCollectionId`), `page.setTitle`, `page.setDescription`, `webflow.getIdToken`, `webflow.setExtensionSize`, `webflow.subscribe('currentpage')`, `webflow.notify`.
+- `setTitle` and `setDescription` run only in the click handler of **Apply to this page**. Nothing changes on load or when the page changes.
+- It calls one server, `https://aiseodeck.silitlabs.com/ext/` (`context`, `suggest`, `applied`), with POST. Each request carries a fresh ID token from `webflow.getIdToken()`, the site id, the page id and the page path, and no other credential. The token is asked for every request and never kept.
+- The server resolves the ID token with `POST /beta/token/resolve`, using the stored token of the site named in the request, and answers only when Webflow says the token belongs to that same site. A site id sent by the panel is never trusted on its own.
+- A caller that cannot be confirmed gets one and the same answer whatever the reason: the site is not connected, the token is unknown, the token belongs to another site, or Webflow gave no answer. The answers do not tell which sites use the app.
+- CORS: `/ext/*` names one allowed origin, the extension's own (`https://<client id>.webflow-ext.com`), and answers 403 to any other origin or to none. CORS is not what authorizes a call; the ID token is. No other route sends CORS headers.
+- The panel has no inline handlers or styles, no `eval`, no HTML built from strings, no timers, no keyboard shortcuts, no `message` handler, no browser storage, no cookies and no iframe. Events are bound with `addEventListener`. Links to the app are ordinary links that open in a new tab when clicked; one function makes them all and lets them point only to the app's own address. The only address in its files is the app's own, over HTTPS.
+
+## The backend
+
+- Every `/app/*` route needs a signed-in session and checks that the site belongs to that account; a site of another account answers the same "not found" as a site that does not exist. Forms are refused from other origins.
+- `/cron/*` needs a secret. The billing webhook checks its signature. `/r/{token}` is the client report link the user creates on purpose: public to whoever has the link, marked noindex, replaceable.
+- The app requests only fixed addresses: Webflow's API, the AI providers, DataForSEO, Resend, Polar and its database. No address comes from user input.
+- The app has no third-party dependencies (`package.json` lists none).
+- Log lines pass through one function that takes out email addresses and anything long enough to be a token.
+
+## What goes to other services
+
+- **AI engines** (OpenAI, Google, Anthropic, xAI) and **DataForSEO** get the user's keywords, the questions written for them and the market, to produce the answers that are measured.
+- **When the user asks for a suggestion**, the title, description and part of the text of that page, as the Webflow API returns them (at most 6,000 characters), go to one AI provider to write it.
+- **DataForSEO** gets the keywords and the site's address for search volumes and for the keywords where Google's AI Overviews cite the site.
+- Nothing else leaves. The privacy policy lists what is stored and for how long.
+
+## Prices and access for review
+
+All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3 engines, no Apply. Solo: USD 19 a month or USD 190 a year. Studio: USD 49 a month or USD 490 a year. Agency: USD 149 a month or USD 1,490 a year. Paid plans start with a 7-day free trial, once per customer: Polar takes a card, charges nothing during the trial and charges the plan's price on day 8 unless the user cancels. No other fees.
+
+**Reviewers:** an account with an `@webflow.com` email gets the Agency plan with no checkout and no card, for as long as the account exists. After authorizing from the Install URL you land on the setup of the site.
+
+## How to test
+
+1. Open the Install URL and approve for the test site. Setup opens. (To see the denied path: open the Install URL again and cancel on Webflow's screen.)
+2. Setup: brand name, rivals by name, then **Suggest keywords from my site** or type a keyword. Save. The first check runs for a few minutes.
+3. Keywords: open a keyword to read each engine's answer.
+4. Site health: **Read my pages from Webflow**. Open a page with **Fix**: "Now in Webflow" on the left, **Write a suggestion with AI**, then **Apply to Webflow**. Check the page settings in Webflow: the change is there, unpublished.
+5. Keyword page, **Write the fixes**, tick the CMS box, **Apply to Webflow**: draft items appear in the collection.
+6. In the Designer: Apps, AI SEO Deck. The panel shows the open page. **Fix**, **Write with AI**, **Apply to this page**.
+7. Site Settings, **Disconnect this site**; then Sites, **Add a site**, **Connect**: no Webflow screen appears.
+8. Remove the app in Webflow. Open the app again and press anything that reads Webflow: the Sites page says access was removed and the site is gone.
+
+## Checks run on this build
+
+- `node test/app.js`: `[to fill: N passed, 0 failed]` (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
+- `node test/panel.js`: `[to fill: N passed, 0 failed]` (the panel in Chromium, served from the extension's address under a strict Content Security Policy, against the real server code).
+- End-to-end on the published test site: `[to fill: date and result]`.
+- App Review Preflight: `[to fill: readiness and receipt]`.
