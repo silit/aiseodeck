@@ -2,19 +2,12 @@
 // (Standard Webhooks headers: webhook-id, webhook-timestamp, webhook-signature).
 import billing from './_lib/billing.js';
 import store from './_lib/store.js';
-import vrpay from './_lib/vr/pay.js';
 
 export async function POST(request) {
   const raw = await request.text();
   const deps = { getUser: store.getUser, saveUser: store.saveUser, enforce: (user) => store.enforceLimit(user) };
   try {
-    // one-time orders are AI Visibility Reports; everything else is a plan
-    let type = '';
-    try { type = String(JSON.parse(raw).type || ''); } catch (e) { type = ''; }
-    if (type.startsWith('order.')) {
-      const o = await vrpay.handleWebhook(raw, request.headers, { verify: billing.polar.verify });
-      return Response.json(o.body, { status: o.status });
-    }
+    // only subscription events of AI SEO Deck's plans change anything; every other event is answered and ignored
     const r = await billing.handleWebhook(raw, request.headers, deps);
     return Response.json(r.body, { status: r.status });
   } catch (e) {

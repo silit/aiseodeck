@@ -55,18 +55,6 @@
       "destination": "/api/index?path=r/:token"
     },
     {
-      "source": "/_vr/ai-visibility-report",
-      "destination": "/api/index?path=ai-visibility-report"
-    },
-    {
-      "source": "/_vr/ai-visibility-report/:rest*",
-      "destination": "/api/index?path=ai-visibility-report/:rest*"
-    },
-    {
-      "source": "/_vr/check/:rest*",
-      "destination": "/api/index?path=check/:rest*"
-    },
-    {
       "source": "/cron/:job",
       "destination": "/api/index?path=cron/:job"
     },
@@ -106,10 +94,6 @@
   "crons": [
     {
       "path": "/cron/tick",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/cron/vr",
       "schedule": "*/5 * * * *"
     }
   ]
