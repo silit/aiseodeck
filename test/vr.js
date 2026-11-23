@@ -385,7 +385,7 @@ const polar = http.createServer((req, res) => {
   const blocked = await core.start('blocked.example', { ip: 'visitor4' });
   c = await core.get(blocked.id);
   assert(blocked.id && !c.site.read.ok && c.site.read.status === 403 && core.findingsOf(c.site)[0].code === 'blocked' && /We could not read/.test(V.app(await pub(blocked.id))), 'a site that refuses our reader still gets a check, and the refusal is the first finding');
-  for (let i = 0; i < 6; i++) await core.start('nowhere.example', { ip: 'greedy' });
+  for (let i = 0; i < core.FREE_PER_IP + 2; i++) await core.start('nowhere.example', { ip: 'greedy' });
   assert((await core.start('casaaldora.example', { ip: 'greedy', fresh: true })).code === 'limit', 'free checks are limited per visitor and day');
   // one engine fails, the writing model is down
   const calls2 = fx.install({ failEngine: 'gemini', llmDown: true });

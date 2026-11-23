@@ -383,6 +383,11 @@ function topicsFrom(list, looked) {
   return (list || []).slice(0, topicCount()).map((t, i) => ({ id: 't' + i, keyword: kwLib.clean(t.keyword) || keywordFrom(t.question), question: clean(t.question, 170), volume: typeof t.volume === 'number' ? t.volume : null, looked: looked || '', edited: false }));
 }
 
+// Free checks one visitor can start in a day (VR_FREE_PER_IP sets another number). The usual number is 4.
+// It is 30 from 23 November 2026, while we run the checks for our own outreach from one address: put it
+// back to 4 when that is done. The site says "up to 4 a day" (checksPerDay in its src/data/report.js).
+const FREE_PER_IP = 30;
+
 // Free checks are capped per visitor and per day; a website checked in the last week shows that check again.
 async function start(input, ctx) {
   ctx = ctx || {};
@@ -398,7 +403,7 @@ async function start(input, ctx) {
     const stuck = old && old.status === 'draft' && !old.topics.length && old.site && old.site.read && old.site.read.ok;
     if (old && ['preview', 'running', 'draft'].includes(old.status) && !old.paid && !stuck) { await count('again'); return { id: old.id, cached: true }; }
   }
-  if (ctx.ip && !(await store.rateOk('vrip:' + ctx.ip, parseInt(process.env.VR_FREE_PER_IP || '', 10) || 4, 86400))) return { error: 'You have used today\'s free checks. Come back tomorrow, or open the full report for a check you already ran.', code: 'limit' };
+  if (ctx.ip && !(await store.rateOk('vrip:' + ctx.ip, parseInt(process.env.VR_FREE_PER_IP || '', 10) || FREE_PER_IP, 86400))) return { error: 'You have used today\'s free checks. Come back tomorrow, or open the full report for a check you already ran.', code: 'limit' };
   let read = await readSite(n.origin, n.host);
   if (read.moved) {
     const m = normalizeUrl(read.moved);
@@ -1428,7 +1433,7 @@ async function tick(opts) {
 }
 
 module.exports = {
-  ID_RE, COUNTRY, FIN_STEPS, SEARCH, RECHECK_EARLY, RECHECK_AFTER, DAY, price, topicCount, NUMBER,
+  ID_RE, COUNTRY, FIN_STEPS, SEARCH, RECHECK_EARLY, RECHECK_AFTER, DAY, FREE_PER_IP, price, topicCount, NUMBER,
   normalizeUrl, URL_ERRORS, readSite, findingsOf, understand, keywordFrom, sameBusiness, nameWords, bareName, readAnswer, searchVolumes, pickTopics, othersOf, alike, sameSubject, demandOf, CANDIDATES,
   get, save, update, results, rowsOf, start, runFree, runFull, pump, work, maybeFinish, finalizeStep, tick,
   markPaid, setEmail, sendReady, startRecheck, count, stats,
