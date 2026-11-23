@@ -1173,6 +1173,85 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     wfState.revoked = false;
   }
 
+  console.log('an account made by the version before this one');
+  {
+    // The database as the version that was live until this one left it (test/fixtures/db-before-rework.json, made
+    // by running that version's own test): a site whose addresses were typed, a Site health result read from the
+    // published website, drafts written from published pages, and an authorization kept without its list of sites.
+    const fsx = require('fs'), px = require('path');
+    const snap = JSON.parse(fsx.readFileSync(px.join(__dirname, 'fixtures', 'db-before-rework.json'), 'utf8'));
+    for (const k of [...db.keys()]) if (/^(user:|site:|audit:|draft:|hist:|run:|res:|email:|users:all$|sites:all$|runs:active$|lock:|connchk:|conncursor$|rl:)/.test(k)) { db.delete(k); ttl.delete(k); }
+    for (const [k, e] of snap) db.set(k, e.t === 'set' ? new Set(e.v) : e.t === 'hash' ? new Map(e.v) : e.t === 'list' ? e.v.slice() : e.v);
+    const was = getJ('site:siteA'), wasAudit = getJ('audit:siteA'), wasUser = getJ('user:user_1');
+    const oldDrafts = [...db.keys()].filter((k) => k.startsWith('draft:siteA:'));
+    assert(!was.metaAt && was.project.domains.join() === 'lumendental.com' && was.audit && !was.audit.readAt && !wasAudit.source && wasAudit.siteIssues.some((x) => x.code === 'llms_missing') && wasAudit.pages.some((x) => (x.issues || []).includes('schema_missing')) && oldDrafts.length === 4 && oldDrafts.every((k) => getJ(k).v === undefined) && wasUser.connections.length === 1 && wasUser.connections[0].siteIds === undefined && wasUser.plan === 'solo',
+      'the starting point is what the version before left: typed addresses, findings on llms.txt and schema, drafts from published pages, an authorization without its sites');
+    // the findings of the version before, by their codes and by the words its screens used for them
+    const STALE = /schema_missing|schema_invalid|faq_no_schema|llms_missing|sitemap_missing|org_schema_missing|robots_blocks_ai|not_https|home_unreachable|No structured data|JSON-LD|FAQPage schema|Organization schema|AI crawlers are blocked|No llms\.txt file|No sitemap\.xml|not served over HTTPS|homepage could not be read/i;
+    const kOld = was.keywords.find((x) => x.text === 'veneers in antalya');
+    {
+      // while Webflow cannot be asked, an address that was typed is never shown as one read from Webflow
+      const keptSites = wfState.sites;
+      wfState.sites = [];
+      r = await request(port, 'GET', '/app/site?id=siteA&tab=settings', { headers: { cookie: cookie2 } });
+      wfState.sites = keptSites;
+      assert(r.status === 200 && r.body.includes('Not read from Webflow yet.') && !/class="fromwf">[^<]*lumendental\.com/.test(r.body) && !r.body.includes('when the site was connected') && !getJ('site:siteA').metaAt && getJ('site:siteA').project.domains.join() === 'lumendental.com',
+        'while Webflow cannot be asked, the typed addresses are not shown as addresses read from Webflow');
+    }
+    const sitesCallsBefore = wfState.paths.filter((x) => x === 'GET /v2/sites/siteA').length;
+    r = await request(port, 'GET', '/app', { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Lumen Dental') && !STALE.test(r.body), 'the Sites page opens for that account');
+    r = await request(port, 'GET', '/app/site?id=siteA', { headers: { cookie: cookie2 } });
+    const now1 = getJ('site:siteA');
+    assert(r.status === 200 && !STALE.test(r.body) && now1.metaAt > Date.now() - 60000 && now1.project.domains.join() === host + ',lumendental.com,lumen-dental.webflow.io' && wfState.paths.filter((x) => x === 'GET /v2/sites/siteA').length === sitesCallsBefore + 1 && now1.keywords.length === 3 && now1.audit === null,
+      'opening the site reads its name and addresses from Webflow once: the typed addresses give way to the ones Webflow has, and the old Site health score is gone');
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=settings', { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Your website, read from Webflow') && r.body.includes(host + ', lumendental.com, lumen-dental.webflow.io') && /Read from Webflow (just now|\d+ min ago)\./.test(r.body) && !r.body.includes('when the site was connected') && wfState.paths.filter((x) => x === 'GET /v2/sites/siteA').length === sitesCallsBefore + 1,
+      'Settings shows the addresses Webflow gave, with the time of that read, and does not ask Webflow again');
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Read my pages from Webflow') && !STALE.test(r.body) && !/data-read-from-webflow>\d+ pages? of/.test(r.body) && !r.body.includes('/blog/post-1'),
+      'Site health starts as never read: nothing the version before found on the published website is shown');
+    r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kOld.id, { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && !STALE.test(r.body) && !r.body.includes('How long do veneers last?') && !/id="applyform"|class="diff2"/.test(r.body) && r.body.includes('Read my pages from Webflow'),
+      'a keyword page shows no suggestion written from a published page, and asks for a read from Webflow first');
+    r = await request(port, 'GET', '/app/settings', { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Webflow authorizations') && r.body.includes('1 site connected') && !STALE.test(r.body), 'the Account page lists the old authorization with its site');
+    r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' });
+    const oldCtx = JSON.parse(r.body);
+    assert(r.status === 200 && oldCtx.ok && oldCtx.page.audited === false && oldCtx.page.issues.length === 0 && oldCtx.page.unknown.length === 0 && oldCtx.site.keywords === 3 && !STALE.test(r.body), 'the panel in the Designer answers for that site and shows no finding from the old read');
+    // a read through the Webflow API brings Site health back, and the next fixes are written from it
+    r = await post('/app/site/audit', cookie2, { id: 'siteA' });
+    const fresh = getJ('audit:siteA');
+    assert(r.status === 302 && fresh && fresh.source === 'webflow-data-api' && fresh.siteIssues.length === 0 && fresh.pages.every((x) => (x.issues || []).every((c) => require('../api/_lib/health').RULES[c])) && getJ('site:siteA').audit.readAt > 0, 'reading the pages from Webflow replaces the old result with one from the Webflow API');
+    r = await request(port, 'GET', '/app/site?id=siteA&tab=audit', { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && /data-read-from-webflow>\d+ pages? of \d+\. Read from Webflow/.test(r.body) && !STALE.test(r.body), 'and Site health shows it');
+    {
+      // the suggestions the version before wrote from published pages are still stored, and none of them is shown
+      const kOldImp = was.keywords.find((x) => x.text === 'dental implants antalya');
+      const pages3 = [
+        await request(port, 'GET', '/app/keyword?id=siteA&k=' + kOld.id, { headers: { cookie: cookie2 } }),
+        await request(port, 'GET', '/app/keyword?id=siteA&k=' + kOldImp.id, { headers: { cookie: cookie2 } }),
+        await request(port, 'GET', '/app/fix?id=siteA&page=%2Fabout', { headers: { cookie: cookie2 } })
+      ];
+      const shown = pages3.map((x) => x.body).join('\n');
+      // (the description "planned in one visit" is what Webflow has now, applied earlier in this run: it shows as the current value)
+      assert(pages3.every((x) => x.status === 200) && oldDrafts.every((k) => db.has(k) && getJ(k).v === undefined) && !/How long do veneers last\?|fully digital workflow|Do you speak English\?|How long do implants take\?/.test(shown) && !/id="applyform"|class="diff2"|suggested by AI/.test(shown) && pages3[0].body.includes('Write the fixes') && pages3[1].body.includes('Draft the page'),
+        'the suggestions the version before wrote from published pages are not shown on the keyword pages or the page fix: the user asks for new ones');
+    }
+    r = await post('/app/keyword/plan', cookie2, { id: 'siteA', k: kOld.id });
+    const madeNow = getJ('draft:siteA:kwfix:' + kOld.id);
+    assert(r.status === 302 && madeNow && madeNow.v === 2 && madeNow.meta && madeNow.was && madeNow.was.readAt > 0, 'fixes written now come from the page as Webflow returned it, and are kept as such');
+    r = await request(port, 'GET', '/app/keyword?id=siteA&k=' + kOld.id, { headers: { cookie: cookie2 } });
+    assert(r.status === 200 && r.body.includes('Now in Webflow') && !STALE.test(r.body), 'and the keyword page shows them next to what Webflow has now');
+    // the jobs run over the old records
+    for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k === 'lock:tick' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); }
+    r = await request(port, 'GET', '/cron/tick', { headers: { authorization: 'Bearer cronkey' } });
+    assert(r.status === 200 && !JSON.parse(r.body).error, 'the scheduled job runs over the old records');
+    for (const k of [...db.keys()]) if (k === 'lock:conncheck' || k.startsWith('connchk:')) { db.delete(k); ttl.delete(k); }
+    r = await request(port, 'GET', '/cron/tokens', { headers: { authorization: 'Bearer cronkey' } });
+    assert(r.status === 200 && JSON.parse(r.body).asked === 1 && JSON.parse(r.body).removed === 0 && getJ('site:siteA'), 'and the hourly look at the tokens asks about the old authorization and keeps it');
+  }
+
   console.log('shared database prefix');
   {
     const kv = require('../api/_lib/kv');

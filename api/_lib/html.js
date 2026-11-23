@@ -765,9 +765,14 @@ const rivalLines = (p) => (p.competitors || []).map((c) => c.name).join('\n');
 // them. The button belongs to a form of its own (refreshForm), so pressing it does not send the form around it.
 const refreshForm = (site, back) => `<form id="wfrefresh" method="post" action="/app/site/refresh" hidden><input type="hidden" name="id" value="${esc(site.id)}"><input type="hidden" name="back" value="${esc(back)}"></form>`;
 function webflowDomains(site) {
+  // A site whose addresses were never read from Webflow (it was set up before they came from there, and Webflow
+  // could not be asked just now) shows none: an address is only ever shown here when Webflow gave it.
+  if (!site.metaAt) {
+    return `<div class="field"><span class="lbl">Your website, read from Webflow</span><p class="fromwf">Not read from Webflow yet.</p><span class="hint">Webflow could not be asked just now. <button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow</button></span></div>`;
+  }
   const domains = (site.project && site.project.domains) || [];
   const list = domains.length ? domains.join(', ') : 'No address yet. Publish the site in Webflow, then refresh.';
-  return `<div class="field"><span class="lbl">Your website, read from Webflow</span><p class="fromwf">${esc(list)}</p><span class="hint">Read from Webflow ${esc(site.metaAt ? ago(site.metaAt) : 'when the site was connected')}. An answer that links to one of these counts as a citation. To change them, change the domains of the site in Webflow. <button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow</button></span></div>`;
+  return `<div class="field"><span class="lbl">Your website, read from Webflow</span><p class="fromwf">${esc(list)}</p><span class="hint">Read from Webflow ${esc(ago(site.metaAt))}. An answer that links to one of these counts as a citation. To change them, change the domains of the site in Webflow. <button class="wfbtn" type="submit" form="wfrefresh">Refresh from Webflow</button></span></div>`;
 }
 
 // The keyword picker on setup. Ideas come from /app/setup/suggest when the user presses the button: the app then

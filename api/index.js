@@ -582,9 +582,12 @@ async function sideData(user, audit) {
 
 async function handleSitePage(req, res, user) {
   const q = queryOf(req);
-  const site = await ownedSite(user, q.id);
+  let site = await ownedSite(user, q.id);
   if (!site) return notFound(res);
   if (!site.project.ready) return redirect(res, '/app/setup?id=' + encodeURIComponent(site.id) + (q.kw ? '&kw=' + encodeURIComponent(kwLib.clean(q.kw)) : ''));
+  // A site set up before its addresses came from Webflow (they were typed then) has no time of such a read:
+  // its name, addresses and languages are read from Webflow the first time one of its pages is opened.
+  if (!site.metaAt) site = (await refreshFromWebflow(user, site)).site || site;
   const tab = ['overview', 'keywords', 'discover', 'insights', 'audit', 'settings'].includes(q.tab) ? q.tab : (q.tab === 'setup' ? 'settings' : q.tab === 'rivals' || q.tab === 'sources' ? 'insights' : q.kw ? 'keywords' : 'overview');
   const limits = user._limits;
   const { progress, running } = await runProgress(site);

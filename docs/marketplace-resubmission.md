@@ -187,7 +187,12 @@ Done
   - Client report links exist on every plan; the agency name on them is Studio and Agency. The guide said otherwise and was corrected, not the app.
   - The panel binds events with `addEventListener` under plain names (`click`, `submit`): no handler attribute name appears in the bundle. Every link is made by one function that lets it point only to the app's own address.
 - 23 Nov, evening: `scripts/package-extension.js` checks `bundle.zip` (exactly the four files, the same bytes as the source, no source map, the manifest of the repository) and writes `extension/review.zip` from the files inside the bundle plus the README. A trial with Webflow CLI 2.16.0 gave a four-file bundle identical to the source; the CLI did not touch `webflow.json`.
-- `npm test`: `test/app.js` 361, `test/panel.js` 46.
+- 23 Nov, night: what happens to the accounts that exist today when this version goes live. `test/fixtures/db-before-rework.json` is the database as the live version leaves it, made by running that version's own test; the test "an account made by the version before this one" loads it and walks through the app.
+  - A Site health result that did not come from the Webflow API is treated as if the site had never been read (`store.getAudit`), and the score kept with the site goes with it (`normalizeSite`). No finding on llms.txt, robots.txt, the sitemap or schema is shown to anyone.
+  - Suggestions the live version wrote from published pages are not shown (`store.getDraft`: drafts carry `v: 2` from now on). The user asks for new ones, written from what Webflow returns.
+  - A site whose addresses were typed gets them from Webflow the first time one of its pages is opened (`handleSitePage`). Until Webflow has answered, the Settings page shows no address at all instead of the typed ones under "read from Webflow".
+  - To remember at the deploy: the Designer Extension published in the app's settings is the old panel. It stops working with the new server until the new bundle is uploaded, so the bundle goes up in the same sitting as the deploy.
+- `npm test`: `test/app.js` 377, `test/panel.js` 46.
 
 Still to do, in this order: step 7 (the report leaves), the deploy, then the end-to-end run of section 7, the final bundle and review ZIP, Preflight, the video and screenshots.
 

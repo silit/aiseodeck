@@ -186,6 +186,9 @@ function normalizeSite(site) {
   }
   delete site.prompts;
   if (!site.kw || typeof site.kw !== 'object') site.kw = {};
+  // The Site health summary of the version that read published websites has no time of a read from Webflow:
+  // it goes, so no screen shows a score that did not come from the Webflow API.
+  if (site.audit && !site.audit.readAt) site.audit = null;
   return site;
 }
 async function getSite(id) { return normalizeSite(await kv.getJSON('site:' + id)); }
@@ -346,10 +349,23 @@ async function takeCalls(n) {
 async function callsToday() { return parseInt((await kv.command('GET', 'calls:' + day())) || '0', 10) || 0; }
 
 /* ---------- audits, drafts, reports ---------- */
-async function getAudit(siteId) { return kv.getJSON('audit:' + siteId); }
+// Site health results. Only what was read through the Webflow Data API counts: a record left by the version that
+// read published websites (before 23 November 2026) is treated as if the site had never been read.
+const AUDIT_SOURCE = 'webflow-data-api';
+async function getAudit(siteId) {
+  const a = await kv.getJSON('audit:' + siteId);
+  return a && a.source === AUDIT_SOURCE ? a : null;
+}
 async function saveAudit(siteId, audit) { return kv.setJSON('audit:' + siteId, audit); }
-async function getDraft(siteId, key) { return kv.getJSON(`draft:${siteId}:${key}`); }
-async function saveDraft(siteId, key, value) { return kv.setJSON(`draft:${siteId}:${key}`, value, 14 * 86400); }
+// Suggestions waiting for the user (kept 14 days). They carry the number of the way they were made: 2 means
+// written from what the Webflow API returned. A draft without it was written by the earlier version from a
+// published page, and is not shown.
+const DRAFT_VERSION = 2;
+async function getDraft(siteId, key) {
+  const d = await kv.getJSON(`draft:${siteId}:${key}`);
+  return d && d.v === DRAFT_VERSION ? d : null;
+}
+async function saveDraft(siteId, key, value) { return kv.setJSON(`draft:${siteId}:${key}`, Object.assign({}, value, { v: DRAFT_VERSION }), 14 * 86400); }
 
 async function ensureReportToken(site) {
   if (site.settings.reportToken) return site.settings.reportToken;
