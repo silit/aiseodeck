@@ -12,6 +12,8 @@ const LONG = { openai: 'ChatGPT', aio: 'Google AI Overviews', aimode: 'Google AI
 const KEY = { openai: 'OPENAI_API_KEY', aio: 'DATAFORSEO_LOGIN', aimode: 'DATAFORSEO_LOGIN', gemini: 'GEMINI_API_KEY', perplexity: 'PERPLEXITY_API_KEY', claude: 'ANTHROPIC_API_KEY', grok: 'XAI_API_KEY' };
 // How many calls to one engine may run at the same time (stays under each provider's rate limits)
 const PARALLEL = { openai: 4, aio: 4, aimode: 4, gemini: 3, perplexity: 2, claude: 2, grok: 2 };
+// How much of an answer the app keeps: an excerpt of this many characters (the privacy policy names the number).
+const ANSWER_KEPT = 1500;
 // Engines that stay off until switched on: { engine: env flag that must be "1" }
 const OPT_IN = { perplexity: 'PERPLEXITY_ENABLED' };
 // The free plan gets the first three of these that are on: cheap per answer and widely used
@@ -278,4 +280,4 @@ async function ask(engine, prompt, opts) {
   return out;
 }
 
-module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, OPT_IN, LOCATION, COUNTRY_NAME, enabled, freeEngines, forLimits, lockedFor, ask, hostOf, EngineError };
+module.exports = { ORDER, LABEL, LONG, PARALLEL, FREE, OPT_IN, LOCATION, COUNTRY_NAME, ANSWER_KEPT, enabled, freeEngines, forLimits, lockedFor, ask, hostOf, EngineError };

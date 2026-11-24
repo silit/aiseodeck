@@ -109,6 +109,16 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(html.plainAnswer('Shortlist:\n\n| Program | Best for |\n|---|:---:|\n| **Vistage** | CEOs |\n\nPick one.') === 'Shortlist:\n\nProgram, Best for\nVistage, CEOs\n\nPick one.' && html.plainAnswer('The page is titled Pricing | Sessa.') === 'The page is titled Pricing | Sessa.', 'a table in a full answer keeps one row a line, and a single | in a sentence is left alone');
     const shown = html.keywordPage ? html.plainAnswer('**Lumen Dental** is named first.') : '';
     assert(shown === 'Lumen Dental is named first.' && html.highlight(shown, { brand: 'Lumen Dental', aliases: [], domains: [], competitors: [] }) === '<mark>Lumen Dental</mark> is named first.', 'the brand is still marked in an answer whose bold marks were taken out');
+    // an answer is kept up to a fixed number of characters: a longer one says so and stops at a whole word
+    const kept = require('../api/_lib/engines').ANSWER_KEPT;
+    const proj0 = { brand: 'Lumen Dental', aliases: [], domains: [], competitors: [] };
+    const longText = 'So ' + 'alpha beta gamma '.repeat(88) + 'B'; // 1,500 characters, the last word cut to its first letter
+    const longBlock = html.answerBlock({ ok: true, text: longText, snippet: 'alpha beta gamma' }, 'Which clinic?', false, proj0);
+    assert(kept === 1500 && longText.length === kept && longBlock.includes('<summary>First 1,500 characters of the answer</summary>') && !longBlock.includes('Full answer') && /gamma \u2026<\/p><\/details>/.test(longBlock) && !/ B\b/.test(longBlock), 'an answer that was cut is labelled as its first 1,500 characters and ends at a whole word with an ellipsis');
+    const shortText = 'alpha beta gamma '.repeat(20).trim();
+    const shortBlock = html.answerBlock({ ok: true, text: shortText, snippet: 'alpha beta gamma' }, 'Which clinic?', false, proj0);
+    assert(shortBlock.includes('<summary>Full answer</summary>') && shortBlock.includes(shortText + '</p></details>') && !shortBlock.includes('\u2026'), 'an answer that fits is labelled Full answer and shown whole');
+    assert(require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'privacy.html'), 'utf8').includes('up to ' + kept.toLocaleString('en-US') + ' characters of each answer'), 'the privacy policy names the same number of characters as the app keeps');
   }
   {
     const a = require('../api/_lib/analyze');

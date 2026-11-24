@@ -3,7 +3,7 @@
 // light theme. Colors carry meaning everywhere: marker yellow = the brand was named, blue = the brand's site was
 // cited, rose = a rival took the place.
 const { PLANS, FREE, QUESTIONS } = require('./plans');
-const { LABEL, LONG, ORDER, enabled: enginesOn, freeEngines } = require('./engines');
+const { LABEL, LONG, ORDER, ANSWER_KEPT, enabled: enginesOn, freeEngines } = require('./engines');
 const { RULES: PAGE_RULES, LIMITS } = require('./health');
 const { engineCounts, verdict } = require('./analyze');
 const alerts = require('./alerts');
@@ -1191,7 +1191,10 @@ function answerBlock(r, unitText, isKeyword, project) {
   }).join('');
   const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(plainAnswer(r.snippet || ''), project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
   const searched = r && r.ok && (r.queries || []).length ? `<div class="chips"><span class="tiny faint">Searched</span>${r.queries.map((q) => `<span class="q">${esc(q)}</span>`).join('')}</div>` : '';
-  const full = r && r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary>Full answer</summary><p class="quote" style="white-space:pre-line">${highlight(plainAnswer(r.text), project)}</p></details>` : '';
+  // An answer is kept up to ANSWER_KEPT characters. A longer one is shown up to its last whole word, and the label says what it is.
+  const cut = !!(r && r.ok && r.text && r.text.length >= ANSWER_KEPT);
+  const kept = !r || !r.text ? '' : cut ? r.text.replace(/\s+\S*$/, '') + ' \u2026' : r.text;
+  const full = r && r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary>${cut ? 'First ' + ANSWER_KEPT.toLocaleString('en-US') + ' characters of the answer' : 'Full answer'}</summary><p class="quote" style="white-space:pre-line">${highlight(plainAnswer(kept), project)}</p></details>` : '';
   return `<div class="answer"><p class="ask">${isKeyword ? 'Search' : 'Asked'} <b>${esc(unitText)}</b></p><div class="actions" style="gap:6px">${tag}</div>${body}${searched}${chips ? `<div class="chips" aria-label="Sources">${chips}</div>` : ''}${full}</div>`;
 }
 
@@ -1477,4 +1480,4 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
 }
 
 module.exports = {
-  partialWhy, UNINSTALL_HOW, donePage, issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, plainAnswer, lineChart, verdictText, longDay, COUNTRIES, LANGS };
+  partialWhy, UNINSTALL_HOW, donePage, issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, plainAnswer, answerBlock, lineChart, verdictText, longDay, COUNTRIES, LANGS };
