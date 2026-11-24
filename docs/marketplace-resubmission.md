@@ -217,7 +217,8 @@ Done
   - The settings have no field for an Install URL: it is given in the submission form only. The notes that said otherwise were corrected.
   - The app is installed on no site now (0 installs), and the panel published in its settings is the one of 15 November (three versions, all of that day).
   - **Publish extension version** takes a `.zip`, a distribution (only "internal testing" can be chosen before the app is in the Marketplace) and notes under four headings: New Features, Changes/Fixes, Improvements, Resolution notes. The text for them is in `docs/listing.md`.
-  - App Review Preflight is installed in the Workspace (authorized on 15 November). The submission form shows nothing until "Sign in with Webflow" is pressed on its page; that is the owner's step.
+  - App Review Preflight is installed in the Workspace (authorized on 15 November). The submission form shows nothing until "Sign in with Webflow" is pressed on its page; that is the owner's step. Two-factor authentication is enabled on the owner's Webflow account.
+  - In this project's Vercel settings `POLAR_ACCESS_TOKEN` and `POLAR_WEBHOOK_SECRET` are kept as readable values (Vercel marks them "Needs Attention"). They should be saved again as secrets when the owner next has the values at hand.
 - `npm test`: `test/app.js` 413, `test/panel.js` 63, `test/contrast.js` 81.
 
 Where it stands, and who does what next
@@ -227,7 +228,7 @@ Where it stands, and who does what next
 4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded with Publish extension version. Owner: add `COMPLIMENTARY_CODE` in Vercel before that deploy (a long random value; the same value goes into the form's access field).
 5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a and the list "For the sitting" at the end of `docs/quality-gate.md` (the panel's fonts and colors in the real Designer among them).
 6. Claude: final `bundle.zip` and `review.zip` with their checksums, the scene list and captions of the demo video, the `[to fill]` fields.
-7. Owner: App Review Preflight on the final files, the new demo video, two-factor authentication on the Workspace admin, the form. Claude does not submit.
+7. Owner: App Review Preflight on the final files, the new demo video, the form (two-factor authentication on the Workspace admin is on, read on 24 November). Claude does not submit.
 
 The steps as they were planned (1 to 5 are done)
 1. Domains and rivals (finding 3).

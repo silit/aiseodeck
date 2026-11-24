@@ -129,7 +129,7 @@ Found by reading the guidelines again, and fixed:
 
 | Item | Verdict | Where it is shown |
 | --- | --- | --- |
-| Two-factor authentication on a Workspace admin | Owner | To confirm before submitting. |
+| Two-factor authentication on a Workspace admin | Pass | Read on 24 November on the Security page of the owner's Webflow account, the admin of the Silit Labs Workspace: two-factor authentication is enabled. |
 
 ## Design and usability of the panel
 
@@ -168,4 +168,4 @@ In the order they come up:
 6. `POST /beta/token/resolve` answers with `siteId`; a cancelled authorization comes back with `error=access_denied`.
 7. App Review Preflight on the final `bundle.zip` and `review.zip`. Preflight is installed in the Workspace (authorized on 15 November), so it needs no new authorization. The bundle now holds two font files and their license text: if Preflight asks about them, they are the Inter typeface the design guidelines name, and the README in the review ZIP says so.
 8. The usage graph of the database in Upstash.
-9. Two-factor authentication, the demo video, the form. The form at developers.webflow.com/submit shows nothing until **Sign in with Webflow** is pressed there (the owner does it; on Webflow's screen the Workspace is chosen, not a site). Read every field of the live form then, against `docs/listing.md`.
+9. The demo video and the form. The form at developers.webflow.com/submit shows nothing until **Sign in with Webflow** is pressed there (the owner does it; on Webflow's screen the Workspace is chosen, not a site). Read every field of the live form then, against `docs/listing.md`.
