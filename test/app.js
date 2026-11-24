@@ -1080,6 +1080,40 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(k('Your team has either used all available credits or reached its monthly spending limit.', 403) === 'account' && k('Incorrect API key provided: sk-x', 401) === 'account', 'xAI credits, a wrong key');
     assert(k('Google results: You are not authorized to access this resource.', 40100) === 'account' && k('Keyword data: Payment Required.', 40200) === 'account' && k('Google results: Internal Server Error.', 50000) === 'busy' && k('Google results: Invalid Field.', 40501) === 'other', 'DataForSEO codes');
     assert(k('timed out', 0) === 'timeout' && k('Resource has been exhausted (e.g. check quota).', 429) === 'busy', 'timeouts and Gemini rate limits');
+    // DataForSEO's five-digit codes: until 24 November 2026 every code from 40100 to 40399 was read as a refusal of our account
+    assert(k('Google results: Internal SE Server Error.', 40101) === 'busy' && k('Google results: Task execution failed, please try to resubmit the task.', 40103) === 'busy' && k('Keyword data: The rate-limit per minute has been exceeded.', 40202) === 'busy' && k('Keyword data: The duplicate task limit per hour has been exceeded.', 40205) === 'busy' && k('Google results: Too many simultaneous queries.', 40209) === 'busy' && k('Google results: 3rd Party API Service Unavailable.', 50301) === 'busy', 'DataForSEO: a request that Google or DataForSEO could not serve this time passes (40101, 40103, the limits on requests, trouble on its side)');
+    assert(k('Google results: Response timeout.', 40107) === 'timeout' && k('Keyword data: Internal Error - Timeout.', 50401) === 'timeout' && k('Google results: Target page took too long to respond.', 50402) === 'timeout', 'DataForSEO: an answer that took too long is a timeout');
+    assert([40100, 40104, 40200, 40201, 40203, 40204, 40207, 40210].every((code) => k('words that say nothing', code) === 'account') && k('Keyword data: Error while checking the balance.', 50001) === 'busy' && k('Google results: No Search Results.', 40102) === 'other', 'DataForSEO: only the codes about our account call for the owner, and the code decides, not a word in the message');
+    {
+      // the requests themselves, against the stand-in for DataForSEO, and a check that meets them
+      const enginesReal = require('../api/_lib/engines');
+      const jobsReal = require('../api/_lib/jobs');
+      const tryAsk = async (engine, keyword) => { try { return { out: await enginesReal.ask(engine, keyword, { country: 'GB', language: 'en', timeoutMs: 4000 }) }; } catch (e) { return { e }; } };
+      const down = await tryAsk('aio', 'veneers antalya SEDOWN one'), downMode = await tryAsk('aimode', 'veneers antalya SEDOWN one');
+      assert(down.e && down.e.status === 40101 && down.e.retry === true && alerts.kindOf(down.e) === 'busy' && down.e.message === 'Google results: Internal SE Server Error.' && downMode.e && downMode.e.status === 40101 && downMode.e.retry === true, 'Google results: 40101 is an error worth another try and is not about our account, for AI Overviews and AI Mode alike');
+      const taskFailed = await tryAsk('aio', 'veneers antalya TASKFAILED'), tooMany = await tryAsk('aio', 'veneers antalya TOOMANY');
+      assert(taskFailed.e && taskFailed.e.retry === true && alerts.kindOf(taskFailed.e) === 'busy' && tooMany.e && tooMany.e.retry === true && alerts.kindOf(tooMany.e) === 'busy', 'Google results: a task that failed and too many requests at once are tried again too');
+      const nothing = await tryAsk('aio', 'veneers antalya NORESULTS'), nothingMode = await tryAsk('aimode', 'veneers antalya NORESULTS');
+      assert(nothing.out && nothing.out.none === true && !nothing.out.text && nothingMode.out && nothingMode.out.none === true, 'Google results: "No Search Results" is not an error, Google showed nothing and so no AI answer');
+      const noFunds = await tryAsk('aio', 'veneers antalya NOFUNDS');
+      assert(noFunds.e && noFunds.e.status === 40210 && noFunds.e.retry === false && alerts.kindOf(noFunds.e) === 'account', 'Google results: an empty balance is not tried again and is about our account');
+
+      const alarms = () => emails.filter((e) => /DataForSEO needs attention/.test(e.subject)).length;
+      const siteOf = (id, text) => ({ id, keywords: [{ id: 'k1', text, questions: ['Best clinic for veneers in Antalya?'] }], project: { brand: 'Lumen Dental', domains: ['lumendental.com'], country: 'GB', language: 'en' } });
+      const sent = (text) => engineCalls.filter((c) => c.e === 'aio' && c.p === text).length;
+      const runAio = async (id, text) => { const run = await store.createRun(siteOf(id, text), { id: 'user_dfs' }, ['aio'], 'manual', null, true); for (let i = 0; i < 4; i++) await jobsReal.workRun(run.id, Date.now() + 50000); const res = await store.results(run.id); await store.endRun(run.id); return res['k1.k|aio']; };
+      db.delete('alert:dataforseo');
+      const alarmsBefore = alarms();
+      const flaky = await runAio('siteDfs1', 'veneers antalya SEDOWN-TWICE');
+      assert(flaky && flaky.ok && !flaky.none && flaky.mentioned && sent('veneers antalya SEDOWN-TWICE') === 3, 'a check: Google fails twice and answers the third time, so the search is asked again and its answer is saved');
+      const stuck = await runAio('siteDfs2', 'veneers antalya SEDOWN always');
+      assert(stuck && stuck.ok === false && stuck.kind === 'busy' && sent('veneers antalya SEDOWN always') === 3 && alerts.engineText(stuck) === alerts.ENGINE_TEXT.busy, 'a check: when Google keeps failing the search is asked three times, then shown as busy');
+      const empty = await runAio('siteDfs3', 'veneers antalya NORESULTS check');
+      assert(empty && empty.ok && empty.none && sent('veneers antalya NORESULTS check') === 1, 'a check: a search with no results is asked once and saved as "no AI answer"');
+      assert(alarms() === alarmsBefore && !db.has('alert:dataforseo'), 'none of these tells the owner that the account needs attention');
+      const broke = await runAio('siteDfs4', 'veneers antalya NOFUNDS check');
+      assert(broke && broke.ok === false && broke.kind === 'account' && sent('veneers antalya NOFUNDS check') === 1 && alarms() === alarmsBefore + 1, 'a check: an empty balance is asked once, and that is when the owner is told');
+    }
     assert(alerts.engineText({ ok: false, err: 'Google results: You are not authorized to access this resource. See your login details here: https://app.dataforseo.com/api-access' }) === alerts.ENGINE_TEXT.account, 'older saved failures also show plain words');
     assert(alerts.publicText(Object.assign(new Error('The AI reply could not be read. Try again.'), { public: true }), 'x') === 'The AI reply could not be read. Try again.' && alerts.publicText(new Error('AI provider: You exceeded your current quota'), alerts.WRITING_TEXT) === alerts.WRITING_TEXT, 'only our own messages reach customers as they are');
     db.delete('alert:dataforseo');

@@ -228,6 +228,12 @@ Done
   - Left for the report: one test purchase by the owner with a 100% discount code, which is the only thing that shows the webhook, the mail and the six engines of the full report on the new project.
   - Until this branch is deployed, the old deployment of this app still holds the report's code and its cron job. Both projects work the same queue under one lock, with the same keys.
 
+- 24 Nov, afternoon, after the owner's test purchase of the report (order of 14:41, 100% discount code, no money moved):
+  - The whole chain works on the new project: Polar delivered `order.paid` to the report's endpoint with the new secret (HTTP 200), the check was marked paid, six engines were asked 54 times, the report was built in four minutes and the buyer's mail arrived. The owner's notice of the sale came from Polar.
+  - One of the 54 answers stayed empty, and the reason was in code that this app shares with the report: DataForSEO's code 40101 ("Internal SE Server Error", Google did not answer it) was read as a refusal of our account, like every code from 40100 to 40399. Such an answer was never asked again, and the owner got a mail that the account "needs attention" (the mail of 23 November, 01:06, was the same thing). Fixed in both repositories: `kindOf` in `api/_lib/alerts.js` goes by DataForSEO's own list of codes, and `api/_lib/engines.js` asks again after the codes that pass and reads 40102 ("No Search Results") as "no AI answer". The stand-in for DataForSEO in `test/mocks.js` answers with these codes when a search carries a marker word, and the tests run whole checks through it.
+  - This matters for the review: a reviewer's check that met one such moment would have shown "This engine could not answer right now" for Google AI Overviews with nothing wrong on our side.
+- `npm test`: `test/app.js` 425, `test/panel.js` 63, `test/contrast.js` 81.
+
 Where it stands, and who does what next
 1. Done on 24 November: the report's repository, its Vercel project and the database connection exist.
 2. Done on 24 November: the owner entered the eleven values and added the report's webhook at Polar; `/health` says "ok" and `/health/keys` says "keys ok" there.

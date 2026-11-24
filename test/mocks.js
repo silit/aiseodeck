@@ -62,6 +62,7 @@ const redis = http.createServer(async (req, res) => {
 
 /* ---- mock AI engines and text generation ---- */
 const engineCalls = [];
+const serpTries = {}; // how often each search was sent to the stand-in for Google's results
 // switches a test can set: Perplexity answers 429 once; Sonar chat completions are gone
 const flags = { perplexityFailOnce: true, sonarGone: false };
 function answerFor(prompt) {
@@ -149,6 +150,16 @@ const ai = http.createServer(async (req, res) => {
     const task = body[0];
     engineCalls.push({ e: mode, p: task.keyword, loc: task.location_code, lang: task.language_code, auth: req.headers.authorization });
     if (req.headers.authorization !== 'Basic ' + Buffer.from('dl:dp').toString('base64')) return json(res, 200, { status_code: 20000, tasks: [{ status_code: 40100, status_message: 'You are not authorized' }] });
+    // What DataForSEO answers when a request did not go through, chosen by a word in the search. The codes and their
+    // words are its own (docs.dataforseo.com/v3/appendix/errors). SEDOWN-TWICE fails twice per search, then answers.
+    const tries = serpTries[mode + '|' + task.keyword] = (serpTries[mode + '|' + task.keyword] || 0) + 1;
+    const dfsFail = /SEDOWN-TWICE/.test(task.keyword) ? (tries <= 2 ? [40101, 'Internal SE Server Error.'] : null)
+      : /SEDOWN/.test(task.keyword) ? [40101, 'Internal SE Server Error.']
+        : /TASKFAILED/.test(task.keyword) ? [40103, 'Task execution failed, please try to resubmit the task.']
+          : /TOOMANY/.test(task.keyword) ? [40209, 'Too many simultaneous queries.']
+            : /NORESULTS/.test(task.keyword) ? [40102, 'No Search Results.']
+              : /NOFUNDS/.test(task.keyword) ? [40210, 'Insufficient funds. Your account\'s balance is too low to complete this request.'] : null;
+    if (dfsFail) return json(res, 200, { status_code: 20000, tasks: [{ status_code: dfsFail[0], status_message: dfsFail[1], result: null }] });
     const a = answerFor(task.keyword);
     const overview = { type: 'ai_overview', markdown: mode === 'aio' && /veneer/i.test(task.keyword) ? 'Lumen Dental and Bright Smile Clinic are popular for veneers in Antalya [1](https://lumendental.com/veneers).' : a.text, items: [], references: a.sources.map((s) => ({ type: 'ai_overview_reference', domain: new URL(s).hostname.replace(/^www\./, ''), url: s, title: 'T' })) };
     const items = mode === 'aio' && /implant/i.test(task.keyword) ? [{ type: 'organic', url: 'https://x.com' }] : [overview, { type: 'organic', url: 'https://x.com' }];

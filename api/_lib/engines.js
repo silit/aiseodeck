@@ -225,12 +225,18 @@ async function claude(prompt, opts) {
 const COUNTRY_NAME = { US: 'the United States', GB: 'the United Kingdom', IE: 'Ireland', CA: 'Canada', AU: 'Australia', DE: 'Germany', FR: 'France', NL: 'the Netherlands', ES: 'Spain', IT: 'Italy', TR: 'Turkey', AE: 'the United Arab Emirates', SA: 'Saudi Arabia', PL: 'Poland', SE: 'Sweden', IN: 'India', BR: 'Brazil', MX: 'Mexico' };
 const LOCATION = { US: 2840, GB: 2826, IE: 2372, CA: 2124, AU: 2036, DE: 2276, FR: 2250, NL: 2528, ES: 2724, IT: 2380, TR: 2792, AE: 2784, SA: 2682, PL: 2616, SE: 2752, IN: 2356, BR: 2076, MX: 2484 };
 function dfsAuth() { return 'Basic ' + Buffer.from(env('DATAFORSEO_LOGIN') + ':' + env('DATAFORSEO_PASSWORD')).toString('base64'); }
+// DataForSEO's codes for a request that is worth sending again: Google did not answer it (40101, "Internal SE Server
+// Error"), the task failed (40103), the answer took too long (40107), too many requests in a minute or at once (40202,
+// 40209), and everything from 50000 up, which is trouble on its own side. The same list is in alerts.js, where none
+// of these counts as a refusal of our account.
+const DFS_AGAIN = new Set([40101, 40103, 40107, 40202, 40209]);
 async function dataforseo(path, task, opts) {
   const d = await post(base('DATAFORSEO_API_BASE', 'https://api.dataforseo.com') + path, { Authorization: dfsAuth() }, [task], opts.timeoutMs);
   const t = (d.tasks && d.tasks[0]) || {};
   if (t.status_code !== 20000) {
     const code = t.status_code || d.status_code || 0;
-    throw new EngineError('Google results: ' + String(t.status_message || d.status_message || 'no result').slice(0, 160), code, code >= 50000);
+    if (code === 40102) return {}; // "No Search Results": Google showed nothing for this search, so no AI answer either
+    throw new EngineError('Google results: ' + String(t.status_message || d.status_message || 'no result').slice(0, 160), code, DFS_AGAIN.has(code) || code >= 50000);
   }
   return (t.result && t.result[0]) || {};
 }
