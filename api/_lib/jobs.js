@@ -65,7 +65,10 @@ async function startRun(site, user, reason, opts) {
 }
 
 /* ---------- when Webflow no longer accepts a token ---------- */
-const removedNotice = (removed) => 'AI SEO Deck no longer has access to Webflow for ' + (removed.label || 'one authorization') + ': the app was uninstalled or its access was removed in Webflow. Its ' + (removed._sites && removed._sites.length === 1 ? 'site was' : 'sites were') + ' deleted from AI SEO Deck with everything kept about them. Install the app again to start over.';
+const removedNotice = (removed) => {
+  const one = !!(removed._sites && removed._sites.length === 1);
+  return 'AI SEO Deck no longer has access to Webflow for ' + (removed.label || 'one authorization') + ': the app was uninstalled or its access was removed in Webflow. Its ' + (one ? 'site was' : 'sites were') + ' deleted from AI SEO Deck with everything kept about ' + (one ? 'it' : 'them') + '. Install the app again to start over.';
+};
 // added when that was the account's last authorization and it has no paid plan
 const KEPT_NOTICE = ' Your account has no Webflow authorization now: it is kept for ' + store.ACCOUNT_KEEP_DAYS + ' days in case you install again, and is deleted after that.';
 const paidOrComplimentary = (user) => limitsFor(user).plan !== 'free' || billing.hasLiveSubscription(user);
