@@ -1,8 +1,8 @@
 # AI SEO Deck: review notes for the resubmission
 
-Reply to the review of 23 November 2026 (ticket #1221544). This file is the source of the notes that go into the submission form. Everything in it describes the build on the branch `marketplace-rework`.
+Reply to the review of 23 November 2026 (ticket #1221544). The notes field of the submission form takes 5,000 characters, so the form carries a summary of this file and links here for the detail and the evidence. Everything in this file describes the build that is live at aiseodeck.silitlabs.com since 24 November 2026 (the branch `main`).
 
-Status: **NOT READY TO RESUBMIT.** Still open, in order: this build goes to production (the AI Visibility Report runs from its own project since 24 November); the end-to-end run on the published test site; App Review Preflight on the final bundle and review ZIP; the new demo video and screenshots. The fields marked `[to fill]` below are filled from those steps. The owner submits.
+Status: **READY FOR REVIEW.** All five findings are addressed. The build is in production (the AI Visibility Report runs from its own project since 24 November). The end-to-end run on the live app with the published test site passed on 24 November. App Review Preflight ran on the final bundle and review ZIP. The demo video and the screenshots show this build. The submission is filed as an App Update of the kind "App functionality, permissions, or bundle": the form knows the client ID of the app from the first submission and takes it as an update.
 
 ## The app
 
@@ -14,8 +14,8 @@ Status: **NOT READY TO RESUBMIT.** Still open, in order: this build goes to prod
 - **Privacy policy:** `https://aiseodeck.silitlabs.com/privacy` **Terms:** `https://aiseodeck.silitlabs.com/terms`
 - **Support:** info@silitlabs.com
 - **Test site:** `https://aiseodeck-demo.webflow.io` (published; this build is installed on it)
-- **Demo video:** `[to fill]`
-- **Preflight receipt:** `[to fill: wfpre_...]`
+- **Demo video:** `https://youtu.be/C_RxaD_-Rz4` (unlisted, 4 minutes 26 seconds, recorded on the live app on 24 November 2026: the install denied and approved, setup, the first check, Site health, a page fix and a keyword fix applied to Webflow, the panel in the Designer, disconnect and connect again, where to uninstall, and the prices)
+- **Preflight receipt:** `wfpre_ac0fe18c274fefca44b42bbe32f422bb`
 - **Bundle and review ZIP:** `bundle.zip` (137,756 bytes, SHA-256 `a2d5856f28cedb96e77c95a86ae3084f05b9b03387407a50c8c1082b7dd1fe97`), the file published as the panel's version of 24 November 2026; `review.zip` (140,346 bytes, SHA-256 `06d32b2fce8890b3612b4897143e655ff4d806c912e225c6f054287e02d715e3`), the seven files of that bundle byte for byte plus a README.
 
 ## The five findings
@@ -138,12 +138,12 @@ All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3
 5. Keyword page, **Write the fixes**, tick the CMS box, **Apply to Webflow**: draft items appear in the collection.
 6. In the Designer: Apps, AI SEO Deck. The panel shows the open page and follows when another page is opened. **Fix**, **Write with AI**, **Apply to this page**.
 7. Site Settings, **Disconnect this site**; then Sites, **Add a site**, **Connect**: no Webflow screen appears.
-8. Remove the app in Webflow. Open the app again and press anything that reads Webflow: the Sites page says access was removed and the site is gone.
+8. Uninstall the app in Webflow (Site settings, Apps & Integrations, Connected Apps, **View details** next to AI SEO Deck, **Uninstall App**). Open the app again and press anything that reads Webflow: the Sites page says access was removed and the site is gone.
 
 ## Checks run on this build
 
-- `node test/app.js`: 425 passed, 0 failed (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
+- `node test/app.js`: 435 passed, 0 failed (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
 - `node test/panel.js`: 63 passed, 0 failed (the panel in Chromium, served from the extension's address under a strict Content Security Policy, against the real server code).
 - `node test/contrast.js`: 81 passed, 0 failed (every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one: the contrast of every text is at least 4.5 to 1, or 3 to 1 for large text, and the focus ring the Tab key shows stands out 3 to 1).
-- End-to-end on the published test site: `[to fill: date and result]`.
-- App Review Preflight: `[to fill: readiness and receipt]`.
+- End-to-end on the live app with the published test site, 24 November 2026: the eight steps under "How to test" all passed. The install was denied and then approved for the test site alone; setup and the first check ran with all six engines answering; Site health read 14 pages; a title and description applied from a page fix were found in Webflow, unpublished; a keyword fix created five draft items in the collection Posts; the panel followed the open page in the Designer and applied a title and description to it; Disconnect and Connect again showed no Webflow screen; and after Uninstall App the next read of Webflow was refused, the site was deleted and the Sites page said so. In the server log of that day every call of the panel to `/ext/` was answered with 200 and each of its preflight requests with 204; the only refused requests to `/ext/` were two sent on purpose with no origin, to see the 403.
+- App Review Preflight, run in the Designer of the test site on 24 November 2026 on the `bundle.zip` and `review.zip` named above: 0 security blockers, 0 required updates, 1 suggested update. The suggested update, "External API Calls", points at the one network call of the panel (`app.js`, line 209): a POST to the app's own server, `https://aiseodeck.silitlabs.com/ext/`, over HTTPS, with `Content-Type` as its only header. The run is listed as "Runtime test needed" because the test of a published runtime was not prepared: the app loads no JavaScript on published sites, so there is no runtime file to pin. The tool's advisory boot test did not start; it answered "The boot test runner could not start inside the secure sandbox" on each of three tries. Receipt: `wfpre_ac0fe18c274fefca44b42bbe32f422bb`.
