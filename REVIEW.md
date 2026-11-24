@@ -13,10 +13,10 @@ Status: **NOT READY TO RESUBMIT.** Still open, in order: this build goes to prod
 - **Documentation:** the AI SEO Deck guide, `https://aiseodeck.silitlabs.com/docs`
 - **Privacy policy:** `https://aiseodeck.silitlabs.com/privacy` **Terms:** `https://aiseodeck.silitlabs.com/terms`
 - **Support:** info@silitlabs.com
-- **Test site:** `[to fill: the published .webflow.io site]`
+- **Test site:** `https://aiseodeck-demo.webflow.io` (published; this build is installed on it)
 - **Demo video:** `[to fill]`
 - **Preflight receipt:** `[to fill: wfpre_...]`
-- **Bundle and review ZIP:** `[to fill: file names and SHA-256]`
+- **Bundle and review ZIP:** `bundle.zip` (137,756 bytes, SHA-256 `a2d5856f28cedb96e77c95a86ae3084f05b9b03387407a50c8c1082b7dd1fe97`), the file published as the panel's version of 24 November 2026; `review.zip` (140,346 bytes, SHA-256 `06d32b2fce8890b3612b4897143e655ff4d806c912e225c6f054287e02d715e3`), the seven files of that bundle byte for byte plus a README.
 
 ## The five findings
 
@@ -142,8 +142,8 @@ All prices in US dollars. Free: USD 0, 3 keywords on 1 site, monthly checks on 3
 
 ## Checks run on this build
 
-- `node test/app.js`: `[to fill: N passed, 0 failed]` (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
-- `node test/panel.js`: `[to fill: N passed, 0 failed]` (the panel in Chromium, served from the extension's address under a strict Content Security Policy, against the real server code).
-- `node test/contrast.js`: `[to fill: N passed, 0 failed]` (every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one: the contrast of every text is at least 4.5 to 1, or 3 to 1 for large text, and the focus ring the Tab key shows stands out 3 to 1).
+- `node test/app.js`: 425 passed, 0 failed (the app against stand-ins for Webflow, the database, the AI engines, mail and billing).
+- `node test/panel.js`: 63 passed, 0 failed (the panel in Chromium, served from the extension's address under a strict Content Security Policy, against the real server code).
+- `node test/contrast.js`: 81 passed, 0 failed (every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one: the contrast of every text is at least 4.5 to 1, or 3 to 1 for large text, and the focus ring the Tab key shows stands out 3 to 1).
 - End-to-end on the published test site: `[to fill: date and result]`.
 - App Review Preflight: `[to fill: readiness and receipt]`.
