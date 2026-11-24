@@ -2,7 +2,7 @@
 
 Reply to the review of 23 November 2026 (ticket #1221544). This file is the source of the notes that go into the submission form. Everything in it describes the build on the branch `marketplace-rework`.
 
-Status: **NOT READY TO RESUBMIT.** Still open, in order: the AI Visibility Report runs from its own project (the project exists since 24 November and waits for its keys); this build goes to production; the end-to-end run on the published test site; App Review Preflight on the final bundle and review ZIP; the new demo video and screenshots. The fields marked `[to fill]` below are filled from those steps. The owner submits.
+Status: **NOT READY TO RESUBMIT.** Still open, in order: this build goes to production (the AI Visibility Report runs from its own project since 24 November); the end-to-end run on the published test site; App Review Preflight on the final bundle and review ZIP; the new demo video and screenshots. The fields marked `[to fill]` below are filled from those steps. The owner submits.
 
 ## The app
 

@@ -221,10 +221,17 @@ Done
   - In this project's Vercel settings `POLAR_ACCESS_TOKEN` and `POLAR_WEBHOOK_SECRET` are kept as readable values (Vercel marks them "Needs Attention"). They should be saved again as secrets when the owner next has the values at hand.
 - `npm test`: `test/app.js` 413, `test/panel.js` 63, `test/contrast.js` 81.
 
+- 24 Nov, afternoon: the report runs from its own project, and silitlabs.com passes its three addresses on to it (`silit/site` #22).
+  - The owner entered the eleven values. A first real check on the new project showed that two were not accepted by their services: the DataForSEO login (the e-mail address had been entered, the API login is another value) and a Gemini key made in a Google project without billing. The report's project got `/health/keys` for this: it asks each of the seven services with one free request and prints the names of the settings that were refused. All seven take their keys now; a free check answered on ChatGPT, Google AI Overviews and Gemini.
+  - While two services refused, the cron job of the new project was switched off in Vercel so that it would not work customers' checks; it is on again.
+  - The Polar endpoint of the report (named "aiseodeck-v2" at Polar) has the right address, the Raw format and the two events. Its secret showed in clear on that page while it was read, so the owner reset it and entered the new one.
+  - Left for the report: one test purchase by the owner with a 100% discount code, which is the only thing that shows the webhook, the mail and the six engines of the full report on the new project.
+  - Until this branch is deployed, the old deployment of this app still holds the report's code and its cron job. Both projects work the same queue under one lock, with the same keys.
+
 Where it stands, and who does what next
 1. Done on 24 November: the report's repository, its Vercel project and the database connection exist.
-2. Owner: enter the eleven values `https://ai-visibility-report-wheat.vercel.app/health` names (the AI keys, DataForSEO, Resend, the Polar token, `REPORT_SECRET`, `CRON_SECRET`) and add the report's webhook at Polar (`https://ai-visibility-report-wheat.vercel.app/billing/webhook`, events `order.paid` and `order.refunded`; its secret is the eleventh value). Then redeploy that project. The steps are in the README of the report's repository.
-3. Claude: when `/health` there says "ok", point the three rewrites of silitlabs.com at the new project and check the report live (landing page, sample, a free check, an old check link).
+2. Done on 24 November: the owner entered the eleven values and added the report's webhook at Polar; `/health` says "ok" and `/health/keys` says "keys ok" there.
+3. Done on 24 November: the three rewrites of silitlabs.com lead to the new project; landing page, sample, an older check link and a free check were checked live. Still to do there: the owner's test purchase.
 4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded with Publish extension version. Owner: add `COMPLIMENTARY_CODE` in Vercel before that deploy (a long random value; the same value goes into the form's access field).
 5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a and the list "For the sitting" at the end of `docs/quality-gate.md` (the panel's fonts and colors in the real Designer among them).
 6. Claude: final `bundle.zip` and `review.zip` with their checksums, the scene list and captions of the demo video, the `[to fill]` fields.
