@@ -1,28 +1,26 @@
 # AI SEO Deck
 
-> AI SEO Deck checks, keyword by keyword, whether ChatGPT, Google AI Overviews, AI Mode, Gemini, Claude and Grok recommend a business, and fixes its Webflow site where they do not. It is made by Silit Labs.
+> AI SEO Deck is a Webflow app by Silit Labs. Keyword by keyword, it checks whether ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude and Grok name and cite a business, and it helps improve the Webflow pages where they do not.
 
-Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, Claude and Grok (live web search on), and as the keyword itself on Google AI Overviews and AI Mode: 10 answers a week per keyword on paid plans. The deck shows yes, sometimes or no per engine, the rivals named instead, the sources cited and the searches the engines ran. Fixes (titles, descriptions, FAQ answers with FAQPage schema, CMS drafts) are written to Webflow only when the user presses Apply, as unpublished changes.
+Each keyword is asked as two questions a customer would ask on ChatGPT, Gemini, Claude and Grok (with web search on), and as the search itself on Google AI Overviews and AI Mode: 10 answers a check for each keyword. Paid plans check every week; the free plan checks once a month on three engines. The deck shows yes, sometimes or no for each engine, the rivals named instead, the websites cited and the searches the engines ran.
+
+Site health reads the pages of the connected site through the Webflow API, when the user asks, and lists what to fix: titles, descriptions, Open Graph values, headings, thin text and image alt text. AI SEO Deck does not crawl the published website.
+
+Suggested titles, descriptions and answers are written by AI from the site's own pages. They reach Webflow only when the user presses Apply: a title and description as an unpublished change to the page, answers and page drafts as draft items in a CMS collection. AI SEO Deck never publishes a site. A panel in the Webflow Designer shows the keyword and the fixes of the page that is open.
 
 ## Docs
 
-- [How it works](https://aiseodeck.silitlabs.com/docs): connecting Webflow, keywords, how answers are checked, fixes, plans and the free trial
+- [AI SEO Deck guide](https://aiseodeck.silitlabs.com/docs): what you need, installing from Webflow, setup, checks, fixes, Site health, the panel in the Designer, what is written to Webflow, prices and the free trial, disconnecting and uninstalling
 - [Privacy policy](https://aiseodeck.silitlabs.com/privacy)
 - [Terms of use](https://aiseodeck.silitlabs.com/terms)
 
-## Guides
+## Plans (prices in US dollars)
 
-- [How to check if ChatGPT recommends your business](https://silitlabs.com/guides/check-if-chatgpt-recommends-your-business/): a repeatable manual check across AI engines
-- [AI visibility tracker: what to measure and how to read it](https://silitlabs.com/guides/ai-visibility-tracker/): share of answers, links, rivals, sources and search demand
-- [Webflow AEO checklist](https://silitlabs.com/guides/webflow-aeo-checklist/): crawler access, titles, FAQ schema, llms.txt and measurement on Webflow
-
-## Plans (US dollars)
-
-- Free: 3 keywords on 1 site, ChatGPT, Google AI Overviews and Gemini, checked monthly
-- Solo, $19 a month or $190 a year: 10 keywords on 1 site, all 6 AI engines weekly, one-click fixes to Webflow
-- Studio, $49 a month or $490 a year: 30 keywords on 5 sites, client report links with your agency name
-- Agency, $149 a month or $1,490 a year: 100 keywords on 20 sites
-- Every paid plan starts with 7 days free
+- Free, USD 0: 3 keywords on 1 site, checked once a month on ChatGPT, Google AI Overviews and Gemini; Site health for 20 pages; suggestions to copy
+- Solo, USD 19 a month or USD 190 a year: 10 keywords on 1 site, all six engines every week, Apply to Webflow, 10 keyword checks on demand a month, Site health for 100 pages
+- Studio, USD 49 a month or USD 490 a year: 30 keywords across 5 sites, 30 keyword checks on demand a month, your agency name on client report links, Site health for 150 pages
+- Agency, USD 149 a month or USD 1,490 a year: 100 keywords across 20 sites, 100 keyword checks on demand a month, Site health for 250 pages
+- Every paid plan starts with a 7-day free trial, once per customer across the products of Silit Labs. The plan's price is charged on day 8 unless the plan is cancelled before.
 
 ## Contact
 

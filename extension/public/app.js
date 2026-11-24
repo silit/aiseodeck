@@ -1,5 +1,8 @@
-// AI SEO Deck inside the Webflow Designer: the page that is open, its keyword, what to fix, and the fixes applied
-// to the page in place. Talks to the app with a Webflow ID token; nothing else identifies the user.
+// AI SEO Deck inside the Webflow Designer: the page that is open, its keyword, what to fix, and a title and
+// description set on the page in place when the user presses Apply.
+// The title and description shown as "now" are the ones the Designer has at this moment (Designer API). The
+// headings, text and image findings come from Site health, which reads the page through the Webflow Data API.
+// Talks to the app with a Webflow ID token; nothing else identifies the user.
 (function () {
   'use strict';
   var API = 'https://aiseodeck.silitlabs.com';
@@ -8,15 +11,22 @@
     view: 'page',
     info: null,
     ctx: null,
-    meta: null,
-    faq: null,
+    meta: null, // what is in the two fields of the editor
+    ai: null, // the last title and description the AI wrote, to label them as a suggestion
     busy: '',
-    msg: null,
-    token: null,
-    tokenAt: 0
+    msg: null
   };
+  // Every read of the open page takes the next number. An answer that belongs to an earlier read (the user has
+  // moved to another page since) is dropped, so the panel never shows one page under the name of another.
+  var turn = 0;
+  var live = document.getElementById('live');
+  // The SVG namespace, read from the empty <svg> element of index.html.
+  var SVG_NS = document.getElementById('svgns').namespaceURI;
 
   /* ---------- small helpers ---------- */
+  // The events the interface listens to. In h() a key with one of these names adds a listener with
+  // addEventListener; it is never written to the element as an attribute.
+  var EVENTS = { click: true, submit: true };
   function h(tag, attrs) {
     var el = document.createElement(tag);
     attrs = attrs || {};
@@ -25,7 +35,7 @@
       if (v == null || v === false) return;
       if (k === 'class') el.className = v;
       else if (k === 'text') el.textContent = v;
-      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else if (EVENTS[k] === true) el.addEventListener(k, v);
       else el.setAttribute(k, v === true ? '' : v);
     });
     for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
@@ -42,11 +52,11 @@
     el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
   }
   function svg(d, cls) {
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var s = document.createElementNS(SVG_NS, 'svg');
     s.setAttribute('viewBox', '0 0 16 16');
     s.setAttribute('aria-hidden', 'true');
     if (cls) s.setAttribute('class', cls);
-    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    var p = document.createElementNS(SVG_NS, 'path');
     p.setAttribute('d', d);
     s.appendChild(p);
     return s;
@@ -57,7 +67,8 @@
     i: 'M6.5 9.5l3-3M5.5 7.5l-1 1a2.1 2.1 0 003 3l1-1M10.5 8.5l1-1a2.1 2.1 0 00-3-3l-1 1',
     o: 'M4.5 4.5l7 7M11.5 4.5l-7 7',
     x: 'M4 8h8',
-    f: 'M8 4.5v4.2M8 11.3h.01'
+    f: 'M8 4.5v4.2M8 11.3h.01',
+    w: 'M4.5 8h.01M8 8h.01M11.5 8h.01'
   };
   var WORD = {
     n: 'names you',
@@ -74,7 +85,7 @@
     return m;
   }
   function logo() {
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var s = document.createElementNS(SVG_NS, 'svg');
     s.setAttribute('viewBox', '0 0 32 32');
     s.setAttribute('width', '20');
     s.setAttribute('height', '20');
@@ -87,7 +98,7 @@
       ['circle', { cx: 21, cy: 21, r: 4, fill: '#E8C300', stroke: '#2F5BFF', 'stroke-width': 2.4 }]
     ];
     parts.forEach(function (part) {
-      var el = document.createElementNS('http://www.w3.org/2000/svg', part[0]);
+      var el = document.createElementNS(SVG_NS, part[0]);
       Object.keys(part[1]).forEach(function (k) {
         el.setAttribute(k, String(part[1][k]));
       });
@@ -98,12 +109,27 @@
   function plural(n, one, many) {
     return n + ' ' + (n === 1 ? one : many || one + 's');
   }
+  function ago(ts) {
+    if (!ts) return 'some time ago';
+    var sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (sec < 60) return 'just now';
+    if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
+    if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
+    return plural(Math.floor(sec / 86400), 'day') + ' ago';
+  }
   function andList(a) {
     return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
   }
-  // Links to AI SEO Deck open in a new browser tab only when the user clicks them.
+  // Links to AI SEO Deck open in a new browser tab only when the user clicks them. A link can only point to the
+  // app's own address: anything else is replaced by the address of the app.
   function link(url, cls, text) {
-    return h('a', { class: cls, href: url, target: '_blank', rel: 'noopener noreferrer' }, text);
+    var href = typeof url === 'string' && url.indexOf(API + '/') === 0 ? url : API + '/app';
+    return h('a', { class: cls, href: href, target: '_blank', rel: 'noopener noreferrer' }, text);
+  }
+  // What a screen reader is told: one line, in a region that is always in the page. Errors are told by the
+  // message box itself (role="alert").
+  function say(text) {
+    if (live && live.textContent !== text) live.textContent = text;
   }
   function notify(type, message) {
     try {
@@ -114,12 +140,6 @@
   }
 
   /* ---------- Webflow and the app ---------- */
-  async function idToken() {
-    if (S.token && Date.now() - S.tokenAt < 10 * 60000) return S.token; // valid for 15 minutes
-    S.token = await webflow.getIdToken();
-    S.tokenAt = Date.now();
-    return S.token;
-  }
   async function pageInfo() {
     var site = await webflow.getSiteInfo();
     var page = await webflow.getCurrentPage();
@@ -168,9 +188,20 @@
     }
     return info;
   }
-  async function call(route, body) {
+  // Every request carries a fresh ID token from the Designer. The token is short lived and is not kept.
+  // info: the page the request is about, taken when the request starts.
+  async function call(route, body, info) {
+    info = info || S.info;
+    var token;
+    try {
+      token = await webflow.getIdToken();
+    } catch (e) {
+      return {
+        error: 'The Designer did not confirm who is using this panel. Close the app and open it again.'
+      };
+    }
     var payload = Object.assign(
-      { idToken: await idToken(), siteId: S.info.siteId, pageId: S.info.pageId, path: S.info.path },
+      { idToken: token, siteId: info.siteId, pageId: info.pageId, path: info.path },
       body || {}
     );
     var res;
@@ -190,27 +221,36 @@
       j = {};
     }
     if (!res.ok && !j.error) j.error = 'AI SEO Deck could not answer. Try again in a minute.';
-    if (res.status === 401) S.token = null;
     return j;
   }
   async function load() {
+    var mine = ++turn;
     S.view = 'page';
     S.msg = null;
     S.meta = null;
-    S.faq = null;
+    S.ai = null;
+    S.busy = '';
     render(h('p', { class: 'loading', text: 'Reading this page…' }));
+    say('Reading this page');
+    var info;
     try {
-      S.info = await pageInfo();
+      info = await pageInfo();
     } catch (e) {
+      if (mine !== turn) return;
       S.ctx = { error: 'The Designer did not give the page details. Switch to a page and try again.' };
       return draw();
     }
-    if (!S.info.isPage) {
+    if (mine !== turn) return;
+    S.info = info;
+    if (!info.isPage) {
       S.ctx = { error: 'Open a page in the Designer to see its fixes.' };
       return draw();
     }
-    S.ctx = await call('context');
+    var ctx = await call('context', null, info);
+    if (mine !== turn) return;
+    S.ctx = ctx;
     draw();
+    say(ctx && ctx.ok ? 'Showing ' + (info.name || info.path) : '');
   }
 
   /* ---------- screens ---------- */
@@ -218,18 +258,18 @@
     app.textContent = '';
     add(app, node);
   }
-  function top(withBack, title) {
+  function topBar(withBack, title) {
     if (withBack)
       return h(
         'header',
-        { class: 'top' },
+        { class: 'bar' },
         h(
           'button',
           {
             class: 'back',
             type: 'button',
             'aria-label': 'Back to this page',
-            onclick: function () {
+            click: function () {
               S.view = 'page';
               S.msg = null;
               draw();
@@ -243,7 +283,7 @@
     var c = S.ctx && S.ctx.site;
     return h(
       'header',
-      { class: 'top' },
+      { class: 'bar' },
       logo(),
       h('b', { text: 'AI SEO Deck' }),
       c && c.score != null
@@ -256,20 +296,36 @@
     );
   }
   function msgBox() {
-    return S.msg
-      ? h('div', {
-          class: 'msg ' + S.msg.kind,
-          role: S.msg.kind === 'err' ? 'alert' : 'status',
-          text: S.msg.text
-        })
-      : null;
+    if (!S.msg) return null;
+    if (S.msg.kind !== 'err') say(S.msg.text);
+    return h('div', {
+      class: 'msg ' + S.msg.kind,
+      role: S.msg.kind === 'err' ? 'alert' : null,
+      text: S.msg.text
+    });
+  }
+  // On a site with more than one language the panel cannot see which one the Designer is showing, so it says
+  // what Apply does and where the suggestion comes from.
+  function languagesNote() {
+    var l = S.ctx && S.ctx.site && S.ctx.site.languages;
+    if (!l || !l.others || !l.others.length) return null;
+    return h('div', {
+      class: 'msg info',
+      'data-languages': '',
+      text:
+        'This site has other languages (' +
+        andList(l.others) +
+        '). Suggestions are written from the ' +
+        (l.primary ? l.primary + ' page' : 'page in the primary language') +
+        '. Apply sets the values on the page as the Designer shows it now, so check which language is open before you apply.'
+    });
   }
 
   function draw() {
     var c = S.ctx || {};
     if (c.connect) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
@@ -278,13 +334,13 @@
             { class: 'card' },
             h('h2', { text: 'Connect this site to AI SEO Deck' }),
             h('p', {
-              text: 'AI SEO Deck has not read this site yet. Connect it once and choose your keywords, then come back here.'
+              text: 'AI SEO Deck has nothing to show for this site here. If the site is not connected yet, connect it and choose your keywords, then come back. If it is connected, press Try again.'
             }),
             h(
               'div',
               { class: 'row' },
-              link(c.connectUrl, 'btn mark', 'Connect'),
-              h('button', { class: 'btn', type: 'button', onclick: load }, 'I have connected it')
+              link(c.connectUrl, 'btn primary', 'Connect'),
+              h('button', { class: 'btn', type: 'button', click: load }, 'Try again')
             )
           )
         )
@@ -292,18 +348,18 @@
     }
     if (c.error && !c.ok) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
           h('div', { class: 'msg err', role: 'alert', text: c.error }),
-          h('button', { class: 'btn', type: 'button', onclick: load }, 'Try again')
+          h('button', { class: 'btn', type: 'button', click: load }, 'Try again')
         )
       ]);
     }
     if (!c.site.ready) {
       return render([
-        top(),
+        topBar(),
         h(
           'div',
           { class: 'body' },
@@ -314,13 +370,12 @@
             h('p', {
               text: 'Add your brand, rivals and keywords in AI SEO Deck. The first check runs right after.'
             }),
-            link(c.site.setupUrl, 'btn mark', 'Open the setup')
+            link(c.site.setupUrl, 'btn primary', 'Open the setup')
           )
         )
       ]);
     }
     if (S.view === 'meta') return drawMeta();
-    if (S.view === 'faq') return drawFaq();
     return drawPage();
   }
 
@@ -358,7 +413,7 @@
       { class: 'card', 'aria-label': 'Keyword ' + k.text },
       h(
         'div',
-        { style: 'display:grid;gap:3px' },
+        { class: 'kwhead' },
         h('span', { class: 'k', text: 'Keyword for this page' }),
         h('h2', { text: k.text })
       ),
@@ -367,93 +422,78 @@
     );
   }
 
+  // What the title and description of the open page need, from the values the Designer has now.
+  function metaState() {
+    var r = S.ctx && S.ctx.rules;
+    var t = (S.info.title || '').trim(),
+      d = (S.info.description || '').trim();
+    var out = { title: '', description: '', titleLength: t.length, descriptionLength: d.length };
+    if (!t) out.title = 'missing';
+    else if (r && (t.length < r.title.min || t.length > r.title.max)) out.title = 'length';
+    if (!d) out.description = 'missing';
+    else if (r && (d.length < r.description.min || d.length > r.description.max)) out.description = 'length';
+    return out;
+  }
+  function aim(kind) {
+    var r = S.ctx && S.ctx.rules;
+    return r ? 'Aim for ' + r[kind].aimMin + ' to ' + r[kind].aimMax + ' characters' : '';
+  }
+  function isTemplate() {
+    return !!(S.info.template || (S.ctx.page && S.ctx.page.template));
+  }
+  function openEditor() {
+    S.view = 'meta';
+    S.msg = null;
+    draw();
+  }
   function fixItems() {
     var p = S.ctx.page,
-      items = [],
-      codes = p.issues.map(function (x) {
-        return x.code;
-      });
-    var has = function (c) {
-      return codes.indexOf(c) > -1;
-    };
-    if (p.template)
+      items = [];
+    if (isTemplate()) {
       items.push({
-        ok: false,
-        title: 'CMS template page',
-        note: 'Titles and descriptions of collection pages come from the template settings in Webflow.'
+        info: true,
+        title: 'Collection template',
+        note: 'The title and description of collection pages come from the template settings in Webflow.'
       });
-    if (!p.template && (has('title_missing') || has('title_length')))
-      items.push({
-        title: has('title_missing') ? 'No page title' : 'Title length',
-        note:
-          (S.info.title ? S.info.title.length + ' characters. ' : '') + 'Aim for 50 to 60, with the keyword.',
-        cta: 'Fix',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
-      });
-    if (!p.template && (has('desc_missing') || has('desc_length')))
-      items.push({
-        title: has('desc_missing') ? 'No meta description' : 'Description length',
-        note: 'Aim for 120 to 155 characters.',
-        cta: 'Write',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
-      });
-    if (has('faq_no_schema') || (has('schema_missing') && p.path !== '/'))
-      items.push({
-        title: has('faq_no_schema') ? 'Questions without FAQ schema' : 'No structured data',
-        note: p.faqFound
-          ? plural(p.faqFound, 'question') + ' found on this page.'
-          : 'Answers written from this page, added as FAQ schema.',
-        cta: 'Add',
-        run: function () {
-          S.view = 'faq';
-          draw();
-        }
-      });
-    if (has('schema_missing') && p.path === '/')
-      items.push({
-        title: 'No structured data',
-        note: 'Add the Organization schema from the site audit.',
-        cta: 'Open',
-        href: S.ctx.site.healthUrl
-      });
-    p.issues.forEach(function (x) {
-      if (
-        [
-          'title_missing',
-          'title_length',
-          'desc_missing',
-          'desc_length',
-          'faq_no_schema',
-          'schema_missing'
-        ].indexOf(x.code) > -1
-      )
-        return;
+    } else {
+      var m = metaState();
+      if (m.title)
+        items.push({
+          title: m.title === 'missing' ? 'No SEO title' : 'Title length',
+          note:
+            (m.title === 'missing'
+              ? 'Webflow shows the page name instead. '
+              : m.titleLength + ' characters now. ') +
+            aim('title') +
+            (aim('title') ? ', with the keyword.' : ''),
+          cta: m.title === 'missing' ? 'Write' : 'Fix',
+          run: openEditor
+        });
+      if (m.description)
+        items.push({
+          title: m.description === 'missing' ? 'No meta description' : 'Description length',
+          note:
+            (m.description === 'missing' ? '' : m.descriptionLength + ' characters now. ') +
+            aim('description') +
+            (aim('description') ? '.' : ''),
+          cta: m.description === 'missing' ? 'Write' : 'Fix',
+          run: openEditor
+        });
+      if (!m.title && !m.description)
+        items.push({ ok: true, title: 'Title and description are fine', cta: 'Edit', run: openEditor });
+    }
+    // the findings Site health made when it read this page from Webflow
+    (p.issues || []).forEach(function (x) {
+      if (['title_missing', 'title_length', 'desc_missing', 'desc_length'].indexOf(x.code) > -1) return;
       items.push({ title: x.label, note: x.text });
     });
-    if (
-      p.audited &&
-      !p.template &&
-      !has('title_missing') &&
-      !has('title_length') &&
-      !has('desc_missing') &&
-      !has('desc_length')
-    )
+    (p.unknown || []).forEach(function (x) {
       items.push({
-        ok: true,
-        title: 'Title and description are fine',
-        cta: 'Edit',
-        run: function () {
-          S.view = 'meta';
-          draw();
-        }
+        info: true,
+        title: x.label + ': not determined',
+        note: x.text
       });
-    if (p.schemaTypes.indexOf('FAQPage') > -1) items.push({ ok: true, title: 'FAQ schema is on the page' });
+    });
     return items;
   }
 
@@ -489,87 +529,67 @@
           link(c.site.keywordsUrl, 'btn', 'Add a keyword')
         )
       );
-    if (!p.audited) {
-      add(
-        body,
-        h(
-          'section',
-          { class: 'card' },
-          h('h2', { text: 'Run the site audit' }),
-          h('p', {
-            text: 'It reads your published pages and lists the fixes for each one. You can still write a title and description now.'
-          }),
+    var items = fixItems();
+    var todo = items.filter(function (x) {
+      return !x.ok && !x.info;
+    }).length;
+    var list = h(
+      'ul',
+      { class: 'fixes' },
+      items.map(function (it) {
+        var kind = it.ok ? 'good' : it.info ? 'info' : 'warn';
+        var ic = h('span', { class: 'ic ' + kind }, svg(it.ok ? 'M5 8.3l2 2 4-4.3' : 'M8 4.8v3.6M8 11h.01'));
+        var circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('cx', '8');
+        circle.setAttribute('cy', '8');
+        circle.setAttribute('r', '6.5');
+        ic.firstChild.insertBefore(circle, ic.firstChild.firstChild);
+        return h(
+          'li',
+          null,
+          ic,
           h(
-            'div',
-            { class: 'row' },
-            h(
-              'button',
-              {
-                class: 'btn mark',
-                type: 'button',
-                onclick: function () {
-                  S.view = 'meta';
-                  draw();
-                }
-              },
-              'Title and description'
-            ),
-            link(c.site.healthUrl, 'btn', 'Open Site health')
-          )
-        )
-      );
-    } else {
-      var items = fixItems();
-      var todo = items.filter(function (x) {
-        return !x.ok;
-      }).length;
-      var list = h(
-        'ul',
-        { class: 'fixes' },
-        items.map(function (it) {
-          var ic = h('span', { class: 'ic' }, svg(it.ok ? 'M5 8.3l2 2 4-4.3' : 'M8 4.8v3.6M8 11h.01'));
-          ic.firstChild.style.stroke = it.ok ? 'var(--good)' : 'var(--warn)';
-          var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          circle.setAttribute('cx', '8');
-          circle.setAttribute('cy', '8');
-          circle.setAttribute('r', '6.5');
-          ic.firstChild.insertBefore(circle, ic.firstChild.firstChild);
-          return h(
-            'li',
-            null,
-            ic,
-            h(
-              'span',
-              { class: 'tx' },
-              h('b', { text: it.title }),
-              it.note ? h('span', { class: 'nt', text: it.note }) : null
-            ),
-            it.href
-              ? link(it.href, it.ok ? 'btn' : 'btn mark', it.cta)
-              : it.cta
-                ? h('button', { class: it.ok ? 'btn' : 'btn mark', type: 'button', onclick: it.run }, it.cta)
-                : null
-          );
-        })
-      );
-      add(
-        body,
-        h(
-          'section',
-          { class: 'sec', 'aria-labelledby': 'fixh' },
-          h(
-            'div',
-            { class: 'hd' },
-            h('h2', { id: 'fixh', text: 'Fix this page' }),
-            h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })
+            'span',
+            { class: 'tx' },
+            h('b', { text: it.title }),
+            it.note ? h('span', { class: 'nt', text: it.note }) : null
           ),
-          list
+          it.cta
+            ? h('button', { class: it.ok ? 'btn' : 'btn primary', type: 'button', click: it.run }, it.cta)
+            : null
+        );
+      })
+    );
+    add(
+      body,
+      h(
+        'section',
+        { class: 'sec', 'aria-labelledby': 'fixh' },
+        h(
+          'div',
+          { class: 'hd' },
+          h('h2', { id: 'fixh', text: 'Fix this page' }),
+          h('span', { text: todo ? plural(todo, 'thing') + ' to fix' : 'Nothing to fix' })
+        ),
+        list,
+        h(
+          'p',
+          { class: 'note' },
+          'Title and description: as the Designer has them now. ',
+          p.audited
+            ? 'Headings, text and images: read from Webflow by Site health ' +
+                ago(p.readAt || p.auditAt) +
+                '. '
+            : 'Headings, text and images are checked by Site health, which has not read this page yet. ',
+          link(c.site.healthUrl, '', p.audited ? 'Refresh in Site health' : 'Open Site health'),
+          ' ',
+          h('button', { class: 'linkbtn', type: 'button', click: load }, 'Read this page again')
         )
-      );
-    }
+      )
+    );
     var report = c.keywords[0] ? c.keywords[0].url : c.site.url;
     render([
-      top(),
+      topBar(),
       body,
       h(
         'footer',
@@ -585,24 +605,37 @@
     ]);
   }
 
-  function counter(n, lo, hi, max) {
-    return h('span', { class: 'count' + (n >= lo && n <= hi ? ' ok' : ''), text: n + ' of ' + max });
+  // How long a field is, and whether that is inside the length to aim for.
+  function counter(n, kind) {
+    var r = S.ctx && S.ctx.rules;
+    if (!r) return h('span', { class: 'count ok', text: plural(n, 'character') });
+    var ok = n >= r[kind].aimMin && n <= r[kind].aimMax;
+    return h('span', {
+      class: 'count' + (ok ? ' ok' : ''),
+      text: plural(n, 'character') + ', aim for ' + r[kind].aimMin + ' to ' + r[kind].aimMax
+    });
   }
 
   function drawMeta() {
     var c = S.ctx;
+    var template = isTemplate();
     var m = S.meta || { title: S.info.title || '', description: S.info.description || '' };
     var title = h('input', { type: 'text', id: 'mt', maxlength: '90', value: m.title });
     var desc = h('textarea', { id: 'md', maxlength: '200', rows: '4' });
     desc.value = m.description;
     var tCount = h('span'),
       dCount = h('span');
+    var tTag = h('span', { class: 'tag', text: 'Suggested by AI' }),
+      dTag = h('span', { class: 'tag', text: 'Suggested by AI' });
     var serpT = h('span', { class: 't' }),
       serpD = h('span', { class: 'd' });
     function sync() {
       S.meta = { title: title.value, description: desc.value };
-      tCount.replaceWith((tCount = counter(title.value.length, 30, 60, 60)));
-      dCount.replaceWith((dCount = counter(desc.value.length, 70, 160, 160)));
+      tCount.replaceWith((tCount = counter(title.value.length, 'title')));
+      dCount.replaceWith((dCount = counter(desc.value.length, 'description')));
+      // the label stays only while the field holds exactly what the AI wrote
+      tTag.hidden = !(S.ai && S.ai.title === title.value);
+      dTag.hidden = !(S.ai && S.ai.description === desc.value);
       serpT.textContent = title.value || S.info.name || 'Page title';
       serpD.textContent = desc.value || 'The description shows here.';
     }
@@ -614,36 +647,46 @@
       {
         class: 'btn',
         type: 'button',
-        disabled: !!busy,
-        onclick: async function () {
+        disabled: !!busy || template,
+        click: async function () {
+          var mine = turn;
           S.busy = 'write';
           S.msg = { kind: 'info', text: 'Writing from this page, this takes a few seconds…' };
           drawMeta();
           var r = await call('suggest', { what: 'meta', keywordId: c.keywords[0] ? c.keywords[0].id : '' });
+          // the user has moved to another page while the AI was writing: that page is on screen now
+          if (mine !== turn) return;
           S.busy = '';
           if (r.ok) {
-            S.meta = r.meta;
+            S.meta = { title: r.meta.title, description: r.meta.description };
+            S.ai = { title: r.meta.title, description: r.meta.description };
             S.msg = {
               kind: 'ok',
-              text: r.keyword
-                ? 'Written from this page for the keyword ' +
-                  r.keyword +
-                  '. Change anything before you apply.'
-                : 'Written from this page. Change anything before you apply.'
+              text:
+                (r.keyword
+                  ? 'Written by AI for the keyword ' + r.keyword + ', from the text of this page in Webflow.'
+                  : 'Written by AI from the text of this page in Webflow.') +
+                ' It is a suggestion: nothing is changed until you press Apply.'
             };
           } else S.msg = { kind: 'err', text: r.error || 'No suggestion this time.' };
-          drawMeta();
+          // drawn in the view the user is in now: someone who went back to the page finds the suggestion in the
+          // editor when they open it again
+          draw();
         }
       },
-      S.meta && S.meta.title && S.meta.title !== S.info.title ? 'Write again' : 'Write with AI'
+      S.ai ? 'Write again' : 'Write with AI'
     );
     var apply = h(
       'button',
       {
-        class: 'btn mark',
+        class: 'btn primary',
         type: 'button',
-        disabled: !!busy || !c.plan.canApply || c.page.template,
-        onclick: async function () {
+        disabled: !!busy || !c.plan.canApply || template,
+        click: async function () {
+          // The page this editor was opened for. Everything below is done to that page, also when the user
+          // moves to another page in the Designer before it has finished.
+          var info = S.info,
+            mine = turn;
           var t = title.value.replace(/\s+/g, ' ').trim(),
             d = desc.value.replace(/\s+/g, ' ').trim();
           if (t.length < 5 || d.length < 20) {
@@ -655,32 +698,37 @@
           }
           S.busy = 'apply';
           drawMeta();
+          var titleSet = false;
           try {
-            await S.info.page.setTitle(t);
-            await S.info.page.setDescription(d);
+            await info.page.setTitle(t);
+            titleSet = true;
+            await info.page.setDescription(d);
           } catch (e) {
+            // what the Designer took is what the page has now
+            if (titleSet) info.title = t;
+            if (mine !== turn) return;
             S.busy = '';
             S.msg = {
               kind: 'err',
-              text: 'The Designer did not take the change. Switch to Design mode and try again.'
+              text: titleSet
+                ? 'The Designer took the title but not the description. Try again.'
+                : 'The Designer did not take the change. Switch to Design mode and try again.'
             };
-            return drawMeta();
+            return draw();
           }
-          S.info.title = t;
-          S.info.description = d;
-          await call('applied', {
-            title: t,
-            description: d,
-            keywordId: c.keywords[0] ? c.keywords[0].id : ''
-          });
-          S.busy = '';
+          // tells the app that this keyword got a fix; the app reads the page's values from Webflow itself
+          await call('applied', { keywordId: c.keywords[0] ? c.keywords[0].id : '' }, info);
           notify('Success', 'Title and description set. Publish the site to make them live.');
+          // another page is open now: it is on screen already, and the notification above has said what was done
+          if (mine !== turn) return;
           await load();
-          S.msg = {
-            kind: 'ok',
-            text: 'Title and description set on this page. Publish the site to make them live.'
-          };
-          drawPage();
+          if (turn === mine + 1 && S.ctx && S.ctx.ok && S.ctx.site.ready) {
+            S.msg = {
+              kind: 'ok',
+              text: 'Title and description set on this page. Publish the site to make them live.'
+            };
+            drawPage();
+          }
         }
       },
       busy === 'apply' ? 'Applying…' : 'Apply to this page'
@@ -689,33 +737,43 @@
       'form',
       {
         class: 'body',
-        onsubmit: function (e) {
+        submit: function (e) {
           e.preventDefault();
         }
       },
       msgBox(),
-      c.page.template
+      languagesNote(),
+      template
         ? h('div', {
             class: 'msg info',
-            text: 'This is a CMS template page. Its title and description usually come from collection fields; change them in the template settings.'
+            text: 'This is a Collection template. Its title and description usually come from collection fields; change them in the template settings in Webflow.'
           })
         : null,
       h(
         'div',
-        { class: 'field' },
-        h('div', { class: 'lh' }, h('label', { for: 'mt', text: 'Title' }), tCount),
-        title
+        { class: 'now', 'aria-label': 'On this page now' },
+        h('span', { class: 'k', text: 'On this page now, in the Designer' }),
+        h('span', { class: 'v', text: (S.info.title || '').trim() || '(no SEO title)' }),
+        h('span', { class: 'v sub', text: (S.info.description || '').trim() || '(no meta description)' })
       ),
       h(
         'div',
         { class: 'field' },
-        h('div', { class: 'lh' }, h('label', { for: 'md', text: 'Description' }), dCount),
-        desc
+        h('div', { class: 'lh' }, h('label', { for: 'mt', text: 'New title' }), tTag),
+        title,
+        tCount
       ),
       h(
         'div',
         { class: 'field' },
-        h('span', { style: 'font-size:12px;font-weight:600', text: 'How it can show in search' }),
+        h('div', { class: 'lh' }, h('label', { for: 'md', text: 'New description' }), dTag),
+        desc,
+        dCount
+      ),
+      h(
+        'div',
+        { class: 'field' },
+        h('span', { class: 'flabel', text: 'How the new values can show in search' }),
         h(
           'div',
           { class: 'serp' },
@@ -728,152 +786,31 @@
           serpT,
           serpD
         )
-      ),
-      !c.plan.canApply
-        ? h(
-            'div',
-            { class: 'msg info' },
-            'Applying is part of the paid plans. Copy the text into Page settings, or ',
-            h('a', { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener' }, 'upgrade'),
-            '.'
-          )
-        : null
+      )
     );
     render([
-      top(true, 'Title and description'),
+      topBar(true, 'Title and description'),
       body,
       h(
         'footer',
         { class: 'foot' },
         h('div', { class: 'row' }, apply, write),
-        h('span', {
-          class: 'note',
-          text: 'The change shows in the Designer at once. Publish the site when you are ready.'
-        })
+        // why Apply is off stands right under it
+        c.plan.canApply
+          ? h('span', {
+              class: 'note',
+              text: 'Apply sets the two values on this page in the Designer. Publish the site when you are ready.'
+            })
+          : h(
+              'span',
+              { class: 'note' },
+              'Applying is part of the paid plans. Copy the text into the page settings in Webflow, or ',
+              link(c.plan.upgradeUrl, '', 'see the plans'),
+              '.'
+            )
       )
     ]);
     sync();
-  }
-
-  function drawFaq() {
-    var c = S.ctx;
-    var pairs = S.faq || [];
-    var busy = S.busy;
-    var write = h(
-      'button',
-      {
-        class: pairs.length ? 'btn' : 'btn mark',
-        type: 'button',
-        disabled: !!busy,
-        onclick: async function () {
-          S.busy = 'write';
-          S.msg = { kind: 'info', text: 'Writing answers from this page, this takes a few seconds…' };
-          drawFaq();
-          var r = await call('suggest', { what: 'faq', keywordId: c.keywords[0] ? c.keywords[0].id : '' });
-          S.busy = '';
-          if (r.ok) {
-            S.faq = r.faq;
-            S.msg = {
-              kind: 'ok',
-              text: 'Written from this page. Every answer should also be visible on the page itself.'
-            };
-          } else S.msg = { kind: 'err', text: r.error || 'No answers this time.' };
-          drawFaq();
-        }
-      },
-      pairs.length ? 'Write again' : 'Write answers with AI'
-    );
-    var list = pairs.map(function (x, i) {
-      var q = h('input', { type: 'text', 'aria-label': 'Question ' + (i + 1), maxlength: '200', value: x.q });
-      var a = h('textarea', { 'aria-label': 'Answer ' + (i + 1), maxlength: '900', rows: '3' });
-      a.value = x.a;
-      q.addEventListener('input', function () {
-        pairs[i].q = q.value;
-      });
-      a.addEventListener('input', function () {
-        pairs[i].a = a.value;
-      });
-      return h(
-        'div',
-        { class: 'qa' },
-        q,
-        a,
-        h(
-          'button',
-          {
-            class: 'btn rm',
-            type: 'button',
-            onclick: function () {
-              pairs.splice(i, 1);
-              S.faq = pairs;
-              drawFaq();
-            }
-          },
-          'Remove'
-        )
-      );
-    });
-    var applyBtn = pairs.length
-      ? h(
-          'button',
-          {
-            class: 'btn mark',
-            type: 'button',
-            disabled: !!busy || !c.plan.canApply || pairs.length < 2,
-            onclick: async function () {
-              S.busy = 'apply';
-              drawFaq();
-              var r = await call('faq', { faq: pairs, keywordId: c.keywords[0] ? c.keywords[0].id : '' });
-              S.busy = '';
-              if (!r.ok) {
-                S.msg = { kind: 'err', text: r.error || 'Webflow did not take the change.' };
-                return drawFaq();
-              }
-              notify('Success', 'FAQ schema added. Publish the site to make it live.');
-              await load();
-              S.msg = {
-                kind: 'ok',
-                text: 'FAQ schema added to this page. Publish the site to make it live.'
-              };
-              drawPage();
-            }
-          },
-          busy === 'apply' ? 'Adding…' : 'Add FAQ schema'
-        )
-      : null;
-    var body = h(
-      'div',
-      { class: 'body' },
-      msgBox(),
-      h('p', {
-        class: 'muted',
-        style: 'font-size:12px',
-        text: 'Questions people ask about this page, answered from its own text and added as FAQ schema, the format AI engines read.'
-      }),
-      list,
-      pairs.length && pairs.length < 2
-        ? h('div', { class: 'msg info', text: 'FAQ schema needs at least two questions and answers.' })
-        : null,
-      !c.plan.canApply
-        ? h(
-            'div',
-            { class: 'msg info' },
-            'Adding schema is part of the paid plans. ',
-            h('a', { href: c.plan.upgradeUrl, target: '_blank', rel: 'noopener' }, 'See the plans'),
-            '.'
-          )
-        : null
-    );
-    render([
-      top(true, 'FAQ schema'),
-      body,
-      h(
-        'footer',
-        { class: 'foot' },
-        h('div', { class: 'row' }, applyBtn, write),
-        h('span', { class: 'note', text: 'Nothing is added until you press Add FAQ schema.' })
-      )
-    ]);
   }
 
   /* ---------- start ---------- */

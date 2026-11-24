@@ -2,17 +2,17 @@
 """Burn the English captions into the silent AI SEO Deck demo recording.
 
 Usage:
-  make_video.py --input rec.mp4 --starts 0,12.5,31,... [--end 230] [--crop W:H:X:Y] [--delogo X:Y:W:H] --out demo.mp4
-  make_video.py --input rec.mp4 --ranges 0-12.6,13.6-18.8,... [--captions other.json] --out demo.mp4
+  make_video.py --input rec.mp4 --captions captions.json --starts 0,12.5,31,... [--end 230] [--crop W:H:X:Y] [--delogo X:Y:W:H] --out demo.mp4
+  make_video.py --input rec.mp4 --captions captions.json --ranges 0-12.6,13.6-18.8,... --out demo.mp4
 
---starts are the seconds (in the input) where each scene in captions.json begins; the scenes follow each other.
+--captions is the caption file of this recording: {"scenes": [{"name": "...", "lines": ["...", "..."]}]}.
+--starts are the seconds (in the input) where each scene of the caption file begins; the scenes follow each other.
 --ranges gives each scene its own start-end instead, so the parts between two ranges are cut out.
 --delogo hides a fixed overlay (such as an operating system watermark) in the cropped frame.
 A scene that is too short for its captions is lengthened by holding its last frame.
 """
 import argparse, json, os, subprocess, sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
 CPS = 15.0          # reading speed, characters per second
 MIN_LINE = 2.6      # shortest time a caption stays up
 GAP = 0.25          # pause between two captions
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     p.add_argument('--end')
     p.add_argument('--crop')
     p.add_argument('--delogo')
-    p.add_argument('--captions', default=os.path.join(HERE, 'captions.json'))
+    p.add_argument('--captions', required=True, help='the captions of this recording, a JSON file with scenes')
     p.add_argument('--out', required=True)
     a = p.parse_args()
     if not a.starts and not a.ranges:

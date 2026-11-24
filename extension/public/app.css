@@ -1,18 +1,73 @@
-:root {
-  --bg: #232530;
-  --panel: #2c2f3b;
-  --panel2: #33374a;
-  --line: #3a3e4c;
-  --line2: #4a4f62;
-  --ink: #ecedf2;
-  --muted: #a9adbd;
-  --mark: #f3d46e;
-  --mark-ink: #231c00;
-  --good: #74d3aa;
-  --warn: #edc57a;
-  --bad: #ee8c8c;
-  --cite: #a9bdff;
-  color-scheme: dark;
+/*
+ * AI SEO Deck in the Webflow Designer.
+ * Colors, type and shadows are Webflow's own tokens for apps (the CSS variables of Webflow's design guidelines),
+ * so the panel follows the user's Appearance setting wherever the Designer provides them. Each token is read with
+ * the value of Webflow's default dark theme as its fallback. Sizes follow the same guidelines: 11.5px and 13px
+ * text in two weights, a 4px corner and spacing in steps of 4px.
+ */
+/* Inter, the typeface of Webflow's interface, shipped with the panel as Webflow's design guidelines describe:
+   two font files in fonts/, under the SIL Open Font License 1.1 (fonts/OFL.txt). Nothing is loaded from elsewhere. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(fonts/inter-latin-ext-wght-normal.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(fonts/inter-latin-wght-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+body {
+  --bg: var(--background1, #292929);
+  --surface: var(--background2, #353535);
+  --surface2: var(--background3, #404040);
+  --field: var(--backgroundInput, rgba(0, 0, 0, 0.22));
+  --off: var(--backgroundInactive, #373737);
+  --line: var(--border1, rgba(255, 255, 255, 0.13));
+  --line3: var(--border3, rgba(255, 255, 255, 0.22));
+  --ink: var(--text1, #ffffff);
+  --ink2: var(--text2, rgba(255, 255, 255, 0.67));
+  --ink-off: var(--textInactive, rgba(255, 255, 255, 0.5));
+  --primary: var(--actionPrimaryBackground, #006acc);
+  --primary-hover: var(--actionPrimaryBackgroundHover, #187cd9);
+  --primary-ink: var(--actionPrimaryText, #ffffff);
+  --secondary: var(--actionSecondaryBackground, rgba(255, 255, 255, 0.13));
+  --secondary-hover: var(--actionSecondaryBackgroundHover, rgba(255, 255, 255, 0.19));
+  --blue: var(--blueText, #a7d1ff);
+  --blue-line: var(--blueBorder, #007df0);
+  --green: var(--greenText, #79e09c);
+  --green-line: var(--greenBorder, #259d4d);
+  --yellow: var(--yellowText, #ffd301);
+  --red: var(--redText, #ff9c9c);
+  --red-line: var(--redBorder, #e42f3a);
+  /* the mark of an answer that names the brand: Webflow's yellow, with ink that reads on it in every theme */
+  --mark: var(--yellowBackground, #ffd301);
+  --mark-ink: #1f1a00;
+  --shadow-primary: var(
+    --boxShadows-action-colored,
+    0 0.5px 1px 0 rgba(0, 0, 0, 0.8),
+    inset 0 0.5px 0.5px 0 rgba(255, 255, 255, 0.2)
+  );
+  --shadow-secondary: var(
+    --boxShadows-action-secondary,
+    0 0.5px 1px 0 rgba(0, 0, 0, 0.8),
+    inset 0 0.5px 0.5px 0 rgba(255, 255, 255, 0.12)
+  );
+  --small: var(--font-size-small, 11.5px);
+  --large: var(--font-size-large, 13px);
+  --small-line: var(--line-height-small, 16px);
+  --large-line: var(--line-height-large, 18px);
+  --regular: var(--font-weight-normal, 400);
+  --medium: var(--font-weight-medium, 600);
+  --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 * {
   box-sizing: border-box;
@@ -25,14 +80,17 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  font:
-    400 12.5px/1.45 Inter,
+  font-family:
+    Inter,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
     Roboto,
     Arial,
     sans-serif;
+  font-size: var(--small);
+  line-height: var(--small-line);
+  font-weight: var(--regular);
   -webkit-font-smoothing: antialiased;
 }
 #app {
@@ -41,12 +99,12 @@ body {
   height: 100%;
 }
 a {
-  color: var(--cite);
+  color: var(--blue);
 }
 :focus-visible {
-  outline: 2px solid var(--mark);
-  outline-offset: 2px;
-  border-radius: 6px;
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+  border-radius: 4px;
 }
 h1,
 h2,
@@ -54,43 +112,49 @@ h3,
 p {
   margin: 0;
 }
+h2 {
+  font-size: var(--large);
+  line-height: var(--large-line);
+  font-weight: var(--medium);
+}
 .loading,
 .empty {
-  padding: 24px 14px;
-  color: var(--muted);
+  padding: 16px 12px;
+  color: var(--ink2);
 }
-.top {
-  height: 46px;
+.bar {
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px 0 14px;
-  border-bottom: 1px solid #353946;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
 }
-.top b {
-  font-size: 13px;
-  font-weight: 700;
+.bar b {
+  font-size: var(--large);
+  line-height: var(--large-line);
+  font-weight: var(--medium);
 }
-.top .pill {
+.bar .pill {
   margin-left: auto;
 }
-.top .back {
-  width: 32px;
-  height: 32px;
-  margin-left: -8px;
+.bar .back {
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   background: none;
   color: var(--ink);
   display: grid;
   place-items: center;
   cursor: pointer;
 }
-.top .back:hover {
-  background: var(--panel);
+.bar .back:hover {
+  background: var(--secondary);
 }
-.top .back svg {
+.bar .back svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -99,23 +163,21 @@ p {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.top .path {
+.bar .path {
   margin-left: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--muted);
+  font-family: var(--mono);
+  color: var(--ink2);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .pill {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--panel2);
-  color: #d6d9e6;
-  font-size: 11.5px;
-  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--ink);
+  font-weight: var(--medium);
   white-space: nowrap;
 }
 .body {
@@ -123,78 +185,74 @@ p {
   min-height: 0;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--line2) transparent;
-  padding: 14px;
+  scrollbar-color: var(--line3) transparent;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .here {
   display: grid;
   gap: 2px;
 }
 .here .k {
-  font-size: 11.5px;
-  color: var(--muted);
+  color: var(--ink2);
 }
 .here .nm {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--large);
+  line-height: var(--large-line);
+  font-weight: var(--medium);
   overflow-wrap: anywhere;
 }
 .here .p {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--muted);
+  font-family: var(--mono);
+  color: var(--ink2);
   overflow-wrap: anywhere;
 }
 .card {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 12px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .card .k {
-  font-size: 11.5px;
-  color: var(--muted);
+  color: var(--ink2);
 }
 .card h2 {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .card p {
-  font-size: 12px;
-  color: #c9ccd8;
+  color: var(--ink2);
 }
 .strip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 .strip .n {
   margin-left: 4px;
-  font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--medium);
 }
+/* one mark for each AI engine: a shape for every state, so no state is told by color alone */
 .m {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid transparent;
   display: grid;
   place-items: center;
   flex: none;
+  color: var(--ink2);
 }
 .m svg {
   width: 12px;
   height: 12px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.8;
+  stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -204,35 +262,24 @@ p {
   color: var(--mark-ink);
 }
 .m.st-b {
-  box-shadow: inset 0 0 0 2px #2f5bff;
+  box-shadow: inset 0 0 0 2px var(--blue-line);
 }
 .m.st-i {
-  background: rgba(169, 189, 255, 0.16);
-  color: var(--cite);
+  border-color: var(--blue-line);
+  color: var(--blue);
 }
 .m.st-o {
-  border: 1.5px solid var(--line2);
-  color: var(--muted);
-}
-.m.st-o svg {
-  width: 10px;
-  height: 10px;
-  stroke-width: 2.6;
+  border-color: var(--line3);
 }
 .m.st-x {
-  border: 1.5px dashed var(--line2);
-  color: var(--muted);
-}
-.m.st-x svg {
-  width: 10px;
-  height: 10px;
+  border: 1px dashed var(--line3);
 }
 .m.st-f {
-  background: rgba(238, 140, 140, 0.16);
-  color: var(--bad);
+  border-color: var(--red-line);
+  color: var(--red);
 }
 .m.st-w {
-  border: 1.5px dotted var(--line2);
+  border: 1px dotted var(--line3);
 }
 .sec {
   display: grid;
@@ -244,28 +291,24 @@ p {
   align-items: baseline;
   gap: 8px;
 }
-.sec .hd h2 {
-  font-size: 13px;
-  font-weight: 700;
-}
 .sec .hd span {
-  font-size: 11.5px;
-  color: var(--muted);
+  color: var(--ink2);
 }
 ul.fixes {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 ul.fixes li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 9px;
-  background: var(--panel);
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
 }
 ul.fixes li .ic {
   flex: none;
@@ -276,9 +319,16 @@ ul.fixes li .ic svg {
   width: 16px;
   height: 16px;
   fill: none;
-  stroke-width: 2.2;
+  stroke: var(--yellow);
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+ul.fixes li .ic.good svg {
+  stroke: var(--green);
+}
+ul.fixes li .ic.info svg {
+  stroke: var(--ink2);
 }
 ul.fixes li .tx {
   flex: 1;
@@ -287,186 +337,214 @@ ul.fixes li .tx {
   gap: 2px;
 }
 ul.fixes li b {
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: var(--medium);
 }
 ul.fixes li span.nt {
-  font-size: 11.5px;
-  line-height: 1.35;
-  color: var(--muted);
+  color: var(--ink2);
 }
+/* buttons: Webflow's secondary action, and its primary action for the one thing to do next */
 .btn {
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 7px;
-  border: 1px solid var(--line2);
-  background: transparent;
+  font-weight: var(--medium);
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 0;
+  background: var(--secondary);
+  box-shadow: var(--shadow-secondary);
   color: var(--ink);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   white-space: nowrap;
 }
 .btn:hover {
-  border-color: var(--muted);
+  background: var(--secondary-hover);
 }
-.btn.mark {
-  background: var(--mark);
-  border-color: var(--mark);
-  color: var(--mark-ink);
+.btn.primary {
+  background: var(--primary);
+  box-shadow: var(--shadow-primary);
+  color: var(--primary-ink);
 }
-.btn.mark:hover {
-  filter: brightness(1.06);
+.btn.primary:hover {
+  background: var(--primary-hover);
 }
 .btn.wide {
   width: 100%;
-  min-height: 36px;
-  font-size: 12.5px;
+  min-height: 32px;
 }
-.btn[disabled] {
-  opacity: 0.5;
+.btn[disabled],
+.btn[disabled]:hover {
+  background: var(--off);
+  box-shadow: none;
+  color: var(--ink-off);
   cursor: not-allowed;
 }
 .foot {
   flex: none;
-  padding: 12px 14px 14px;
-  border-top: 1px solid #353946;
+  padding: 12px;
+  border-top: 1px solid var(--line);
   display: grid;
   gap: 8px;
 }
-.foot .note {
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--muted);
-  text-align: center;
+.foot .note,
+.sec .note {
+  color: var(--ink2);
+}
+.sec .note {
+  margin: 4px 0 0;
+}
+.note a {
+  color: inherit;
+  text-decoration: underline;
 }
 .row {
   display: flex;
   gap: 8px;
 }
-.row .btn.mark {
+.row .btn {
   flex: 1;
+  min-height: 32px;
 }
 .field {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 .field .lh {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
-.field label {
-  font-size: 12px;
-  font-weight: 600;
+.field label,
+.flabel {
+  font-weight: var(--medium);
 }
 .count {
-  font-size: 11.5px;
-  color: var(--warn);
+  color: var(--yellow);
 }
 .count.ok {
-  color: var(--good);
+  color: var(--green);
 }
 input[type='text'],
 textarea {
   width: 100%;
   font: inherit;
-  font-size: 12.5px;
   color: var(--ink);
-  background: #1b1d26;
-  border: 1px solid var(--line2);
-  border-radius: 8px;
-  padding: 8px 10px;
+  background: var(--field);
+  border: 1px solid var(--line3);
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 input[type='text'] {
-  min-height: 36px;
+  min-height: 24px;
 }
 textarea {
-  min-height: 76px;
+  min-height: 72px;
   resize: vertical;
-  line-height: 1.4;
 }
-input:focus,
+input[type='text']:focus,
 textarea:focus {
-  outline: none;
-  border-color: var(--cite);
+  outline: 1px solid var(--blue);
+  outline-offset: 0;
+  border-color: var(--blue);
 }
+/* how the values can show in a search result: always dark text on white, whatever the theme */
 .serp {
-  padding: 10px 12px;
-  border-radius: 9px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
   background: #ffffff;
-  color: #1f2430;
+  color: #3c4043;
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 .serp .u {
-  font-size: 11px;
-  color: #4d5466;
+  color: #4d5156;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .serp .t {
-  font-size: 14px;
-  line-height: 1.3;
-  color: #1a3fc4;
+  font-size: var(--large);
+  line-height: var(--large-line);
+  color: #1a0dab;
   overflow-wrap: anywhere;
 }
 .serp .d {
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: #3f4555;
+  color: #4d5156;
   overflow-wrap: anywhere;
 }
 .msg {
-  border-radius: 9px;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.4;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--blue-line);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 8px;
 }
 .msg.err {
-  background: rgba(238, 140, 140, 0.14);
-  color: #f6c3c3;
+  border-left-color: var(--red-line);
 }
 .msg.ok {
-  background: rgba(116, 211, 170, 0.14);
-  color: #bdebd6;
+  border-left-color: var(--green-line);
 }
-.msg.info {
-  background: var(--panel);
-  color: #c9ccd8;
-}
-.qa {
+.kwhead {
   display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 9px;
-  background: var(--panel);
+  gap: 2px;
 }
-.qa .rm {
-  justify-self: end;
-  font-size: 11.5px;
-  min-height: 26px;
+/* what the page has now, apart from what is being written */
+.now {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px dashed var(--line3);
 }
-.muted {
-  color: var(--muted);
+.now .k {
+  color: var(--ink2);
 }
+.now .v {
+  font-weight: var(--medium);
+  overflow-wrap: anywhere;
+}
+.now .v.sub {
+  font-weight: var(--regular);
+  color: var(--ink2);
+}
+.tag {
+  padding: 0 4px;
+  border: 1px solid var(--blue-line);
+  border-radius: 4px;
+  color: var(--blue);
+  white-space: nowrap;
+}
+.tag[hidden] {
+  display: none;
+}
+.linkbtn {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* the empty svg element the script reads the SVG namespace from */
+.svgns {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+/* the line a screen reader is told; not shown */
 .sr {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-  }
+  white-space: nowrap;
 }

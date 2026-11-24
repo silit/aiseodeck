@@ -4,6 +4,8 @@
 //   users:all             set of user ids
 //   email:{address}       user id for an email (sign in by email link)
 //   login:{sha256}        one-time sign in link, 15 minutes
+//   oauth:{sha256}        one authorization request to Webflow (its state value): 10 minutes, read once
+//   connchk:{connId}      set for 24 hours each time a connection's token is checked with Webflow
 //   site:{id}             site record: project settings, keywords, latest summary per keyword, schedule, site summary
 //   sites:all             set of tracked site ids (the scheduler walks this)
 //   run:{id}              one check run (keyword questions x engines) with a snapshot of the project
@@ -16,7 +18,7 @@
 //   report:{token}        siteId for public report links
 //   calls:{day}           engine calls made that day (cost guard)
 const kv = require('./kv');
-const { seal, open, random, sha256 } = require('./crypto');
+const { seal, open, random, sha256, timingEqual } = require('./crypto');
 const { limitsFor, QUESTIONS } = require('./plans');
 
 const HISTORY_KEEP = 52;
@@ -59,6 +61,34 @@ async function rateOk(key, max, windowSec) {
 }
 async function allUserIds() { return kv.smembers('users:all'); }
 
+/* ---------- authorization requests to Webflow (the OAuth state) ---------- */
+const OAUTH_STATE_TTL = 600; // seconds
+// Remembers one authorization request: its state value (kept as a hash) and the browser that started it (the hash
+// of that browser's sign-in cookie). The record expires on its own after ten minutes.
+async function saveOauthState(state, browser) {
+  return kv.setNX('oauth:' + sha256(state), { b: sha256(browser), at: Date.now() }, OAUTH_STATE_TTL);
+}
+// Reads and deletes the record in one operation (GETDEL), so a state value works once. True only when the state
+// was issued here, less than ten minutes ago, to the browser that presents it now.
+async function takeOauthState(state, browser) {
+  if (typeof state !== 'string' || !/^[A-Za-z0-9_-]{20,128}$/.test(state)) return false;
+  const rec = await kv.getDelJSON('oauth:' + sha256(state));
+  if (!rec || !rec.b || !rec.at || !browser) return false;
+  if (Date.now() - rec.at > OAUTH_STATE_TTL * 1000) return false;
+  return timingEqual(rec.b, sha256(String(browser)));
+}
+// How often Webflow is asked whether a stored token still works: every 20 hours. The passes that ask start at most
+// an hour apart, so each token is asked within a day of the time before.
+const TOKEN_CHECK_EVERY = 20 * 3600; // seconds
+const TOKEN_CHECK_RETRY = 3600; // seconds: when Webflow did not say, the token is asked about again an hour later
+// True once in 20 hours for a connection: the moment to ask Webflow whether its token still works.
+async function dueForTokenCheck(connId) { return kv.setNX('connchk:' + connId, { at: Date.now() }, TOKEN_CHECK_EVERY); }
+// Webflow did not say whether the token works (no answer, an error, a request to slow down): due again in an hour.
+async function tokenCheckAgainSoon(connId) { return kv.setJSON('connchk:' + connId, { at: Date.now(), again: true }, TOKEN_CHECK_RETRY); }
+// Where the last pass over the stored tokens stopped when it ran out of time ('' when it reached the end).
+async function tokenCheckCursor() { const c = await kv.getJSON('conncursor'); return c && typeof c.id === 'string' ? c.id : ''; }
+async function setTokenCheckCursor(id) { return id ? kv.setJSON('conncursor', { id, at: Date.now() }, 86400) : kv.del('conncursor'); }
+
 function newUser(info) {
   return {
     id: info.id,
@@ -71,11 +101,17 @@ function newUser(info) {
     siteIds: []
   };
 }
-function addConnection(user, token, label) {
-  const conn = { id: random(8), tokenEnc: seal({ t: token }), label: label || '', authorizedAt: Date.now() };
+// siteIds: the sites this authorization covered when Webflow was last asked (GET /v2/sites).
+function addConnection(user, token, label, siteIds) {
+  const conn = { id: random(8), tokenEnc: seal({ t: token }), label: label || '', authorizedAt: Date.now(), siteIds: siteIds || [] };
   user.connections.push(conn);
+  delete user.noAccessAt;
   return conn;
 }
+// How long an account is kept after its last Webflow authorization ended (the app was uninstalled), when it has no
+// paid plan: long enough to read what happened and install again. After that the account is deleted (jobs.leftBehind).
+const ACCOUNT_KEEP_DAYS = 30;
+const ACCOUNT_KEEP_MS = ACCOUNT_KEEP_DAYS * 86400000;
 function tokenOf(conn) {
   if (!conn || !conn.tokenEnc) return null;
   const o = open(conn.tokenEnc);
@@ -94,6 +130,13 @@ function primaryUrl(meta) {
   return host ? scheme + '://' + host : '';
 }
 const bareHost = (u) => String(u || '').replace(/^[a-z]+:\/\//i, '').replace(/\/.*$/, '').replace(/^www\./i, '').toLowerCase();
+// The addresses Webflow serves the site on: its custom domains and its webflow.io address. An AI answer that links
+// to one of them counts as a citation. They are read from Webflow and never typed by the user.
+function domainsOf(meta) {
+  const domains = ((meta && meta.customDomains) || []).map((d) => bareHost(d.url)).filter(Boolean);
+  if (meta && meta.shortName) domains.push(String(meta.shortName).toLowerCase() + '.webflow.io');
+  return [...new Set(domains)];
+}
 
 // Webflow Localization: the site's primary locale (the language AI SEO Deck reads, checks and writes) and the names
 // of its other enabled languages. null when Webflow sends no locales.
@@ -107,8 +150,6 @@ function localeOf(meta) {
 
 function newSite(meta, userId, connectionId) {
   const url = primaryUrl(meta);
-  const domains = (meta.customDomains || []).map((d) => bareHost(d.url)).filter(Boolean);
-  if (meta.shortName) domains.push(meta.shortName + '.webflow.io');
   return {
     id: meta.id,
     userId,
@@ -118,10 +159,11 @@ function newSite(meta, userId, connectionId) {
     domains: (meta.customDomains || []).map((d) => d.url).filter(Boolean),
     url,
     locale: localeOf(meta),
+    metaAt: Date.now(), // when the name, addresses and languages above were last read from Webflow
     createdAt: Date.now(),
     tracked: false,
     pausedByUser: false,
-    project: { brand: meta.displayName || '', aliases: [], domains: [...new Set(domains)], competitors: [], country: '', language: '', ready: false },
+    project: { brand: meta.displayName || '', aliases: [], domains: domainsOf(meta), competitors: [], country: '', language: '', ready: false },
     keywords: [], // [{ id, text, questions: [], volume, source, page, at, fixedAt }]
     kw: {}, // latest summary per keyword id (see analyze.keywordSummary) plus { at, runId, trend: [[at, visibility]] }
     sched: { lastRunAt: null, nextRunAt: null, runId: '', lastManualAt: null, firstRunDone: false },
@@ -136,6 +178,9 @@ function refreshMeta(site, meta) {
   site.domains = (meta.customDomains || []).map((d) => d.url).filter(Boolean);
   site.url = primaryUrl(meta) || site.url;
   if (meta.locales) site.locale = localeOf(meta);
+  const domains = domainsOf(meta);
+  if (domains.length && site.project) site.project.domains = domains;
+  site.metaAt = Date.now();
   return site;
 }
 // Sites saved before keywords existed tracked questions ("prompts"): each question becomes a keyword asked as itself.
@@ -146,6 +191,9 @@ function normalizeSite(site) {
   }
   delete site.prompts;
   if (!site.kw || typeof site.kw !== 'object') site.kw = {};
+  // The Site health summary of the version that read published websites has no time of a read from Webflow:
+  // it goes, so no screen shows a score that did not come from the Webflow API.
+  if (site.audit && !site.audit.readAt) site.audit = null;
   return site;
 }
 async function getSite(id) { return normalizeSite(await kv.getJSON('site:' + id)); }
@@ -193,7 +241,8 @@ async function enforceLimit(user) {
   return changed;
 }
 
-// Removes a Webflow connection and every site that came with it.
+// Removes a Webflow connection (its token is forgotten) and every site that came with it. This is what happens
+// when Webflow no longer accepts the token: the app was uninstalled or its access was removed there.
 async function removeConnection(user, connId) {
   const conn = (user.connections || []).find((c) => c.id === connId);
   if (!conn) return null;
@@ -202,27 +251,22 @@ async function removeConnection(user, connId) {
   const gone = sites.filter((s) => s.connectionId === connId);
   for (const site of gone) await deleteSite(site);
   user.siteIds = (user.siteIds || []).filter((id) => !gone.some((s) => s.id === id));
+  // no authorization left: the day from which the account itself is kept for ACCOUNT_KEEP_DAYS more days
+  if (!user.connections.length) user.noAccessAt = Date.now();
   conn._sites = gone.map((s) => s.name);
   return conn;
 }
-// Webflow answered 401: delete only after a second 401 at least REVOKE_CONFIRM_MS later.
-async function confirmRevoked(user, connId, now) {
-  now = now || Date.now();
+// The in-app Disconnect: the sites of one Webflow authorization leave AI SEO Deck and what is kept about them is
+// deleted. The authorization itself stays as it is in Webflow and here, so the sites can be connected again
+// without asking Webflow for a new authorization. Access to Webflow ends when the app is uninstalled in Webflow.
+async function disconnectSites(user, connId) {
   const conn = (user.connections || []).find((c) => c.id === connId);
   if (!conn) return null;
-  const raw = process.env.REVOKE_CONFIRM_MS;
-  const wait = raw != null && raw !== '' && !isNaN(parseInt(raw, 10)) ? parseInt(raw, 10) : 600000;
-  if (!conn.revokedSince) {
-    conn.revokedSince = now;
-    if (wait > 0) { await saveUser(user); return null; }
-  }
-  if (now - conn.revokedSince < wait) return null;
-  return removeConnection(user, connId);
-}
-function clearRevoked(user, connId) {
-  const conn = (user.connections || []).find((c) => c.id === connId);
-  if (conn && conn.revokedSince) { delete conn.revokedSince; return true; }
-  return false;
+  const sites = await getSites(user.siteIds || []);
+  const gone = sites.filter((x) => x.connectionId === connId);
+  for (const site of gone) await deleteSite(site);
+  user.siteIds = (user.siteIds || []).filter((id) => !gone.some((x) => x.id === id));
+  return { label: conn.label || '', sites: gone.map((x) => x.name) };
 }
 
 // Keywords used by all of a user's sites (the plan's keyword limit is a shared pool)
@@ -312,10 +356,23 @@ async function takeCalls(n) {
 async function callsToday() { return parseInt((await kv.command('GET', 'calls:' + day())) || '0', 10) || 0; }
 
 /* ---------- audits, drafts, reports ---------- */
-async function getAudit(siteId) { return kv.getJSON('audit:' + siteId); }
+// Site health results. Only what was read through the Webflow Data API counts: a record left by the version that
+// read published websites (before 23 November 2026) is treated as if the site had never been read.
+const AUDIT_SOURCE = 'webflow-data-api';
+async function getAudit(siteId) {
+  const a = await kv.getJSON('audit:' + siteId);
+  return a && a.source === AUDIT_SOURCE ? a : null;
+}
 async function saveAudit(siteId, audit) { return kv.setJSON('audit:' + siteId, audit); }
-async function getDraft(siteId, key) { return kv.getJSON(`draft:${siteId}:${key}`); }
-async function saveDraft(siteId, key, value) { return kv.setJSON(`draft:${siteId}:${key}`, value, 14 * 86400); }
+// Suggestions waiting for the user (kept 14 days). They carry the number of the way they were made: 2 means
+// written from what the Webflow API returned. A draft without it was written by the earlier version from a
+// published page, and is not shown.
+const DRAFT_VERSION = 2;
+async function getDraft(siteId, key) {
+  const d = await kv.getJSON(`draft:${siteId}:${key}`);
+  return d && d.v === DRAFT_VERSION ? d : null;
+}
+async function saveDraft(siteId, key, value) { return kv.setJSON(`draft:${siteId}:${key}`, Object.assign({}, value, { v: DRAFT_VERSION }), 14 * 86400); }
 
 async function ensureReportToken(site) {
   if (site.settings.reportToken) return site.settings.reportToken;
@@ -341,8 +398,8 @@ async function unlock(name) { return kv.del('lock:' + name); }
 
 module.exports = {
   day, HISTORY_KEEP, RESULTS_KEEP,
-  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, newUser, addConnection, tokenOf, tokenForSite,
-  primaryUrl, bareHost, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, confirmRevoked, clearRevoked, keywordCount,
+  getUser, saveUser, findUserByEmail, createLoginToken, peekLoginToken, consumeLoginToken, loginRateOk, rateOk, allUserIds, saveOauthState, takeOauthState, dueForTokenCheck, tokenCheckAgainSoon, tokenCheckCursor, setTokenCheckCursor, TOKEN_CHECK_EVERY, ACCOUNT_KEEP_DAYS, ACCOUNT_KEEP_MS, newUser, addConnection, tokenOf, tokenForSite,
+  primaryUrl, bareHost, domainsOf, localeOf, newSite, normalizeSite, refreshMeta, getSite, getSites, saveSite, updateSite, allSiteIds, deleteSite, enforceLimit, removeConnection, disconnectSites, keywordCount,
   monthOf, usageOf, addUsage, SEARCH_ENGINES, createRun, getRun, saveRun, activeRunIds, takeTasks, requeue, tasksLeft, saveResult, results, resultCount, endRun, pushHistory, history, expireRun, takeCalls, callsToday,
   getAudit, saveAudit, getDraft, saveDraft, ensureReportToken, siteIdForReport, deleteReport, deleteUser, digestDone, lock, unlock
 };

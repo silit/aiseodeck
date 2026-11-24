@@ -1,14 +1,17 @@
 'use strict';
+const log = require('./log');
 // Background work, driven by one cron address (every few minutes) and by the dashboard while a run is open:
-// start runs that are due, ask the engines, finish runs (summary, history, email), refresh old audits.
+// start runs that are due, ask the engines, finish runs (summary, history, email). Nothing here reads or writes a
+// Webflow site: Site health is read from Webflow only when the user asks for it (runAudit).
 const store = require('./store');
 const engines = require('./engines');
 const alerts = require('./alerts');
 const analyze = require('./analyze');
-const auditLib = require('./audit');
+const health = require('./health');
 const wf = require('./webflow');
 const email = require('./email');
 const { limitsFor, DAY } = require('./plans');
+const billing = require('./billing');
 
 const insights = require('./insights');
 const STALE_MS = 3 * 60000; // a run with no tasks left and no progress for this long is finished as it is
@@ -61,10 +64,94 @@ async function startRun(site, user, reason, opts) {
   return { run };
 }
 
+/* ---------- when Webflow no longer accepts a token ---------- */
+const removedNotice = (removed) => 'AI SEO Deck no longer has access to Webflow for ' + (removed.label || 'one authorization') + ': the app was uninstalled or its access was removed in Webflow. Its ' + (removed._sites && removed._sites.length === 1 ? 'site was' : 'sites were') + ' deleted from AI SEO Deck with everything kept about them. Install the app again to start over.';
+// added when that was the account's last authorization and it has no paid plan
+const KEPT_NOTICE = ' Your account has no Webflow authorization now: it is kept for ' + store.ACCOUNT_KEEP_DAYS + ' days in case you install again, and is deleted after that.';
+const paidOrComplimentary = (user) => limitsFor(user).plan !== 'free' || billing.hasLiveSubscription(user);
+
+// Webflow answered 401 to a call made with this connection's token. One question settles what that means:
+// GET /v2/token/authorized_by with the same token (`known` skips it when that answer is already at hand).
+// Refused there too: the app was uninstalled or its access was removed. From that moment nothing more is asked of
+// Webflow with that token: it is forgotten with the connection, and the connection's sites are deleted with all
+// that is kept about them. Accepted there: the token works and the 401 was about something else.
+async function accessRemoved(user, connId, known) {
+  const conn = (user.connections || []).find((c) => c.id === connId);
+  if (!conn) return null;
+  const token = store.tokenOf(conn);
+  const st = known || (token ? await wf.tokenStatus(token) : 'revoked');
+  if (st !== 'revoked') return null;
+  const removed = await store.removeConnection(user, connId);
+  if (removed) { user.notice = removedNotice(removed) + (user.noAccessAt && !paidOrComplimentary(user) ? KEPT_NOTICE : ''); await store.saveUser(user); }
+  return removed;
+}
+
+// What is left of an account after the app was uninstalled everywhere: the Webflow user id, name and email, and the
+// settings. With no paid plan and no complimentary access, that account is deleted ACCOUNT_KEEP_DAYS days after its
+// last authorization ended. An account that authorizes again in that time starts counting from nothing
+// (store.addConnection). Answers true when the account was deleted.
+async function leftBehind(id, now) {
+  const user = await store.getUser(id); // the record as it is at this moment
+  if (!user || (user.connections || []).length || (user.siteIds || []).length || paidOrComplimentary(user)) return false;
+  // an account that was already without an authorization when this rule arrived starts its days now
+  if (!user.noAccessAt) { user.noAccessAt = now; await store.saveUser(user); return false; }
+  if (now - user.noAccessAt < store.ACCOUNT_KEEP_MS) return false;
+  await store.deleteUser(user);
+  return true;
+}
+
+// There is no uninstall webhook, and the checks of this app ask the AI engines, not Webflow. So every stored token
+// is asked whether Webflow still accepts it (GET /v2/token/authorized_by) once every 20 hours: that is how an
+// uninstall is noticed, within a day, for a site nobody opens.
+// A pass starts at most once an hour (the hourly job /cron/tokens, and the tick when it has time left) and stops
+// after `budgetMs`. A pass that ran out of time is continued by the next tick from the account it stopped at, so
+// every account is reached however many there are. When Webflow did not say whether a token works (no answer, an
+// error, a request to slow down), nothing is removed, that token is asked about again an hour later, and the next
+// pass waits its hour.
+async function checkConnections(now, budgetMs) {
+  if (!(await store.lock('conncheck', 3600))) return { asked: 0, removed: 0 };
+  const started = Date.now();
+  const budget = budgetMs || 8000;
+  const out = { asked: 0, removed: 0 };
+  const ids = (await store.allUserIds()).slice().sort();
+  const from = await store.tokenCheckCursor();
+  const order = from ? ids.filter((id) => id > from).concat(ids.filter((id) => id <= from)) : ids;
+  let last = '', cut = false, unsure = 0;
+  for (const id of order) {
+    if (Date.now() - started > budget) { cut = true; break; }
+    const seen = await store.getUser(id);
+    let whole = true;
+    for (const c of (seen && seen.connections) || []) {
+      if (Date.now() - started > budget) { whole = false; break; }
+      if (!(await store.dueForTokenCheck(c.id))) continue;
+      const token = store.tokenOf(c);
+      const st = token ? await wf.tokenStatus(token) : 'revoked';
+      out.asked++;
+      if (st === 'unknown') { unsure++; await store.tokenCheckAgainSoon(c.id); continue; }
+      if (st !== 'revoked') continue;
+      // the record as it is now: it may have changed while Webflow was asked
+      const user = await store.getUser(id);
+      if (user && (await accessRemoved(user, c.id, 'revoked'))) out.removed++;
+    }
+    if (!whole) { cut = true; break; }
+    if (seen && !(seen.connections || []).length && (await leftBehind(id, now || Date.now()))) out.deleted = (out.deleted || 0) + 1;
+    last = id;
+  }
+  if (cut) {
+    await store.setTokenCheckCursor(last || from);
+    out.more = true;
+    // continue at the next tick, unless Webflow is not answering: then the next pass waits its hour
+    if (!unsure) await store.unlock('conncheck');
+  } else await store.setTokenCheckCursor('');
+  if (unsure) out.unsure = unsure;
+  return out;
+}
+
 async function scheduleDue(now, max) {
   const ids = await store.allSiteIds();
   const sites = await store.getSites(ids);
   let started = 0;
+  let silent = false; // Webflow did not answer about a token in this pass
   for (const site of sites) {
     if (started >= (max || 20)) break;
     if (!site.tracked || !site.project || !site.project.ready || !(site.keywords || []).length) continue;
@@ -73,15 +160,12 @@ async function scheduleDue(now, max) {
     const user = await store.getUser(site.userId);
     if (!user) continue;
     // Our checks do not touch Webflow, so an uninstalled app would never be noticed: ask Webflow first.
+    // When Webflow does not say (no answer, an error), the check runs all the same, since it asks the AI engines
+    // only, and Webflow is not asked again in this pass.
     const token = store.tokenForSite(user, site);
-    const st = token ? await wf.tokenStatus(token) : 'revoked';
-    if (st === 'revoked') {
-      const removed = await store.confirmRevoked(user, site.connectionId, now);
-      if (removed) { user.notice = 'Webflow access for ' + (removed.label || 'one connection') + ' was removed (the app was uninstalled or access was revoked), so its sites were deleted from AI SEO Deck. Connect again to bring them back.'; await store.saveUser(user); }
-      else await store.updateSite(site.id, (s) => { s.sched.nextRunAt = now + 15 * 60000; });
-      continue;
-    }
-    if (st === 'ok' && store.clearRevoked(user, site.connectionId)) await store.saveUser(user);
+    const st = !token ? 'revoked' : silent ? 'unknown' : await wf.tokenStatus(token);
+    if (st === 'unknown') silent = true;
+    if (st === 'revoked') { await accessRemoved(user, site.connectionId, 'revoked'); continue; }
     const r = await startRun(site, user, site.sched.firstRunDone ? 'scheduled' : 'first');
     if (r.run) started++;
     else await store.updateSite(site.id, (s) => { s.sched.nextRunAt = now + DAY; s.sched.note = r.error; }); // try again tomorrow
@@ -203,7 +287,7 @@ async function finishRun(run, now) {
   const sums = {};
   for (const k of run.keywords || []) sums[k.id] = analyze.keywordSummary(run.project, run.engines, list.filter((r) => r.k === k.id));
   let described = null;
-  if (!run.partial) { try { described = await insights.describe(run, list); } catch (e) { console.error('[aiseodeck] insights', e.message); } }
+  if (!run.partial) { try { described = await insights.describe(run, list); } catch (e) { log.error('[aiseodeck] insights', e.message); } }
   run.status = 'done';
   run.finishedAt = now;
   run.summary = { keywords: Object.keys(sums).length, ok: list.filter((r) => r.ok && !r.none).length, total: list.length };
@@ -241,9 +325,9 @@ async function finishRun(run, now) {
   if (run.partial) await store.expireRun(run.id, 90);
   else await store.pushHistory(site.id, { runId: run.id, at: run.at, finishedAt: now, score: l.score, mentionRate: l.mentionRate, citationRate: l.citationRate, avgRank: l.avgRank, ok: l.ok, total: l.total, keywords: l.keywords, kwNamed: l.kwNamed, engines: run.engines, reason: run.reason }, keep);
   // keywords added while this check was running
-  if (pending.length && user) { try { await startRun(site, user, 'new', { keywordIds: pending }); } catch (e) { console.error('[aiseodeck] pending keywords', e.message); } }
+  if (pending.length && user) { try { await startRun(site, user, 'new', { keywordIds: pending }); } catch (e) { log.error('[aiseodeck] pending keywords', e.message); } }
   if (!run.partial && user && user.settings && user.settings.digest && run.reason !== 'manual' && !(await store.digestDone(run.id))) {
-    try { await sendDigest(user, site, l, prev); } catch (e) { console.error('[aiseodeck] digest email failed', e.message); }
+    try { await sendDigest(user, site, l, prev); } catch (e) { log.error('[aiseodeck] digest email failed', e.message); }
   }
   return l;
 }
@@ -274,20 +358,23 @@ async function sendDigest(user, site, summary, prev) {
   await email.send({ to, subject: `AI visibility for ${site.project.brand || site.name}: ${summary.score}% of answers`, html: digestHtml(site, summary, prev), text: `AI visibility for ${site.project.brand || site.name}: named in ${summary.score}% of AI answers for ${summary.keywords || 0} keywords, cited in ${pct(summary.citationRate)}. ${appUrl()}/app/site?id=${site.id}` });
 }
 
-/* ---------- audits ---------- */
-async function runAudit(site, user, budgetMs) {
-  if (!site.url) throw new Error('This site has no published address yet. Publish it in Webflow first.');
+/* ---------- site health ---------- */
+// Reads the site's pages from Webflow (the page list, then the content of each static page) and keeps what to fix.
+// It runs only when the user presses the button. A site with more pages than fit in `budgetMs` is read in parts:
+// opts.resume continues the read that is not complete yet instead of starting again.
+async function runAudit(site, user, budgetMs, opts) {
   const limits = limitsFor(user);
   const token = store.tokenForSite(user, site);
-  let pages = [];
-  if (token) { try { pages = await wf.listPages(token, site.id, 500); } catch (e) { if (wf.isRevoked(e)) throw e; pages = []; } }
-  // the site's languages (Webflow Localization), for the notes next to every Apply button
-  let locale;
-  if (token) { try { locale = store.localeOf(await wf.getSite(token, site.id)); } catch (e) { if (wf.isRevoked(e)) throw e; } }
-  const audit = await auditLib.auditSite(site, pages, { maxPages: limits.auditPages, budgetMs: budgetMs || 35000 });
+  if (!token) throw new Error('The Webflow connection for this site is missing. Connect again.');
+  const meta = await wf.getSite(token, site.id);
+  const pages = await wf.listPages(token, site.id, 500);
+  const before = opts && opts.resume ? await store.getAudit(site.id) : null;
+  const resume = before && before.source === 'webflow-data-api' && !before.complete && Date.now() - (before.readAt || 0) < 6 * 3600000 ? before : null;
+  const fresh = Object.assign({}, site, meta && meta.id ? { url: store.primaryUrl(meta) || site.url, locale: store.localeOf(meta) } : {});
+  const audit = await health.auditSite(token, fresh, pages, { maxPages: limits.auditPages, budgetMs: budgetMs || 35000, resume });
   await store.saveAudit(site.id, audit);
-  const issues = audit.pages.reduce((a, p) => a + (p.issues || []).length, 0) + audit.siteIssues.length;
-  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, score: audit.score, issues, pages: audit.pagesChecked }; if (locale !== undefined) s.locale = locale; });
+  const issues = audit.pages.reduce((a, p) => a + (p.issues || []).length, 0);
+  await store.updateSite(site.id, (s) => { s.audit = { at: audit.at, readAt: audit.readAt, score: audit.score, issues, pages: audit.pagesChecked, complete: audit.complete }; if (meta && meta.id) store.refreshMeta(s, meta); });
   return audit;
 }
 
@@ -299,7 +386,7 @@ async function tick(opts) {
   const now = opts.now || startedAt;
   const deadline = startedAt + (opts.budgetMs || 45000);
   if (!(await store.lock('tick', 58))) return { skipped: 'another tick is running' };
-  const out = { started: 0, worked: 0, finished: 0, audits: 0 };
+  const out = { started: 0, worked: 0, finished: 0 };
   try {
     out.started = await scheduleDue(now, 20);
     let ids = await store.activeRunIds();
@@ -315,14 +402,10 @@ async function tick(opts) {
       out.worked += (r.ok || 0) + (r.failed || 0);
     }
     for (const id of await store.activeRunIds()) if (await maybeFinish(id, Date.now())) out.finished++;
-    // one audit older than a week, when there is time left
-    if (Date.now() < deadline - 25000) {
-      const sites = await store.getSites(await store.allSiteIds());
-      const due = sites.filter((s) => s.tracked && (!s.audit || now - s.audit.at > 7 * DAY)).sort((a, b) => ((a.audit && a.audit.at) || 0) - ((b.audit && b.audit.at) || 0))[0];
-      if (due) {
-        const user = await store.getUser(due.userId);
-        if (user) { try { await runAudit(due, user, Math.min(30000, deadline - Date.now() - 3000)); out.audits++; } catch (e) { console.error('[aiseodeck] audit failed', e.message); } }
-      }
+    // with time left, the look at the stored Webflow tokens (the hourly job /cron/tokens does the same)
+    if (!out.budget && Date.now() < deadline - 12000) {
+      const c = await checkConnections(now, 8000);
+      if (c.asked) out.tokens = c;
     }
   } finally {
     await store.unlock('tick');
@@ -330,4 +413,4 @@ async function tick(opts) {
   return out;
 }
 
-module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };
+module.exports = { tick, startRun, workRun, maybeFinish, finishRun, runAudit, scheduleDue, accessRemoved, checkConnections, leftBehind, removedNotice, allowedKeywords, digestHtml, canStartTask, windowRetry, FULL_WINDOW_MS };

@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // Text generation for suggestions (prompt ideas, meta titles and descriptions, FAQ answers).
 // Uses the first provider with a key that answers: OpenAI, then Gemini, then Anthropic. No web search here.
 
@@ -109,7 +110,7 @@ async function generateJSON(opts) {
     try { return await Promise.any(list.slice(0, 2).map(ask)); } catch (e) {
       const errors = (e && e.errors) || [e];
       const why = errors.find((x) => x && !x.public) || errors[0];
-      console.error('[aiseodeck] writing failed', (why && why.message) || 'no provider answered in time');
+      log.error('[aiseodeck] writing failed', (why && why.message) || 'no provider answered in time');
       throw why || unreadable();
     }
   }
@@ -128,7 +129,7 @@ async function generateJSON(opts) {
     last = Object.assign(new Error(UNREADABLE), { public: true });
   }
   // every provider failed: logged, so a run of failures shows in the server logs
-  console.error('[aiseodeck] writing failed', (last && last.message) || 'no provider answered in time');
+  log.error('[aiseodeck] writing failed', (last && last.message) || 'no provider answered in time');
   throw last || Object.assign(new Error(UNREADABLE), { public: true });
 }
 

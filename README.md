@@ -1,100 +1,101 @@
 # AI SEO Deck
 
-Webflow app by Silit Labs. "Every AI. One deck." Keyword by keyword, every week, it checks whether six AI engines (ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude, Grok) name and cite a brand. Each keyword is asked as two customer questions on the chat engines and as the search itself on Google AI Overviews and AI Mode (10 answers a check). Perplexity is kept in the code for a later release and stays off until `PERPLEXITY_ENABLED=1`. For each keyword it shows yes, sometimes or no, the answers, the rivals named instead and a fix plan (best page, title and description, FAQ schema, CMS drafts, a new page draft when no page fits) applied to Webflow in one click. Related keywords come from the AI's own searches and DataForSEO Labs (keywords where Google's AI Overviews already cite the site, related searches, monthly volumes).
+Webflow app by Silit Labs. "Every AI. One deck." Keyword by keyword, it checks whether six AI engines (ChatGPT, Google AI Overviews, Google AI Mode, Gemini, Claude, Grok) name and cite a brand. Each keyword is asked as two customer questions on the chat engines and as the search itself on Google AI Overviews and AI Mode (10 answers a check). For each keyword it shows yes, sometimes or no, the answers, the rivals named instead and a fix plan (the best page, a title and description, CMS drafts, a new page draft when no page fits). Site health reads the pages of the site through the Webflow Data API and lists what to fix. Fixes reach Webflow only when the user presses Apply, as unpublished changes. Related keywords come from the AI's own searches and DataForSEO Labs. Perplexity is kept in the code for a later release and stays off until `PERPLEXITY_ENABLED=1`.
 
-Live address (planned): https://aiseodeck.silitlabs.com
+Address: https://aiseodeck.silitlabs.com
+
+The app is a Hybrid App on Webflow: a Data Client (OAuth, this server) and a Designer Extension (the panel in `extension/`).
+
+## Rules this build keeps (Webflow Marketplace)
+
+These came out of the review of 23 November 2026. `REVIEW.md` holds the notes for the reviewers, `docs/marketplace-resubmission.md` the findings, the rules and the plan, `docs/listing.md` the listing text. The tests check each rule.
+
+- Site data comes from the Webflow Data API only, with the scopes the user granted. The app never requests a customer's published website.
+- No feature uses a beta endpoint. The one call outside `/v2` is `POST /beta/token/resolve`, which resolves the ID token of the Designer panel.
+- No screen asks for a website address. The addresses of a site come from `GET /v2/sites/{site_id}`.
+- The Install URL is `/auth`. It mints a one-time `state` for each request, kept on the server as a hash, tied to the browser and valid for ten minutes. `/callback` checks and uses up the state before the code is exchanged.
+- The app never calls `/oauth/revoke_authorization`. Disconnect deletes what the app keeps and leaves the authorization alone. Access ends when the user uninstalls in Webflow.
+- A 401 from Webflow is never retried. It is settled with one call to `GET /v2/token/authorized_by`; refused there too, the token is forgotten and the sites of that authorization are deleted. Every stored token is asked about once every 20 hours (`/cron/tokens`), so an uninstall is noticed within a day.
+- Nothing is written to Webflow on a schedule. The user sees the current value next to the new one and presses Apply. The app never publishes a site.
+- The panel answers only its own origin, confirms every call with a fresh Webflow ID token, and gives every caller it cannot confirm the same answer.
+- The panel is styled with Webflow's CSS variables for apps (default dark theme as the fallback), drops an answer that arrives for a page the user has left, and finishes an Apply on the page it was pressed for.
+- The server writes to the primary locale only. The panel sets the title and description on the page as the Designer shows it, and says so on a site with more than one language.
+- An account with no Webflow authorization left and no paid plan is deleted 30 days after its last authorization ended.
+- Logs pass through `api/_lib/log.js`, which takes out email addresses and anything long enough to be a token.
 
 ## How it works
 
-- `api/index.js`: one serverless entry point (pages, OAuth, fixes, cron). `vercel.json` rewrites every app path to it.
-- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API + web_search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Claude (Messages API + web search tool), Grok (xAI Responses API + web_search), and Perplexity for later (Sonar, switching by itself to the Agent API, which needs paid credits; off until `PERPLEXITY_ENABLED=1`). An engine is on when its key is set. Free plan: the first three of ChatGPT, AI Overviews, Perplexity and Gemini that are on, so ChatGPT, AI Overviews and Gemini today; the others show as locked columns.
+- `api/index.js`: one serverless entry point (pages, OAuth, fixes, the panel's routes, cron). `vercel.json` rewrites every app path to it.
+- `api/_lib/webflow.js`: the Webflow Data API client. Every call to Webflow goes through it. It waits as long as `Retry-After` says on a 429 and keeps the `X-RateLimit-Remaining` Webflow reports.
+- `api/_lib/health.js` and `pagetext.js`: Site health. The page list with SEO and Open Graph settings (`GET /v2/sites/{id}/pages`) and the text, headings and images of static pages (`GET /v2/pages/{id}/dom`). It runs when the user asks, stops short of Webflow's rate limit and continues on request.
+- `api/_lib/engines.js`: ChatGPT (OpenAI Responses API with web search), Google AI Overviews and AI Mode (DataForSEO SERP API), Gemini (Google Search grounding), Claude (Messages API with the web search tool), Grok (xAI Responses API with web search). An engine is on when its key is set. Free plan: ChatGPT, AI Overviews and Gemini; the others show as locked columns.
 - `api/_lib/analyze.js`: brand and rival detection in answers (case, accents, dashes and Turkish letters ignored), citations, share of voice, score (50% named, 30% cited, 20% place).
-- `api/_lib/insights.js`: "Where rivals win" gaps and "How AI describes you" (sentiment, words, claims worth checking; one small LLM call per run).
+- `api/_lib/insights.js`: "Where rivals win" and "How AI describes you" (one small LLM call per run).
 - `api/_lib/keywords.js`: keyword cleaning, matching a keyword to the best page, DataForSEO Labs (volumes, related searches, keywords cited in AI Overviews).
-- `api/_lib/jobs.js`: runs are queues of `keyword question x engine` tasks in Redis; a run covers all keywords (weekly) or some (a keyword checked on demand, keywords just added). The cron tick and the open site page both work through them; each engine has its own parallel limit; failed calls are retried up to 3 times.
-- `api/_lib/audit.js` + `fetcher.js`: reads live pages, robots.txt, llms.txt, sitemap.xml (only the site's own hosts, private addresses refused).
-- `api/_lib/fixes.js` + `llm.js`: suggestions (questions, meta, FAQ answers), schema building and merging, llms.txt.
-- `api/_lib/billing.js` + `polar.js`: Polar subscriptions. Only Polar products named "AI SEO Deck ..." (or with metadata `app=aiseodeck`) are used. Free trial: every checkout of an account that never had a trial or a subscription gets `trial_interval: day`, `trial_interval_count: TRIAL_DAYS` (default 7, 0 turns it off); the others get `allow_trial: false`. Back from checkout, `/app/billing/return` reads the checkout and its subscription so the plan is on before the webhook arrives.
-- Trial flow: home page "Start free trial" -> `/auth?plan=solo&interval=monthly` -> Webflow -> `/app/start` (today $0, first charge date) -> Polar checkout -> `/app/billing/return` -> site setup.
-- `test/app.js`: end-to-end test with mock Webflow, Redis, AI engines, Resend and Polar. Run `npm test`.
+- `api/_lib/jobs.js`: a check is a queue of `keyword question x engine` tasks in Redis. The cron tick and the open site page both work through it; each engine has its own parallel limit; failed calls are retried up to 3 times. It also holds what happens when Webflow no longer accepts a token.
+- `api/_lib/fixes.js` and `llm.js`: the suggestions (questions, title and description, answers, page drafts), written by an LLM from what the Webflow API returned for the page.
+- `api/_lib/store.js`, `kv.js` and `crypto.js`: the records in Upstash Redis. Access tokens are encrypted with AES-256-GCM.
+- `api/_lib/billing.js`, `polar.js` and `api/billing-webhook.mjs`: Polar subscriptions. Only Polar products named "AI SEO Deck ..." (or with metadata `app=aiseodeck`) are used. Free trial: every checkout of an account that never had a trial or a subscription gets `trial_interval: day`, `trial_interval_count: TRIAL_DAYS` (default 7, 0 turns it off); the others get `allow_trial: false`.
+- `api/_lib/html.js`: every page of the app. `public/`: the home page, the guide (`docs.html`), the privacy policy and the terms.
+- `extension/`: the Designer panel (`webflow.json` and `public/` with `index.html`, `app.css`, `app.js` and `fonts/`, which holds Inter for Latin text under the Open Font License; no framework, no build step).
+
+## Tests
+
+`npm test` runs all three:
+
+- `node test/app.js`: the whole app against stand-ins for Webflow, the database, the AI engines, mail and billing (`test/mocks.js`). A stand-in for the customer's published website must receive no request, and the Webflow endpoints called during the run must be exactly the ones `REVIEW.md` lists.
+- `node test/panel.js`: the panel in Chromium (Playwright), served from the extension's address under a strict Content Security Policy, against the real server code. It is skipped with a message when Playwright is not installed.
+- `node test/contrast.js`: every page of the web app and the public pages in Chromium, in the light and the dark theme, on the free plan and on a paid one. It measures the contrast of every text against what is behind it (4.5 to 1, or 3 to 1 for large text) and of the focus ring the Tab key shows (3 to 1). Also skipped without Playwright.
 
 ## Plans
 
-| Plan | Price | Sites | Keywords | Checks |
+| Plan | Price (US dollars) | Sites | Keywords | Checks |
 |---|---|---|---|---|
-| Free | $0 | 1 | 3 | monthly, 3 engines (ChatGPT, AI Overviews, Gemini), no Apply to Webflow |
-| Solo | $19/mo, $190/yr | 1 | 10 | weekly, all 6 engines, Apply, 10 keyword checks on demand a month |
-| Studio | $49/mo, $490/yr | 5 | 30 | as Solo with 30 checks on demand, client report links with agency name |
-| Agency | $149/mo, $1490/yr | 20 | 100 | as Studio with 100 checks on demand |
+| Free | USD 0 | 1 | 3 | monthly on 3 engines (ChatGPT, AI Overviews, Gemini), no Apply to Webflow, Site health for 20 pages |
+| Solo | USD 19 a month, USD 190 a year | 1 | 10 | weekly on all 6 engines, Apply, 10 keyword checks on demand a month, Site health for 100 pages |
+| Studio | USD 49 a month, USD 490 a year | 5 | 30 | as Solo with 30 checks on demand, agency name on client report links, Site health for 150 pages |
+| Agency | USD 149 a month, USD 1,490 a year | 20 | 100 | as Studio with 100 checks on demand, Site health for 250 pages |
 
-New keywords get a first check right away, up to the plan's number of keywords in new keywords a month.
+Keywords are a pool shared by all sites of an account. New keywords get a first check right away, up to the plan's number of keywords in new keywords a month. An account with an `@webflow.com` email gets the Agency plan with no checkout (the review team). So does an account that enters the access code (`COMPLIMENTARY_CODE`) on its Account page, for a reviewing account on another address.
 
 Every paid plan starts with a 7-day free trial (card taken by Polar, charged on day 8 unless cancelled; one trial per account, and Polar's "Prevent trial abuse" also blocks a second trial with the same email or card). A Solo trial costs at most about $4 in AI calls.
 
 Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (web search $10 per 1,000 calls), AI Overviews 0.4 and AI Mode 0.4 (DataForSEO live), Gemini about 0.2 within the 5,000 free grounded prompts a month and about 3 after ($14 per 1,000 search queries), Claude about 1.2 to 3 (web search $10 per 1,000), Grok about 2.5 to 4 (web search $5 per 1,000 calls plus tokens). One keyword check (10 answers) is about 18 cents (11 to 25), so about $0.78 a keyword a month with weekly checks. Worst case per month (every keyword, every check on demand and every new keyword check used): Solo about $11, Studio about $34, Agency about $114. DataForSEO Labs lookups cost 1.2 cents plus 0.012 cents per keyword. `MAX_DAILY_CALLS` (default 1500, at most about $22 a day) stops all checks for the day once reached; work continues the next day.
 
-## AI Visibility Report (one-time report, no Webflow)
-
-A second product, for any website, read at `https://silitlabs.com/ai-visibility-report`. This app builds its pages, but visitors reach them through silitlabs.com (see "Where it is served" below). The visitor types a website, gets a free check (the searches their customers make with how often each is made, and one of them on ChatGPT, Google AI Overviews and Gemini, the answers shown word for word with marks and margin notes), and can buy the full report once ($29 by default): the five searches made most often on all six engines, each chat engine asked twice (about 50 answers), where the most searches end in an answer without the business, who gets named instead, the pages the engines read, what AI says about the business by name, what a crawler sees, a fix kit with text and code to paste, and a re-check after 30 days. No account: the long random id in `/check/{id}` is the key to a check, and check pages are kept out of search.
-
-- `api/_lib/vr/core.js`: the pipeline. Read the site, work out the business and ten searches its customers make (each with the question a customer would put to a chat engine), look up how often each is made on Google in the customers' country (`keywords.js`, about 1.3 cents a lookup) and keep the most searched ones. Google gets the search, chat engines get the question. Without keyword data the report still works and shows no numbers. Then ask the engines (same queue idea as `jobs.js`) and take five closing steps: open the pages the engines read, audit the site, judge the by-name answers, write the drafts, compose the report. Every write to a check goes through `update(id, fn)`.
-- Names in an answer are sorted by a model into three kinds (`extractNamed`): a rival (someone the customer could choose instead), a directory (a listing or review site), or other (a maker, supplier, association or regulator such providers only use or belong to). Other is left out, or an implant brand tops the rival list of every clinic. The pages the engines read get a kind too (`hostKind`, `sortPages`): another business's own website is set apart (`theirs`) and is not counted as a page the business is missing from.
-- `api/_lib/vr/state.js`: what the browser may see at each stage. Nothing of the paid report leaves the server before payment.
-- `api/_lib/vr/pay.js`: one-time Polar checkout, `order.paid` and `order.refunded` webhooks (they arrive at `api/billing-webhook.mjs`, which passes `order.*` events on), and the unlock key.
-- `api/_lib/vr/view.js`, `css.js`, `client.js`, `pages.js`: one renderer used on the server and in the browser, the styles, the browser code and the pages. `sample.json` is the public sample (a made-up hotel), made by `node scripts/vr-sample.js`.
-- `api/_lib/vr/http.js`: the addresses. `GET /ai-visibility-report`, `/ai-visibility-report/sample`, `/check/{id}`, `/check/{id}/state`; `POST /check/start`, `/check/{id}/run|pump|unlock|confirm|email|recheck`.
-- `api/_lib/vr/where.js`: the report's own address (`VR_URL`, default `https://silitlabs.com`) and this app's (`APP_URL`). Every link the report prints, emails or gives to the checkout uses the first.
-
-Where it is served: the report lives at silitlabs.com, not on this app's website. The Vercel project of the site (`silit/site`, `vercel.json`) rewrites `/ai-visibility-report`, `/ai-visibility-report/...` and `/check/...` to `/_vr/...` on this app, and this app's `vercel.json` answers `/_vr/...` with the same function. The app's own old addresses (`/ai-visibility-report`, `/check/...` on aiseodeck.silitlabs.com) redirect to the site for good. The visitor's IP address still arrives in `x-forwarded-for` through that rewrite (checked on 22 Nov 2026), so the limits per visitor work as before. Vercel waits up to 120 seconds for a proxied answer; the function's limit is 60. The website of AI SEO Deck (`public/`) does not mention the report: it was taken off there on 23 Nov 2026 so the app's site stays as it was sent to the Webflow Marketplace review. The Terms and Privacy text of the report are on silitlabs.com (`/terms/`, `/privacy/`), and so is the picture a shared link shows (`public/images/og/ai-visibility-report.jpg` in the site's repo).
-- Cron: `/cron/vr` every 5 minutes works open checks and starts re-checks that are due. `/cron/vrstats?days=30` (cron secret) returns the funnel per day: `start`, `again`, `asked`, `preview`, `checkout`, `paid`, `opened_by_key`, `report_built`, `recheck_built`. Numbers only, nothing about a visitor.
-- Cost: about 1.8 cents an answer, so about $1 a report and $1 a re-check. The free check costs about 5 cents and is limited per visitor and per day (`VR_FREE_PER_IP`, `VR_FREE_PER_DAY`); everything also counts toward `MAX_DAILY_CALLS`. Starting a check looks up its search numbers once (about 1.3 cents), capped by `VR_LOOKUPS_PER_DAY`. That lookup reads DataForSEO's own keyword list, which has nothing for many real searches, so the searches it missed are asked of Google Ads in one more request when a check starts (`keywords.adsVolumes`): 9 cents whatever the number of keywords, up to about 7 seconds, 12 requests a minute for the whole account. It has its own cap, `VR_ADS_LOOKUPS_PER_DAY` (default 40 a day, at most $3.60; 0 turns it off), and never stops a check.
-- `test/vr.js` + `test/vr-fixture.js`: the whole flow against mock engines, Polar and Redis. `node scripts/vr-preview.js <file>` builds a click-through preview from the sample.
-
-Rapor ürünü 22 Kasım 2026'da satışa açıldı; 23 Kasım 2026'da adresi silitlabs.com/ai-visibility-report oldu (AI SEO Deck sitesinden kaldırıldı, eski adresler oraya yönleniyor). Durum:
-
-- Polar'da tek seferlik "AI Visibility Report" ürünü var, fiyat $29. Ürün adı aynen böyle kaldıkça `POLAR_REPORT_PRODUCT_ID` gerekmez. Ürün arşivlenirse sayfa çalışmaya devam eder, satın alma yerine "yakında" der ve e-posta toplar.
-- AI SEO Deck webhook'unda `order.paid` ve `order.refunded` işaretli (adres aynı). Rapora ait olmayan siparişler yok sayılır.
-- Kendi denemelerin için istersen Vercel'e `VR_UNLOCK_KEY` ekle (12+ karakter): `/check/{id}?key=...` raporu ödemesiz açar.
-- Ücretsiz kontrol aynı ağdan günde 4 kez yapılabilir (`VR_FREE_PER_IP`; koddaki varsayılan `FREE_PER_IP`, `api/_lib/vr/core.js`).
-- Search Console'da `https://aiseodeck.silitlabs.com/` mülkü info@silitlabs.com hesabında, site haritası gönderildi. Doğrulama dosyası `public/google735e5a9a85f8a95e.html`, silme. Raporun sayfaları artık `https://silitlabs.com/` mülkünde izlenir (silitlabs.com site haritasında).
-
-İade yok (sayfalarda ve şartlarda yazıyor). Bir rapor kurulamadıysa: aynı site için yeni kontrol başlat, `https://silitlabs.com/check/{id}?key=...` ile aç, bağlantıyı müşteriye gönder. Polar satıştan sonraki 60 gün içinde itirazı önlemek için kendi kararıyla iade edebilir; o zaman `order.refunded` gelir ve rapor kendiliğinden kapanır.
-
-23 Kasım 2026'da ilk gerçek ücretli rapor (bir diş kliniği sitesi) dört hata gösterdi, aynı gün düzeltildi: tedarikçi markaları rakip sayılıyordu; başka işletmelerin kendi siteleri "eklenmeniz gereken sayfa" sayılıyordu; "sitende bu aramaya sayfa yok" cümlesi kontrol edilmeden yazılıyordu (artık okunan sayfalara bakıyor); arama sayısı bulunamayan adaylar eleniyordu (artık Google Ads'e bir kez soruluyor). Bu tarihten önce kurulan raporlarda rakip listesi marka içerebilir.
-
-Canlıda bir sorun ararken: Vercel > Logs'ta `[vr]` ara. Her başlatılan kontrol tek satır yazar: `[vr] start <site>: read ... ms, understand ... ms (N searches), volumes ... ms (known, Google Ads gave X of Y more)`.
-
 ## Kurulum (Batuhan için, sırayla)
 
 1. **Vercel**: Add New > Project > `silit/aiseodeck` reposunu içe aktar. Framework: Other. Deploy et.
-2. **Veritabanı**: Vercel projesinde Storage > Upstash Redis (Create). Değişkenler projeye otomatik eklenir. Veritabanı başka bir uygulamayla paylaşılıyorsa `KV_PREFIX=asd:` ekleyin; anahtarlar hiç karışmaz.
+2. **Veritabanı**: Vercel projesinde Storage > Upstash Redis (Create). Değişkenler projeye otomatik eklenir. Veritabanı başka bir uygulamayla paylaşılıyorsa `KV_PREFIX=asd:` ekle; anahtarlar hiç karışmaz.
 3. **Alan adı**: Vercel > Settings > Domains > `aiseodeck.silitlabs.com` ekle. GoDaddy DNS'e Vercel'in gösterdiği CNAME kaydını gir (`cname.vercel-dns.com`).
 4. **Webflow uygulaması**: Webflow > Silit Labs workspace > Apps & Integrations > Develop > Create an App.
    - Name: AI SEO Deck, homepage: https://aiseodeck.silitlabs.com
    - Data Client (REST API) aç. Redirect URI: `https://aiseodeck.silitlabs.com/callback`
+   - Install URL: `https://aiseodeck.silitlabs.com/auth`. Uygulama ayarlarında bu adres için bir alan yok (24 Kasım 2026'da bakıldı); adres Marketplace başvuru formuna yazılır. Oraya asla `webflow.com/oauth/authorize...` adresi yazılmaz: her kurulum `/auth` üzerinden başlar, çünkü tek kullanımlık `state` değerini orası üretir.
    - Scopes: Authorized user read; Sites read; Pages read and write; CMS read and write
+   - Designer Extension yapı taşını aç. Ayarlarda görünen "Designer Extension URI" bu uygulama için `https://6af730d2ef364c450fd995ce.webflow-ext.com` (içindeki kimlik uygulamanın kendi kimliği, Client ID değil). Panel sunucuyu yalnızca bu adresten çağırabilir; adres kodda yazılı (`PANEL_ORIGIN`, `api/_lib/webflow.js`). Uygulama Webflow'da yeniden oluşturulursa adres değişir: o zaman koddaki değer güncellenir.
    - Client ID ve Client Secret'ı Vercel'e gir (bana gönderme).
 5. **AI anahtarları** (ödeme ve şartları sen onaylarsın, her birinde bütçe limiti koy):
    - OpenAI (platform.openai.com), Google AI Studio (Gemini, ödeme hesabı bağlı olmalı), Anthropic (console.anthropic.com), xAI (console.x.ai)
    - Perplexity şimdilik kapalı. Açmak için ücretli API kredisi gerekiyor (kayıt kredisi Agent API'de geçmiyor), sonra `PERPLEXITY_API_KEY` ve `PERPLEXITY_ENABLED=1`.
    - DataForSEO (app.dataforseo.com, en az $50 yükleme): API login ve API password (Google AI Overviews ve AI Mode için)
-6. **Polar**: Silit Labs organizasyonunda ürünler:
+6. **Polar**: Silit Labs organizasyonunda ürünler (hepsi USD):
    - "AI SEO Deck Solo" aylık $19, "AI SEO Deck Solo Yearly" yıllık $190
    - "AI SEO Deck Studio" aylık $49, "AI SEO Deck Studio Yearly" yıllık $490
    - "AI SEO Deck Agency" aylık $149, "AI SEO Deck Agency Yearly" yıllık $1490
    - Yeni bir Organization Access Token (products:read, checkouts:read, checkouts:write, subscriptions:read, subscriptions:write, customer_sessions:write)
    - Webhook: `https://aiseodeck.silitlabs.com/billing/webhook`, API version 2026-10, olaylar: subscription.*
    - Settings > Subscriptions > "Prevent trial abuse" açık (14 Kasım 2026'da açıldı). Ürünlere deneme süresi girmeye gerek yok, deneme her checkout'ta koddan veriliyor.
-7. **Zamanlayıcı**: Vercel Pro'da `vercel.json` içindeki cron her 5 dakikada `/cron/tick` çağırır ve `CRON_SECRET` değerini kendisi `Authorization: Bearer` olarak gönderir. Hobby planda bunun yerine cron-job.org kullanın: her 5 dakikada `https://aiseodeck.silitlabs.com/cron/tick`, header `x-cron-secret: <CRON_SECRET>`.
+7. **Zamanlayıcı**: Vercel Pro'da `vercel.json` içindeki iki cron işi kendiliğinden çalışır ve `CRON_SECRET` değerini `Authorization: Bearer` olarak gönderir: `/cron/tick` her 5 dakikada (kontroller), `/cron/tokens` saatte bir (Webflow'da kaldırılan uygulamayı fark etmek için). Hobby planda bunların yerine cron-job.org kullan: aynı iki adres, header `x-cron-secret: <CRON_SECRET>`.
 8. Vercel ortam değişkenlerini girip yeniden deploy et (listesi `.env.example` dosyasında).
+9. **İnceleme ekibi için erişim kodu** (isteğe bağlı ama önerilir): Vercel'de `COMPLIMENTARY_CODE` adıyla uzun ve rastgele bir değer gir (en az 16 karakter, bir şifre üreticisinden). `@webflow.com` adresli hesaplar Agency planını zaten kendiliğinden alır; bu kod, inceleyen hesabın adresi farklıysa aynı erişimi açar (Account > Plan > Access code). Aynı değeri başvuru formundaki "App access credentials" alanına yaz. Değeri bana gönderme.
 
 Not: Vercel Hobby ticari kullanıma kapalı; ücretli plan satmaya başlamadan önce Pro'ya geçmek gerekir.
 
 ## Designer'daki panel (Designer Extension)
 
-`extension/` klasöründe: `webflow.json` ve `public/` (index.html, app.js, app.css; framework yok). Panel açık sayfayı, o sayfanın kelimesini, her AI motorunu ve düzeltilecekleri gösterir; başlık ve açıklamayı Designer API ile sayfaya yazar, FAQ şemasını sunucu yazar (`/ext/*`). Kimlik: `webflow.getIdToken()` ile gelen ID token, sunucuda sitenin kayıtlı tokenı ile `POST /beta/token/resolve` ile çözülür.
+`extension/` klasöründe: `webflow.json` ve `public/` (index.html, app.js, app.css ve Inter yazı tipinin durduğu `fonts/` klasörü; framework yok, derleme adımı yok). Panel Webflow'un uygulamalar için yayımladığı renk ve yazı değişkenlerini kullanır, yani Designer'ın kendi görünümüne uyar. Panel açık sayfayı, o sayfanın kelimesini, her AI motorunu ve düzeltilecekleri gösterir. Başlık ve açıklamayı, kullanıcı "Apply to this page" düğmesine basınca, Designer API ile sayfaya yazar; başka hiçbir şey yazmaz. Sunucuda üç adresi çağırır: `/ext/context`, `/ext/suggest`, `/ext/applied`. Kimlik: her çağrı için `webflow.getIdToken()` ile alınan ID token, sunucuda sitenin kayıtlı tokenı ile `POST /beta/token/resolve` üzerinden çözülür.
 
-Paketlemek: `cd extension && npx @webflow/webflow-cli extension bundle` (bundle.zip, git'e girmez). Yüklemek: Workspace settings > Apps & Integrations > Develop > AI SEO Deck > Publish extension version (workspace admin ve iki adımlı doğrulama açık olmalı; uygulamada Designer Extension yapı taşı açık olmalı). Denemek: Designer > Apps > AI SEO Deck > Launch App.
+Paketlemek: `cd extension && npx @webflow/webflow-cli extension bundle` (bundle.zip, git'e girmez). Review ZIP'i: `node scripts/package-extension.js` (bundle.zip içindeki yedi dosyanın kaynakla bayt bayt aynı olduğunu doğrular, README ile birlikte `extension/review.zip` dosyasını yazar ve SHA-256 değerlerini basar). Yüklemek: Workspace settings > Apps & Integrations > Develop > AI SEO Deck > Publish extension version (workspace admin ve iki adımlı doğrulama açık olmalı; uygulamada Designer Extension yapı taşı açık olmalı). Denemek: Designer > Apps > AI SEO Deck > Launch App.
 
 ## Environment variables
 
@@ -103,3 +104,5 @@ See `.env.example`.
 ## When a paid service fails
 
 Customers never see a provider's own error message. A failed answer reads "This engine could not answer right now" (or busy, or too slow), keyword data reads "not available right now", and writing falls back from OpenAI to Gemini to Anthropic. When a service refuses our account (the credit ran out or a key stopped working), `ALERT_EMAIL` (default info@silitlabs.com) gets an email naming the service and where to top it up, at most once every 6 hours per service.
+
+What counts as a refusal is decided in `api/_lib/alerts.js` (`kindOf`). For the services that answer with plain HTTP numbers it is 401, 402, 403 or words about credit, billing or the key. DataForSEO answers with five-digit codes of its own, and there the code decides: only 40100, 40104, 40200, 40201, 40203, 40204, 40207 and 40210 are about our account. The others pass and raise no alarm. An answer from Google AI Overviews or AI Mode that failed with one of the passing codes is asked again, up to three times in all: 40101 ("Internal SE Server Error": Google did not answer DataForSEO), 40103, 40107, 40202, 40209 and everything from 50000 up (`DFS_AGAIN` in `api/_lib/engines.js`). 40102 ("No Search Results") is not an error: the search is saved as "no AI answer". Until 24 November 2026 every code from 40100 to 40399 was read as a refusal, so one 40101 cost a check its answer and sent the owner an alarm about an account that was fine.

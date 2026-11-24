@@ -1,8 +1,8 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI SEO Deck privacy policy</title><meta name="description" content="What AI SEO Deck stores about you and your Webflow sites, why it is stored, for how long, and how to delete it."><link rel="canonical" href="https://aiseodeck.silitlabs.com/privacy"><meta property="og:type" content="website"><meta property="og:title" content="AI SEO Deck privacy policy"><meta property="og:description" content="What AI SEO Deck stores about you and your Webflow sites, why it is stored, for how long, and how to delete it."><meta property="og:url" content="https://aiseodeck.silitlabs.com/privacy"><meta property="og:image" content="https://aiseodeck.silitlabs.com/og.png"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"AI SEO Deck privacy policy","description":"What AI SEO Deck stores about you and your Webflow sites, why it is stored, for how long, and how to delete it.","url":"https://aiseodeck.silitlabs.com/privacy","isPartOf":{"@type":"WebSite","name":"AI SEO Deck","url":"https://aiseodeck.silitlabs.com/"},"publisher":{"@type":"Organization","name":"Silit Labs","url":"https://silitlabs.com"}}</script><link rel="icon" href="/favicon.png">
 <meta name="theme-color" content="#222B5E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap"><style>
-:root{--bg:#222B5E;--panel:#2C3673;--line:#4A5699;--line2:#36417F;--ink:#F2F4FF;--muted:#C0C5EA;--faint:#9CA3D3;--mark:#FFE45C;--cite:#8DB4FF;color-scheme:dark}
-@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--panel:#FFFFFF;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#868CAE;--mark:#FFE14D;--cite:#2F5BFF;color-scheme:light}}
+:root{--bg:#222B5E;--panel:#2C3673;--line:#4A5699;--line2:#36417F;--ink:#F2F4FF;--muted:#C0C5EA;--faint:#9CA3D3;--mark:#FFE45C;--cite:#8DB4FF;--focus:#FFE45C;color-scheme:dark}
+@media (prefers-color-scheme:light){:root{--bg:#F3F5FB;--panel:#FFFFFF;--line:#D9DEEE;--line2:#E6E9F4;--ink:#0F1433;--muted:#535A7E;--faint:#60678F;--mark:#FFE14D;--cite:#2F5BFF;--focus:#2F5BFF;color-scheme:light}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:450 16px/1.65 "Montserrat","Montserrat Variable",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased;padding:0 max(18px,env(safe-area-inset-right,0px)) 64px max(18px,env(safe-area-inset-left,0px))}
 main{max-width:780px;margin:0 auto}
@@ -12,39 +12,55 @@ h1{font-size:clamp(32px,5vw,44px);font-weight:820;letter-spacing:-.024em;margin:
 h2{font-size:21px;font-weight:760;letter-spacing:-.014em;margin:38px 0 10px;font-stretch:108%}h3{font-size:16px;margin:24px 0 6px}
 p,li{max-width:70ch}
 a{color:var(--cite);text-underline-offset:3px}
-:focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:4px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
 .muted{color:var(--muted)}
 code{font-family:"Martian Mono","Martian Mono Variable",ui-monospace,Menlo,monospace;font-stretch:87.5%;font-size:13px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:1px 6px}
 @media (max-width:600px){code{overflow-wrap:anywhere}}
 .tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:15px}td,th{border-top:1px solid var(--line2);padding:10px 8px;text-align:left;vertical-align:top}th{color:var(--faint);font-size:13px;font-weight:600}
 mark{background:var(--mark);color:#1B1600;padding:0 3px;border-radius:3px}
 </style></head><body><main>
-<nav><a href="/">AI SEO Deck</a><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+<nav><a href="/">AI SEO Deck</a><a href="/docs">Guide</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
 <h1>Privacy policy</h1>
-<p class="muted">Last updated: 16 November 2026. AI SEO Deck is run by Silit Labs.</p>
+<p class="muted">Last updated: 24 November 2026. AI SEO Deck is run by Silit Labs.</p>
 <h2>What AI SEO Deck does</h2>
-<p>It checks the keywords you choose with AI assistants, reads your public website for an audit, and, when you ask it to, writes fixes to your Webflow site. This policy explains what it stores and why.</p>
+<p>It asks AI assistants about the keywords you choose, reads the pages of your Webflow site through the Webflow API for Site health and for suggestions, and writes a title, a description or CMS drafts to Webflow when you press Apply. It does not request your published website, and it adds no code to it. This policy says what it reads, what it stores, where data goes and how to delete it.</p>
 <h2>Webflow access</h2>
-<p>When you connect, Webflow asks which sites to share. The access token Webflow issues is stored encrypted so checks can run while you are away. It is never sent to your browser, logged or shared. Disconnecting revokes it at Webflow and deletes it. If you uninstall the app in Webflow, we delete the token and that connection's sites after the next refused request.</p>
+<p>When you install the app, Webflow asks which sites or Workspace to authorize. The access token Webflow issues is stored encrypted on our servers. It is never sent to your browser or to the panel in the Designer, never logged and never shared.</p>
+<p>Through that access AI SEO Deck reads: your Webflow user id, name and email; the names, addresses and languages of the sites you authorized; the list of their pages with each page's SEO and Open Graph settings; the text, headings and images of static pages; and the names and fields of your CMS collections. It writes only when you press Apply: the SEO title and meta description of one page, or draft items in a collection you choose. The <a href="/docs#api">guide</a> lists each Webflow API call.</p>
+<p>We do not read your form submissions, your site's visitors, your orders, your users or your analytics.</p>
 <h2>What we store</h2>
 <ul>
-<li>Your Webflow user id, name, email and the settings you choose (report email, agency name), and how many checks you used this month.</li>
-<li>Per site: name, domains, your brand details, rivals and keywords, with the questions asked for each keyword and their monthly searches; the answers from AI assistants (an excerpt of up to 1,500 characters per answer, with the cited source links) for your latest checks, and summary numbers for up to 52 checks; the latest site audit (page titles, descriptions, detected questions and findings); keyword ideas and keywords cited in AI Overviews.</li>
-<li>Suggestions you have not applied yet and related keyword lookups, for 14 days. Answers from checks of a single keyword are kept for up to 90 days.</li>
-<li>For paid plans: plan, subscription status, renewal date and the Polar customer and subscription IDs. Card details go directly to Polar.</li>
+<li><b>Your account:</b> your Webflow user id, name and email, the settings you choose (report email, agency name), your plan, and how many checks you used this month.</li>
+<li><b>Per site:</b> its name, addresses and languages as read from Webflow; your brand name, other names, market, rivals and keywords, with the questions asked for each keyword and their monthly searches; keyword ideas and the keywords cited in AI Overviews.</li>
+<li><b>AI answers:</b> an excerpt of up to 1,500 characters of each answer with the links it cited, for your latest 8 checks, and summary numbers for up to 52 checks. Answers from a check of a single keyword are kept for up to 90 days.</li>
+<li><b>Site health:</b> for each page, its path and name, its SEO title and meta description, whether it has Open Graph values, its H1 headings, the number of words and images, the questions it answers and the findings, with the time they were read from Webflow. The text of your pages is not stored.</li>
+<li><b>Suggestions</b> you have not applied yet and related keyword lookups, for 14 days.</li>
+<li><b>For paid plans:</b> plan, subscription status, renewal date and the Polar customer and subscription ids. Card details go to Polar and never reach us.</li>
 </ul>
-<p>We do not read or store your form submissions, visitors or analytics.</p>
 <h2>AI providers and keyword data</h2>
-<p>Your keywords and the questions written for them are sent through their APIs to OpenAI (ChatGPT), Google (Gemini), Anthropic (Claude) and xAI (Grok) to get answers, and to DataForSEO to read Google AI Overviews and AI Mode for your country and language. To find keyword ideas, monthly searches, related searches and the keywords where Google's AI Overviews cite your site, your keywords and your site's domain are sent to DataForSEO. To write questions, ideas and suggestions, and to describe how AI talks about you, your keywords, text from your public pages and excerpts of answers that name your brand are sent to one of these AI providers.</p>
+<ul>
+<li><b>To get AI answers,</b> your keywords and the questions written for them, with your country, go through their APIs to OpenAI (ChatGPT), Google (Gemini), Anthropic (Claude) and xAI (Grok), and to DataForSEO, which reads Google AI Overviews and AI Mode for your country and language.</li>
+<li><b>For keyword data</b> (ideas, monthly searches, related searches, and the keywords where Google's AI Overviews cite your site), your keywords and the address of your site go to DataForSEO.</li>
+<li><b>To write a suggestion when you ask for one,</b> text of your own pages, as the Webflow API returns it, goes to one of the AI providers above: for keyword ideas, the title, description and up to 2,500 characters of your home page; for a title and description, the path, title, description, main heading and up to 3,000 characters of that page; for answers, up to 5,000 characters of that page; for a new page draft, up to 6,000 characters from up to four of your pages. Your brand name, rivals' names, market and keywords go with it.</li>
+<li><b>To describe how AI talks about you,</b> excerpts of the answers that name your brand go to one of these AI providers.</li>
+</ul>
+<p>Nothing is sent to an AI provider for a suggestion until you press the button that asks for it.</p>
+<h2>The panel in the Webflow Designer</h2>
+<p>The panel sends our server a short-lived ID token from Webflow, the id of the site, and the id and path of the page that is open. Webflow confirms the token for us. The panel stores nothing in your browser and sets no cookie.</p>
 <h2>Client report links</h2>
-<p>A report link is public to anyone who has it and is marked not to be indexed by search engines. Replace the link at any time to invalidate the old one.</p>
+<p>A report link is public to anyone who has it and is marked not to be indexed by search engines. Replace the link at any time to end the old one.</p>
 <h2>Cookies</h2>
-<p>AI SEO Deck sets only the cookies it needs to work: one that keeps you signed in, and short-lived ones while you connect Webflow. There are no tracking, advertising or analytics cookies, and the site has no analytics.</p>
+<p>AI SEO Deck sets only the cookies it needs to work: one that keeps you signed in for up to 30 days, and short-lived ones while you authorize the app in Webflow (10 minutes) or carry a keyword or a plan from the home page (1 hour). There are no tracking, advertising or analytics cookies, and the site has no analytics.</p>
 <h2>Other services we use</h2>
-<ul><li>Webflow (your sites and the API)</li><li>Vercel (hosting) and Upstash (database)</li><li>Resend (email)</li><li>Polar (payments)</li><li>OpenAI, Google, Anthropic and xAI (AI answers and suggestions)</li><li>DataForSEO (Google AI Overviews and AI Mode results, keyword data)</li></ul>
-<p>Our hosting provider keeps standard server logs for a limited time.</p>
-<h2>Deleting your data</h2>
-<p>Account &gt; Delete account revokes every Webflow authorization and removes your account and all stored data immediately. Changes you already applied to your Webflow sites stay.</p>
+<ul><li>Webflow (your sites, through its API)</li><li>Vercel (hosting) and Upstash (database)</li><li>Resend (email)</li><li>Polar (payments)</li><li>OpenAI, Google, Anthropic and xAI (AI answers and suggestions)</li><li>DataForSEO (Google AI Overviews and AI Mode results, keyword data)</li></ul>
+<p>Our hosting provider keeps standard server logs for a limited time. Our own log messages are stripped of email addresses and tokens before they are written, and never hold the text of your pages.</p>
+<h2>Disconnecting, uninstalling and deleting</h2>
+<ul>
+<li><b>Disconnect</b> (a site in its Settings, or all sites of one authorization on your Account page) deletes what we store about those sites at once. The access token stays stored, because the app is still installed in Webflow, and you can connect the sites again without authorizing again.</li>
+<li><b>Uninstall in Webflow.</b> When you remove the app in Webflow, Webflow refuses our access token. We notice at our next contact with Webflow, at the latest within a day, ask Webflow nothing more, and delete the token and the sites of that authorization with everything stored about them. The <a href="/docs#remove">guide</a> says where to do this in Webflow. If that was your last authorization and you have no paid plan, your account itself (your Webflow user id, name, email and settings) is kept for 30 days in case you install again, and is deleted after that.</li>
+<li><b>Delete your account</b> on your Account page: your account and everything stored with it are deleted at once, the access tokens included, and a paid plan is cancelled.</li>
+</ul>
+<p>Titles, descriptions and CMS drafts you applied are in Webflow and stay there; the guide says how to remove them. You can also write to us to have your data deleted or to get a copy of it.</p>
 <h2>Contact</h2>
 <p><a href="mailto:info@silitlabs.com">info@silitlabs.com</a></p>
 </main></body></html>

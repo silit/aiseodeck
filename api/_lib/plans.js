@@ -20,7 +20,16 @@ function trialDays() {
   return Number.isFinite(n) && n >= 0 && n <= 30 ? n : 7;
 }
 
+// The access code (COMPLIMENTARY_CODE, at least 16 characters; '' when none is set). An account that enters it on
+// its Account page gets the same complimentary Agency access as the addresses below. It is there for the Marketplace
+// review team when the reviewing account is not on an @webflow.com address, and for partners.
+function accessCode() {
+  const c = String(process.env.COMPLIMENTARY_CODE || '').trim();
+  return c.length >= 16 ? c : '';
+}
 function complimentary(user) {
+  // an access code was entered on this account (user.comp is written in one place: the Account page's code form)
+  if (user && user.comp && user.comp.plan === 'agency') return true;
   // "@webflow.com" is always included so the Marketplace review team gets the highest tier.
   const list = ['@webflow.com'].concat(String(process.env.COMPLIMENTARY_EMAILS || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean));
   const email = String((user && user.email) || '').toLowerCase();
@@ -58,4 +67,4 @@ function limitsFor(user) {
   return lim;
 }
 
-module.exports = { PLANS, FREE, DAY, QUESTIONS, limitsFor, complimentary, trialDays };
+module.exports = { PLANS, FREE, DAY, QUESTIONS, limitsFor, complimentary, accessCode, trialDays };

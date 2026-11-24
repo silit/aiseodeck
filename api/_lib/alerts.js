@@ -1,4 +1,5 @@
 'use strict';
+const log = require('./log');
 // The paid services behind AI SEO Deck (the AI engines, keyword data and the writing of fixes) can fail. Customers get
 // plain words for each failure, never a provider's own message. When a service refuses our account (the credit ran
 // out, a key stopped working), the owner gets an email, at most once every 6 hours per service.
@@ -21,6 +22,25 @@ const EVERY_S = 6 * 3600;
 const BUSY = /rate[ -]?limit|too many requests|overloaded|temporarily|try again later|resource has been exhausted|network error|could not be reached|fetch failed|econnreset|socket hang up/i;
 const ACCOUNT = /\bcredits?\b|balance|funds|insufficient[_ ]quota|exceeded your current quota|payment required|billing|spending limit|not authori[sz]ed|unauthori[sz]ed|authentication|api[ _-]?key|permission[ _]denied|account (is |has been )?(blocked|suspended|disabled|deactivated)/i;
 
+// DataForSEO says what happened in a five-digit code of its own (docs.dataforseo.com/v3/appendix/errors, read on
+// 24 November 2026), and the code is what counts: its words for one code change, and 50001 has "balance" in them
+// without being about ours. Only these mean that the owner must look at the account: the login is not taken (40100),
+// the account is not verified (40104), payment is due (40200), the account is paused (40201), the daily cost limit
+// set in the account is reached (40203), a subscription is missing (40204), our address is not on its list (40207),
+// the balance is too low (40210).
+const DFS_ACCOUNT = new Set([40100, 40104, 40200, 40201, 40203, 40204, 40207, 40210]);
+// These are about one request and pass: Google did not answer DataForSEO (40101, "Internal SE Server Error"), the task
+// failed and is to be sent again (40103), too many requests in a minute, an hour, a day or at once (40202, 40205,
+// 40206, 40209). So does everything from 50000 up, which is trouble on DataForSEO's own side.
+const DFS_BUSY = new Set([40101, 40103, 40202, 40205, 40206, 40209]);
+const DFS_TIMEOUT = new Set([40107, 50401, 50402]);
+function dataforseoKind(code) {
+  if (DFS_ACCOUNT.has(code)) return 'account';
+  if (DFS_TIMEOUT.has(code)) return 'timeout';
+  if (DFS_BUSY.has(code) || code >= 50000) return 'busy';
+  return 'other';
+}
+
 // 'account': the service refused our account and the owner must act. 'busy': a rate limit, an overload or the network,
 // which passes. 'timeout': no answer in time. 'other': anything else.
 function kindOf(e) {
@@ -28,11 +48,12 @@ function kindOf(e) {
   if (e.kind) return e.kind;
   const msg = String(e.message || e);
   const st = Number(e.status) || 0;
+  if (st >= 10000) return dataforseoKind(st);
   if (/timed out|timeout/i.test(msg)) return 'timeout';
   if (BUSY.test(msg)) return 'busy';
   if (ACCOUNT.test(msg)) return 'account';
-  if (st === 401 || st === 402 || st === 403 || (st >= 40100 && st < 40400)) return 'account'; // DataForSEO codes are 5 digits
-  if (st === 429 || st === 529 || (st >= 500 && st < 600) || st >= 50000) return 'busy';
+  if (st === 401 || st === 402 || st === 403) return 'account';
+  if (st === 429 || st === 529 || (st >= 500 && st < 600)) return 'busy';
   return 'other';
 }
 
@@ -62,7 +83,7 @@ async function report(service, e, where) {
   if (kind !== 'account') return kind;
   const s = SERVICES[service] || { name: String(service), fix: '' };
   const detail = String((e && e.message) || e || '').replace(/\s+/g, ' ').slice(0, 300);
-  console.error('[aiseodeck] ' + s.name + ' refused our account (' + (where || 'call') + '): ' + detail);
+  log.error('[aiseodeck] ' + s.name + ' refused our account (' + (where || 'call') + '): ' + detail);
   try {
     if (!(await kv.setNX('alert:' + service, { at: Date.now(), where: where || '' }, EVERY_S))) return kind; // told already
     const lines = [
@@ -78,7 +99,7 @@ async function report(service, e, where) {
       text: lines.join('\n\n'),
       html: lines.map((l, i) => (i === 1 ? '<p><code>' + escHtml(l) + '</code></p>' : '<p>' + escHtml(l).replace(/(https:\/\/\S+?)([.:]?)$/, '<a href="$1">$1</a>$2') + '</p>')).join('')
     });
-  } catch (err) { console.error('[aiseodeck] alert email failed', err && err.message); }
+  } catch (err) { log.error('[aiseodeck] alert email failed', err && err.message); }
   return kind;
 }
 
