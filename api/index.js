@@ -5,6 +5,8 @@
  */
 'use strict';
 const log = require('./_lib/log');
+// One line for each cold start: the runtime version this instance runs on, for when an advisory names a version.
+log.info('[aiseodeck] start, Node.js ' + process.version);
 
 const wf = require('./_lib/webflow');
 const health = require('./_lib/health');
