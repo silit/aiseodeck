@@ -234,6 +234,14 @@ Done
   - This matters for the review: a reviewer's check that met one such moment would have shown "This engine could not answer right now" for Google AI Overviews with nothing wrong on our side.
 - `npm test`: `test/app.js` 425, `test/panel.js` 63, `test/contrast.js` 81.
 
+- 24 Nov, 15:15: the owner said "yayınla" and asked Claude to do the submission as well. The branch was merged (#14) and is in production.
+  - Checked live right after: the public pages, `/health`, `/cron/*` (401 without the secret), `/ext/*` (403 to another origin), the report's addresses (redirects to silitlabs.com), and the owner's own account, which the version before made: its site opened, the site's address came from Webflow, and Site health, never read by this version, read 14 pages through the API.
+  - The stored authorization of the test site still works. "Installs 0" on the app's row in Webflow counts Marketplace installs, not this one.
+  - The panel's fourth version went up with Publish extension version (internal testing), from the `bundle.zip` whose checksum is in `docs/listing.md`.
+  - `COMPLIMENTARY_CODE` had been entered in the report's project by mistake. The owner entered it in this project at 15:38; the deploy that followed this commit is the first that has it.
+  - Vercel asks for a six-digit code before a Redeploy from its dashboard. A push to main deploys without it.
+  - To show Site health and a fix on real findings, three pages of the test site were given gaps on purpose through the API: `/resources` has no meta description, `/contact` has the title "Contact", `/pricing` a title of 104 characters. Site health then read 97/100 with exactly these findings.
+
 Where it stands, and who does what next
 1. Done on 24 November: the report's repository, its Vercel project and the database connection exist.
 2. Done on 24 November: the owner entered the eleven values and added the report's webhook at Polar; `/health` says "ok" and `/health/keys` says "keys ok" there.

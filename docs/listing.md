@@ -52,7 +52,7 @@ Read in the app's settings on 24 November 2026, and as this build expects: redir
 | App detail description | The text under "Long description" below, between the two rules. |
 | App promo video URL | Leave empty (optional). |
 | App screenshots | The five pictures under "Screenshots" below, in that order, each with its alt text. |
-| Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. `[to fill: SHA-256 of both files]` |
+| Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. Built on 24 November 2026: `bundle.zip` 137,756 bytes, SHA-256 `a2d5856f28cedb96e77c95a86ae3084f05b9b03387407a50c8c1082b7dd1fe97`; `review.zip` 140,346 bytes, SHA-256 `06d32b2fce8890b3612b4897143e655ff4d806c912e225c6f054287e02d715e3`. The two files are kept on the owner's computer in `Downloads\aiseodeck-submission`; a new run of the bundler gives a file with another checksum, so these are the ones to upload. |
 | Website URL | https://aiseodeck.silitlabs.com |
 | Additional notes | The text of `REVIEW.md`, from "The app" to the end, with its `[to fill]` fields filled. |
 | App access credentials | No sign-in credentials are needed: reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan (the highest) automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For a reviewing account on another address: Account, Plan, Access code, and enter `[to fill: the access code, the value of COMPLIMENTARY_CODE in Vercel]`. It opens the same Agency access on that account and it stays. |
@@ -178,7 +178,7 @@ Where: Silit Labs Workspace, Apps & Integrations, Develop, the AI SEO Deck row, 
 | Select distribution | **Publish for internal testing (Workspace only)**. The other choice is greyed out until the app is in the Marketplace ("Submit an App before publishing a Designer Extension for review"). |
 | Submission version notes | Required. The field comes filled with four headings; keep them and put the text below under them. |
 
-The published versions are three, all of 15 November 2026, each with a one-line note. This is the fourth.
+The published versions were three, all of 15 November 2026, each with a one-line note. The fourth was published on 24 November 2026 from the `bundle.zip` named above, for internal testing, with the notes below.
 
 ---
 
