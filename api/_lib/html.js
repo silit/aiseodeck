@@ -1189,7 +1189,8 @@ function answerBlock(r, unitText, isKeyword, project) {
     const isOwn = own.some((dm) => x.host === dm || String(x.host || '').endsWith('.' + dm));
     return x.url && /^https?:\/\//.test(x.url) && !/vertexaisearch|grounding-api/.test(x.url) ? `<a class="chip${isOwn ? ' own' : ''}" href="${esc(x.url)}" rel="noopener nofollow" target="_blank" title="${esc(x.title || x.url)}">${esc(x.host)}</a>` : `<span class="chip${isOwn ? ' own' : ''}">${esc(x.host)}</span>`;
   }).join('');
-  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(plainAnswer(r.snippet || ''), project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
+  // The excerpt keeps the answer's own line breaks (a list, the rows of a table), without its empty lines.
+  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote" style="white-space:pre-line">${highlight(plainAnswer(r.snippet || '').replace(/\n\s*\n+/g, '\n'), project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
   const searched = r && r.ok && (r.queries || []).length ? `<div class="chips"><span class="tiny faint">Searched</span>${r.queries.map((q) => `<span class="q">${esc(q)}</span>`).join('')}</div>` : '';
   // An answer is kept up to ANSWER_KEPT characters. A longer one is shown up to its last whole word, and the label says what it is.
   const cut = !!(r && r.ok && r.text && r.text.length >= ANSWER_KEPT);
