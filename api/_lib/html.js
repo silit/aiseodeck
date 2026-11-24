@@ -541,7 +541,8 @@ function errorPage(title, message, back, label) {
   return layout(title, `<div class="panel stack" role="alert" style="max-width:640px"><h1>${esc(title)}</h1><p class="muted">${esc(message)}</p><div class="actions"><a class="btn" href="${esc(back || '/app')}">${esc(label || 'Go back')}</a></div></div>`);
 }
 // How access to Webflow ends: in Webflow, not here. The words are the ones Webflow uses on those screens.
-const UNINSTALL_HOW = 'To remove AI SEO Deck\'s access to Webflow, remove the app in Webflow. If you authorized single sites: Site settings, Apps & integrations, then Revoke next to AI SEO Deck. If you authorized a whole Workspace: Workspace settings, Apps & integrations, then Uninstall app. In the Designer, the Apps panel has the same under Remove app.';
+// The words are the ones on Webflow's own screens, read on 24 November 2026 while the app was uninstalled from the test site.
+const UNINSTALL_HOW = 'To remove AI SEO Deck\'s access to Webflow, uninstall the app in Webflow. For one site: Site settings, Apps & Integrations, Connected Apps, View details next to AI SEO Deck, then Uninstall App. For a whole Workspace: Workspace settings, Apps & Integrations, Manage, View details next to AI SEO Deck, then Uninstall App. In the Designer: the Apps panel, AI SEO Deck, then Remove App.';
 // A plain page that says something was done, with one way on.
 function donePage(title, paragraphs, href, label) {
   return layout(title, `<div class="panel stack" style="max-width:640px"><h1>${esc(title)}</h1>${[].concat(paragraphs).map((p) => `<p class="muted">${esc(p)}</p>`).join('')}<div class="actions"><a class="btn" href="${esc(href || '/')}">${esc(label || 'Go to the home page')}</a></div></div>`);
@@ -630,8 +631,22 @@ function verdictText(sum, brand) {
 // code marks, heading marks (also in the middle of an excerpt, where the line breaks are gone), list marks, and a link
 // written as [words](address) is left as its words. Nothing else of the answer is changed: a name with underscores, a
 // sum with stars in it and a # that belongs to a word stay as they are.
+// A Markdown table: the row of dashes goes, a row becomes its cells with commas between them, and in an excerpt, where
+// the line breaks are gone, one row ends with a semicolon. A single | is left alone ("Pricing | Sessa" is a page title).
+const TABLE = /\|[ \t]*:?-{3,}:?[ \t]*\||\|[^|\n]{1,80}\|[^|\n]{1,80}\|/;
+function plainTable(text) {
+  if (!TABLE.test(text)) return text;
+  return text
+    .replace(/^[ \t]*\|?(?:[ \t]*:?-{3,}:?[ \t]*\|)+[ \t]*:?-{3,}:?[ \t]*\|?[ \t]*$\n?/gm, '')
+    .replace(/\|(?:[ \t]*:?-{3,}:?[ \t]*\|)+/g, '|')
+    .replace(/^[ \t]*\|[ \t]*/gm, '')
+    .replace(/[ \t]*\|[ \t]*$/gm, '')
+    .replace(/([:.])[ \t]*\|[ \t]*/g, '$1 ')
+    .replace(/[ \t]*(?:\|[ \t]*){2,}/g, '; ')
+    .replace(/[ \t]*\|[ \t]*/g, ', ');
+}
 function plainAnswer(text) {
-  return String(text || '')
+  return plainTable(String(text || ''))
     .replace(/\[([^\]\n]{1,200})\]\((?:https?:\/\/|\/)[^)\s]*\)/g, '$1')
     .replace(/(^|[\s(])#{1,6}[ \t]+(?=\S)/g, '$1')
     .replace(/^([ \t]*)[*-][ \t]+(?=\S)/gm, '$1\u2022 ')
