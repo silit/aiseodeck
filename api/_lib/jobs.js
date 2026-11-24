@@ -194,7 +194,7 @@ async function doTask(run, task, deadline) {
       return 'ok';
     }
     const a = analyze.analyzeAnswer(run.project, ans);
-    await store.saveResult(run.id, field, Object.assign(base, { ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, 1500), queries: (ans.queries || []).slice(0, 6) }, a));
+    await store.saveResult(run.id, field, Object.assign(base, { ok: true, at: Date.now(), ms: ans.ms, model: ans.model, text: ans.text.slice(0, engines.ANSWER_KEPT), queries: (ans.queries || []).slice(0, 6) }, a));
     return 'ok';
   } catch (e) {
     // a timeout caused by our own short time window is not the engine's fault: try again without counting it
