@@ -626,6 +626,20 @@ function verdictText(sum, brand) {
 }
 
 // Highlights the brand (marker) and rivals (rose) inside an answer, in one pass over the escaped text.
+// An engine writes its answer in Markdown, and the page shows it as plain text. The marks go, the words stay: bold and
+// code marks, heading marks (also in the middle of an excerpt, where the line breaks are gone), list marks, and a link
+// written as [words](address) is left as its words. Nothing else of the answer is changed: a name with underscores, a
+// sum with stars in it and a # that belongs to a word stay as they are.
+function plainAnswer(text) {
+  return String(text || '')
+    .replace(/\[([^\]\n]{1,200})\]\((?:https?:\/\/|\/)[^)\s]*\)/g, '$1')
+    .replace(/(^|[\s(])#{1,6}[ \t]+(?=\S)/g, '$1')
+    .replace(/^([ \t]*)[*-][ \t]+(?=\S)/gm, '$1\u2022 ')
+    .replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '$1')
+    .replace(/\*\*/g, '')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/[ \t]+\n/g, '\n');
+}
 function highlight(text, project) {
   const own = [project.brand].concat(project.aliases || []).concat(project.domains || []).filter((t) => String(t || '').trim().length >= 3);
   const rivals = (project.competitors || []).map((c) => c.name).filter((t) => String(t || '').trim().length >= 3);
@@ -1160,9 +1174,9 @@ function answerBlock(r, unitText, isKeyword, project) {
     const isOwn = own.some((dm) => x.host === dm || String(x.host || '').endsWith('.' + dm));
     return x.url && /^https?:\/\//.test(x.url) && !/vertexaisearch|grounding-api/.test(x.url) ? `<a class="chip${isOwn ? ' own' : ''}" href="${esc(x.url)}" rel="noopener nofollow" target="_blank" title="${esc(x.title || x.url)}">${esc(x.host)}</a>` : `<span class="chip${isOwn ? ' own' : ''}">${esc(x.host)}</span>`;
   }).join('');
-  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(r.snippet || '', project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
+  const body = !r ? '' : r.none ? '<p class="small muted">Google showed regular results only for this search, without an AI answer.</p>' : r.ok ? `<p class="quote">${highlight(plainAnswer(r.snippet || ''), project)}</p>` : `<p class="small muted">${esc(alerts.engineText(r))}</p>`;
   const searched = r && r.ok && (r.queries || []).length ? `<div class="chips"><span class="tiny faint">Searched</span>${r.queries.map((q) => `<span class="q">${esc(q)}</span>`).join('')}</div>` : '';
-  const full = r && r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary>Full answer</summary><p class="quote" style="white-space:pre-line">${highlight(r.text, project)}</p></details>` : '';
+  const full = r && r.ok && r.text && r.text.length > (r.snippet || '').length + 40 ? `<details><summary>Full answer</summary><p class="quote" style="white-space:pre-line">${highlight(plainAnswer(r.text), project)}</p></details>` : '';
   return `<div class="answer"><p class="ask">${isKeyword ? 'Search' : 'Asked'} <b>${esc(unitText)}</b></p><div class="actions" style="gap:6px">${tag}</div>${body}${searched}${chips ? `<div class="chips" aria-label="Sources">${chips}</div>` : ''}${full}</div>`;
 }
 
@@ -1448,4 +1462,4 @@ ${(site.keywords || []).length ? deckTable(site, { engines: d.engines, link: fal
 }
 
 module.exports = {
-  partialWhy, UNINSTALL_HOW, donePage, issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, lineChart, verdictText, longDay, COUNTRIES, LANGS };
+  partialWhy, UNINSTALL_HOW, donePage, issueLabel, allEnginesCount, freeEnginesText, esc, layout, errorPage, loginPage, loginConfirm, dashboard, setupPage, sitePage, keywordPage, fixPage, settingsPage, startPage, waitPage, reportPage, deckTable, fixNext, highlight, plainAnswer, lineChart, verdictText, longDay, COUNTRIES, LANGS };
