@@ -119,6 +119,8 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     const shortBlock = html.answerBlock({ ok: true, text: shortText, snippet: 'alpha beta gamma' }, 'Which clinic?', false, proj0);
     assert(shortBlock.includes('<summary>Full answer</summary>') && shortBlock.includes(shortText + '</p></details>') && !shortBlock.includes('\u2026'), 'an answer that fits is labelled Full answer and shown whole');
     assert(require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'privacy.html'), 'utf8').includes('up to ' + kept.toLocaleString('en-US') + ' characters of each answer'), 'the privacy policy names the same number of characters as the app keeps');
+    const rowsBlock = html.answerBlock({ ok: true, text: 'x', snippet: 'I would shortlist these:\n\n| Best fit | Program | Why consider it |\n|---|---|---|\n| Strong all-around | Cen\u2026' }, 'Which clinic?', false, proj0);
+    assert(rowsBlock.includes('<p class="quote" style="white-space:pre-line">I would shortlist these:\nBest fit, Program, Why consider it\nStrong all-around, Cen\u2026</p>'), 'an excerpt keeps the line breaks of the answer, so the rows of a table do not run into each other, and drops its empty lines');
   }
   {
     const a = require('../api/_lib/analyze');
