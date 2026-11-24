@@ -951,12 +951,12 @@ function andList(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', 
 // token, which only a token of this app can resolve, so no cookie or session of ours crosses over.
 const appBase = () => ENV().appUrl || 'https://aiseodeck.silitlabs.com';
 
-// Webflow serves the panel from the extension's own address, https://<client id>.webflow-ext.com, and that is
-// the only origin whose pages may call /ext/* and read the answers. EXT_ORIGINS names others (comma separated),
-// for a second registration of the app. Any other origin, or none, is refused before anything is read or done.
+// Webflow serves the panel from one fixed address of the extension's own (wf.PANEL_ORIGIN, the "Designer Extension
+// URI" of the app's settings), and that is the only origin whose pages may call /ext/* and read the answers.
+// EXT_ORIGINS names others (comma separated), for a second registration of the app. Any other origin, or none,
+// is refused before anything is read or done.
 function extOrigins() {
-  const own = ENV().clientId ? ['https://' + ENV().clientId + '.webflow-ext.com'] : [];
-  return own.concat(String(process.env.EXT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean));
+  return [wf.PANEL_ORIGIN].concat(String(process.env.EXT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean));
 }
 function extHeaders(req, res) {
   const origin = String(req.headers.origin || '');
@@ -1085,7 +1085,7 @@ async function extApplied(a, b) {
 async function handleExt(req, res, path, method) {
   if (!extHeaders(req, res)) {
     // one line, so that a changed panel address shows up in the logs instead of as a silent failure
-    // (a long label, such as the client id in the panel's address, is shortened here so the log keeps enough of it to compare)
+    // (a long label in the address is shortened here, so the log keeps enough of it to compare and no more)
     log.info('[aiseodeck] panel: refused origin ' + String(req.headers.origin || '(none)').slice(0, 160).replace(/[A-Za-z0-9_-]{32,}/g, (m) => m.slice(0, 8) + '...' + m.slice(-4) + ' (' + m.length + ' characters)'));
     return json(res, 403, { error: 'This address may not call the panel.' });
   }

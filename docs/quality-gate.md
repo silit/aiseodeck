@@ -25,6 +25,8 @@ Found by reading the guidelines again, and fixed:
 8. **The authorize address** joins the scopes with `%20`, as Webflow's OAuth documentation writes them (it used `+`, which worked).
 9. **The three attestations** on the OAuth token are written out as such in the review notes.
 10. **The bundle** is refused by the packaging script when it is over the 5 MB Webflow takes.
+11. **The panel's address** (24 November, from the app's settings). The server let the panel call it from an address made from the OAuth client id. The settings show another one: the id in the Designer Extension URI is the app's own. With the assumed address the server would have refused its own panel in the real Designer. The real address is now written out in the code and tested, and an address made from the client id is refused. `EXT_ORIGINS` adds the address of a second registration and nothing else.
+12. **Where the Install URL goes.** The notes said it also had to be entered in the app's settings. The settings have no such field; it is given in the submission form only. The notes were corrected.
 
 ## Is it real?
 
@@ -65,7 +67,7 @@ Found by reading the guidelines again, and fixed:
 | Object-level authorization, non-enumerating failure | Pass | Same tests; "other sites are not reachable"; "a page of another site is refused whatever id the panel sends". |
 | No reusable secret returned | Pass | The token never leaves the server. The panel gets no credential. |
 | Outbound destinations from a server-side list, HTTPS, no user-supplied hosts | Pass | Fixed addresses only. `test/app.js`: "where the requests of the whole run went". |
-| CORS names production origins, never `*` | Pass / Sitting | `/ext/*` answers one origin, the extension's own. Sitting: that the real origin is `https://<client id>.webflow-ext.com` (else set `EXT_ORIGINS`; a refused origin is logged). |
+| CORS names production origins, never `*` | Pass / Sitting | `/ext/*` answers one origin, the extension's own: the Designer Extension URI of the app's settings, `https://6af730d2ef364c450fd995ce.webflow-ext.com`, read there on 24 November and written out in `api/_lib/webflow.js`. Tests: "the panel can call the app from its own address", "an address made from the OAuth client id is not the panel's". Sitting: the panel shows its data in the real Designer (a refused origin leaves one log line). |
 | Credentials encrypted at rest, per tenant | Pass | AES-256-GCM (`api/_lib/crypto.js`), one token per authorization. |
 | No privileged decision trusts browser storage | Pass | The panel stores nothing. |
 | Values put into scripts or markup are serialized and escaped | Pass | `esc()` for markup, `jsValue()` for the two values in inline scripts. |
@@ -82,7 +84,7 @@ Found by reading the guidelines again, and fixed:
 | Item | Verdict | Where it is shown |
 | --- | --- | --- |
 | Scopes are the minimum, each direction used | Pass | Six scopes; the endpoint behind each is in the review notes and tested ("the scopes are the six the features use"). |
-| Install URL scopes equal the configured ones | Sitting | Compare the app's settings with the six scopes. |
+| Install URL scopes equal the configured ones | Pass | Read in the app's settings on 24 November: Authorized user read-only, CMS read and write, Pages read and write, Sites read-only, every other permission "No access". These are the six scopes `/auth` asks for (test: "the scopes are the six the features use"). |
 | Stops calling on revoke; 401 never retried | Pass | Tests: sections "uninstalled in Webflow" and "signed in keyword from the home page, uninstall detection". |
 | Code on customer sites through the Custom Code API | N/A | The app puts no code on a site. |
 | Injected scripts pinned; new version for every change | N/A | No script. |
@@ -158,10 +160,12 @@ Found by reading the guidelines again, and fixed:
 
 In the order they come up:
 
-1. The Designer Extension URI in the app's settings is `https://<client id>.webflow-ext.com`; the Install URL there is `https://aiseodeck.silitlabs.com/auth`; the redirect URI is `https://aiseodeck.silitlabs.com/callback`; the six scopes.
+1. Done on 24 November, by reading the app's settings: the redirect URI is `https://aiseodeck.silitlabs.com/callback`, the permissions are the six scopes, and the Designer Extension URI is `https://6af730d2ef364c450fd995ce.webflow-ext.com`, the address the server now expects. The Install URL has no field there; it goes into the form.
 2. `COMPLIMENTARY_CODE` is set in Vercel (16 characters or more), and the same value is ready for the form's access field.
-3. In the Designer: the panel opens, its text is Inter, and its colors follow the Appearance setting (try the light theme). No error in the browser console of the panel.
-4. `POST /beta/token/resolve` answers with `siteId`; a cancelled authorization comes back with `error=access_denied`.
-5. App Review Preflight on the final `bundle.zip` and `review.zip`. The bundle now holds two font files and their license text: if Preflight asks about them, they are the Inter typeface the design guidelines name, and the README in the review ZIP says so.
-6. The usage graph of the database in Upstash.
-7. Two-factor authentication, the demo video, the form.
+3. The new bundle goes up with **Publish extension version** (distribution: internal testing; the notes are in `docs/listing.md`). The panel published now is the one of 15 November: it does not work with the new server, so this is done in the same sitting as the deploy.
+4. The app is installed on no site at the moment (the app's row says 0 installs). Install it on the test site from the Install URL.
+5. In the Designer: the panel opens and shows the page's data (this is the check of the address in item 1), its text is Inter, and its colors follow the Appearance setting (try the light theme). No error in the browser console of the panel.
+6. `POST /beta/token/resolve` answers with `siteId`; a cancelled authorization comes back with `error=access_denied`.
+7. App Review Preflight on the final `bundle.zip` and `review.zip`. Preflight is installed in the Workspace (authorized on 15 November), so it needs no new authorization. The bundle now holds two font files and their license text: if Preflight asks about them, they are the Inter typeface the design guidelines name, and the README in the review ZIP says so.
+8. The usage graph of the database in Upstash.
+9. Two-factor authentication, the demo video, the form. The form at developers.webflow.com/submit shows nothing until **Sign in with Webflow** is pressed there (the owner does it; on Webflow's screen the Workspace is chosen, not a site). Read every field of the live form then, against `docs/listing.md`.

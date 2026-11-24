@@ -26,7 +26,7 @@ for (const d of [RAW, FINAL]) fs.mkdirSync(d, { recursive: true });
 
 const DAY = 86400000;
 const APP = 'https://aiseodeck.silitlabs.com';
-const PANEL = 'https://cid.webflow-ext.com';
+const PANEL = require('../api/_lib/webflow').PANEL_ORIGIN;
 const ENG = ['openai', 'aio', 'aimode', 'gemini', 'claude', 'grok'];
 const SEARCH = ['aio', 'aimode'];
 

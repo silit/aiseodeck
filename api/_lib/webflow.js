@@ -8,6 +8,11 @@ const AUTH_BASE = () => (process.env.WEBFLOW_AUTH_BASE || 'https://webflow.com')
 
 const SCOPES = ['authorized_user:read', 'sites:read', 'pages:read', 'pages:write', 'cms:read', 'cms:write'];
 
+// The address Webflow serves this app's Designer panel from: the "Designer Extension URI" in the app's settings
+// (Workspace settings, Apps & Integrations, Develop, Edit App, Building blocks). It is public: every Designer that
+// opens the panel loads it from there. The id in it is the app's own, not the OAuth client id.
+const PANEL_ORIGIN = 'https://6af730d2ef364c450fd995ce.webflow-ext.com';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = () => parseInt(process.env.WEBFLOW_RETRY_BASE_MS || '', 10) || 2000;
@@ -175,6 +180,6 @@ const getCollection = (token, collectionId) => call(token, 'GET', `/collections/
 const createDraftItem = (token, collectionId, fieldData, cmsLocaleId) => call(token, 'POST', `/collections/${collectionId}/items`, Object.assign({ isArchived: false, isDraft: true, fieldData }, cmsLocaleId ? { cmsLocaleId } : {}));
 
 module.exports = {
-  SCOPES, call, callsLeft, authorizeUrl, exchangeCode, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
+  SCOPES, PANEL_ORIGIN, call, callsLeft, authorizeUrl, exchangeCode, isRevoked, authorizedBy, resolveIdToken, tokenStatus, listSites, getSite,
   listPages, getPage, pageDom, updatePageSeo, listCollections, getCollection, createDraftItem
 };

@@ -70,9 +70,9 @@ Rough AI cost per answer (Nov 2026 list prices): ChatGPT about 1.1 to 2 cents (w
 4. **Webflow uygulaması**: Webflow > Silit Labs workspace > Apps & Integrations > Develop > Create an App.
    - Name: AI SEO Deck, homepage: https://aiseodeck.silitlabs.com
    - Data Client (REST API) aç. Redirect URI: `https://aiseodeck.silitlabs.com/callback`
-   - Install URL (App installation URL): `https://aiseodeck.silitlabs.com/auth`. Buraya asla `webflow.com/oauth/authorize...` adresi yazılmaz: her kurulum `/auth` üzerinden başlar, çünkü tek kullanımlık `state` değerini orası üretir.
+   - Install URL: `https://aiseodeck.silitlabs.com/auth`. Uygulama ayarlarında bu adres için bir alan yok (24 Kasım 2026'da bakıldı); adres Marketplace başvuru formuna yazılır. Oraya asla `webflow.com/oauth/authorize...` adresi yazılmaz: her kurulum `/auth` üzerinden başlar, çünkü tek kullanımlık `state` değerini orası üretir.
    - Scopes: Authorized user read; Sites read; Pages read and write; CMS read and write
-   - Designer Extension yapı taşını aç. Ayarlarda görünen "Designer Extension URI" `https://<client id>.webflow-ext.com` olmalı; farklıysa o adresi Vercel'de `EXT_ORIGINS` olarak gir.
+   - Designer Extension yapı taşını aç. Ayarlarda görünen "Designer Extension URI" bu uygulama için `https://6af730d2ef364c450fd995ce.webflow-ext.com` (içindeki kimlik uygulamanın kendi kimliği, Client ID değil). Panel sunucuyu yalnızca bu adresten çağırabilir; adres kodda yazılı (`PANEL_ORIGIN`, `api/_lib/webflow.js`). Uygulama Webflow'da yeniden oluşturulursa adres değişir: o zaman koddaki değer güncellenir.
    - Client ID ve Client Secret'ı Vercel'e gir (bana gönderme).
 5. **AI anahtarları** (ödeme ve şartları sen onaylarsın, her birinde bütçe limiti koy):
    - OpenAI (platform.openai.com), Google AI Studio (Gemini, ödeme hesabı bağlı olmalı), Anthropic (console.anthropic.com), xAI (console.x.ai)

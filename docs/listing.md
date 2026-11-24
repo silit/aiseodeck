@@ -22,7 +22,9 @@ Fields marked `[to fill]` wait for the last steps: the end-to-end run, the final
 | Payment type | Free and Paid (tick both) |
 | Marketplace visibility | Public |
 
-The Install URL is the address above and never a `webflow.com/oauth/authorize...` address. The same address has to be in the app's settings in Webflow (App installation URL) before the form is sent. The first submission had the authorize address here; that is one of the things a review now refuses.
+The Install URL is the address above and never a `webflow.com/oauth/authorize...` address. It is given in this form and nowhere else: the app's settings in Webflow have no field for it (read on 24 November 2026: App info holds the name, the description, the icon, the homepage and the site restriction; Building blocks holds the Designer Extension URI, the client id and secret, the redirect URI and the scopes). The first submission had the authorize address here; that is one of the things a review now refuses.
+
+Read in the app's settings on 24 November 2026, and as this build expects: redirect URI `https://aiseodeck.silitlabs.com/callback`; Authorized user read-only, CMS read and write, Pages read and write, Sites read-only, every other permission "No access"; Designer Extension URI `https://6af730d2ef364c450fd995ce.webflow-ext.com`. The app description there ("Every AI, one deck. See if ChatGPT, Google AI, Gemini, Claude and Grok recommend you, then fix your Webflow site.") still describes this build and stays.
 
 ### Why each scope is asked for (for the scope fields of the form)
 
@@ -165,3 +167,43 @@ AI SEO Deck is made by Silit Labs. It is not affiliated with or endorsed by Webf
 - Checked at Polar on 23 November 2026: a monthly and a yearly product exist for Solo, Studio and Agency at these prices; "Trial conversion reminder" is on under Customer Notifications (Polar sends it 3 days before a 7-day trial ends); "Prevent trial abuse" is on under Subscriptions, and it counts a trial of any Silit Labs product, which is why the texts say one trial per customer across our products. Look again on the day of the submission.
 - The demo video has to show this build: the install approved and denied, Site health reading from Webflow, a fix with "Now in Webflow" next to the suggestion, the panel in the Designer, Disconnect and connecting again.
 - The logo: a logomark at 900x900, no text.
+
+## The new version of the panel (Publish extension version)
+
+Where: Silit Labs Workspace, Apps & Integrations, Develop, the AI SEO Deck row, **Publish extension version**. Read on 24 November 2026; nothing was uploaded then.
+
+| Field | Value |
+| --- | --- |
+| Upload zip file | `extension/bundle.zip`, the file `node scripts/package-extension.js` has checked (seven files). Only `.zip` is taken. |
+| Select distribution | **Publish for internal testing (Workspace only)**. The other choice is greyed out until the app is in the Marketplace ("Submit an App before publishing a Designer Extension for review"). |
+| Submission version notes | Required. The field comes filled with four headings; keep them and put the text below under them. |
+
+The published versions are three, all of 15 November 2026, each with a one-line note. This is the fourth.
+
+---
+
+# New Features
+- The panel follows the page that is open in the Designer. When another page is opened it shows that page's keyword, how each AI engine answered, and the page's title and description, with no reload.
+- On a site with more than one language the editor says, before anything is applied, that Apply sets the values on the page as the Designer shows it now, and names the language the suggestion was written from.
+- "Read this page again" reads the page's data from Webflow again.
+
+# Changes/Fixes
+- Everything the panel shows about a page comes from the Webflow Data API through our server, and from the Designer API for the open page. No published page is read, by the panel or by the server.
+- The schema features are gone (FAQ, Organization and WebSite schema), so no feature uses a beta endpoint.
+- An answer that arrives for a page the user has left is dropped. An Apply finishes on the page it was pressed for. If the Designer takes the title and not the description, the panel says so.
+- The script does not name the window around the panel, has no inline handlers, builds no HTML from strings and keeps nothing in the browser.
+
+# Improvements
+- Design: Webflow's CSS variables for apps, so the panel follows the Appearance setting. Inter at 11.5px and 13px, 4px corners, sentence case, main actions that fill the width. Inter ships in the bundle (two .woff2 files and their license, SIL Open Font License 1.1), so no font is loaded from another host.
+- Accessibility: every control has a name and a visible focus ring, no state is told by color alone, messages reach screen readers, and contrast is at least 4.5 to 1 for text and 3 to 1 for icons in the dark and the light theme.
+- The bundle is seven files written by hand: no build step, no dependency, no source map.
+
+# Resolution notes
+Review of 23 November 2026, ticket #1221544. The full reply is in the review notes of the submission.
+1. Site audit outside the API: the audit is removed. Site health and every suggestion are built on GET /v2/sites/{site_id}/pages and GET /v2/pages/{page_id}/dom. The app requests no customer website.
+2. Beta endpoints: every schema-markup call is removed, in the web app and in the panel. One call outside /v2 remains, for identity only: POST /beta/token/resolve, which resolves the Designer's ID token.
+3. Domains typed by the user: setup asks for no website address. The site's addresses are read from GET /v2/sites/{site_id}.
+4. Listing description: rewritten. It says what the app does, what is needed first, what setup asks, the prices in US dollars with the yearly amounts and the trial terms, and names the documentation.
+5. Documentation: the guide covers the whole app, with a section on the panel in the Designer and on what is needed in Webflow (no particular plan).
+
+---

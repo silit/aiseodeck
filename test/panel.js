@@ -99,7 +99,7 @@ const cookiesFrom = (res) => (res.headers['set-cookie'] || []).map((c) => c.spli
   wfState.dom.pNew = [textNode('<h1>Prices</h1>'), textNode(long('Every plan is priced per treatment.', 60))];
 
   /* ---- the browser ---- */
-  const PANEL = 'https://cid.webflow-ext.com';
+  const PANEL = require('../api/_lib/webflow').PANEL_ORIGIN; // the Designer Extension URI of the app's settings
   const APP = 'https://aiseodeck.silitlabs.com';
   // What a strict host allows a Designer Extension: its own files, no inline script or style, and its own server.
   const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src " + APP + "; base-uri 'none'; form-action 'none'";

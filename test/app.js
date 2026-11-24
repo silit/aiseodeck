@@ -730,7 +730,15 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(!r.body.includes('data-locale-note'), 'no note on a site with one language');
 
   console.log('the panel inside the Webflow Designer');
-  const PANEL = 'https://cid.webflow-ext.com';
+  const PANEL = require('../api/_lib/webflow').PANEL_ORIGIN;
+  assert(PANEL === 'https://6af730d2ef364c450fd995ce.webflow-ext.com' && /^https:\/\/[0-9a-f]{24}\.webflow-ext\.com$/.test(PANEL), 'the panel\'s address is the Designer Extension URI of the app\'s settings, written out');
+  {
+    // the documents a reviewer and the owner read name the same address as the code, and no older guess
+    const fsx = require('fs'), up = require('path').join(__dirname, '..');
+    const read = (f) => fsx.readFileSync(require('path').join(up, f), 'utf8');
+    const stale = ['REVIEW.md', 'README.md', '.env.example', 'docs/quality-gate.md', 'docs/listing.md', 'extension/README.md'].filter((f) => /<client id>\.webflow-ext\.com/.test(read(f)));
+    assert(read('REVIEW.md').includes(PANEL) && read('README.md').includes(PANEL) && read('docs/quality-gate.md').includes(PANEL) && stale.length === 0, 'the review notes, the README and the quality gate name the panel\'s address as the code has it (still naming a guessed address: ' + (stale.join(', ') || 'none') + ')');
+  }
   const ext = (route, body, origin) => request(port, route === 'OPTIONS' ? 'OPTIONS' : 'POST', '/ext/' + (route === 'OPTIONS' ? 'context' : route), { headers: Object.assign({ 'content-type': 'application/json' }, origin === null ? {} : { origin: origin || PANEL }), body: route === 'OPTIONS' ? undefined : JSON.stringify(body) });
   r = await ext('OPTIONS');
   assert(r.status === 204 && r.headers['access-control-allow-origin'] === PANEL && /Origin/.test(r.headers.vary || '') && /POST/.test(r.headers['access-control-allow-methods']), 'the panel can call the app from its own address, and only that address is named');
@@ -740,6 +748,19 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
   assert(r.status === 403 && !r.headers['access-control-allow-origin'] && !/keyword|engines/.test(r.body), 'the panel of another app is refused, with a valid ID token too');
   r = await ext('context', { siteId: 'siteA', idToken: 'idt:siteA', pageId: 'p2', path: '/about' }, null);
   assert(r.status === 403, 'a request that names no origin is refused');
+  r = await ext('OPTIONS', null, 'https://cid.webflow-ext.com');
+  assert(r.status === 403 && !r.headers['access-control-allow-origin'], 'an address made from the OAuth client id is not the panel\'s and is refused');
+  {
+    // EXT_ORIGINS adds addresses (a second registration of the app); it never opens the routes to everyone
+    process.env.EXT_ORIGINS = ' https://0123456789abcdef01234567.webflow-ext.com/ , https://second.example';
+    const added = await ext('OPTIONS', null, 'https://0123456789abcdef01234567.webflow-ext.com');
+    const second = await ext('OPTIONS', null, 'https://second.example');
+    const own = await ext('OPTIONS');
+    const stranger = await ext('OPTIONS', null, 'https://evil.example');
+    delete process.env.EXT_ORIGINS;
+    const after = await ext('OPTIONS', null, 'https://second.example');
+    assert(added.status === 204 && added.headers['access-control-allow-origin'] === 'https://0123456789abcdef01234567.webflow-ext.com' && second.status === 204 && own.status === 204 && own.headers['access-control-allow-origin'] === PANEL && stranger.status === 403 && after.status === 403, 'EXT_ORIGINS adds the addresses it names, keeps the panel\'s own, and leaves every other origin refused');
+  }
   {
     // a caller that cannot be confirmed gets one and the same answer, whatever the reason
     const refusedOnes = [];
