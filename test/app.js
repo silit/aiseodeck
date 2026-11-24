@@ -98,6 +98,17 @@ const getJ = (k) => { const v = db.get(k); return v ? JSON.parse(v) : null; };
     assert(html.fixNext({ id: 's2', keywords: [{ id: 'x', text: 'x' }], kw: {} }) === '', 'no fix next before the first check');
   }
   {
+    // an engine's answer is Markdown; the page shows its words without the marks
+    const html = require('../api/_lib/html');
+    const excerpt = 'The best approach is to compare **the same coaching brief and the full engagement cost**, not just the hourly rate. Travel is added. ### Use a like-for-like comparison Send each coac';
+    assert(html.plainAnswer(excerpt) === 'The best approach is to compare the same coaching brief and the full engagement cost, not just the hourly rate. Travel is added. Use a like-for-like comparison Send each coac', 'an answer excerpt is shown without the marks for bold and headings');
+    const whole = '## What it costs\n\n- **Hourly:** about $200 to $500\n* See [the ICF study](https://coachingfederation.org/study) and `rates`\n\nA budget of **about $300 per session** is usual. A bold that is cut **off by the excer';
+    assert(html.plainAnswer(whole) === 'What it costs\n\n\u2022 Hourly: about $200 to $500\n\u2022 See the ICF study and rates\n\nA budget of about $300 per session is usual. A bold that is cut off by the excer', 'a full answer keeps its lines and list items, a link is left as its words, and a bold mark cut in half is dropped');
+    assert(html.plainAnswer('snake_case_name and __init__ stay. 2 * 3 * 4 = 24, a - b, C# and F# 7, the #1 choice, $5 #offer') === 'snake_case_name and __init__ stay. 2 * 3 * 4 = 24, a - b, C# and F# 7, the #1 choice, $5 #offer', 'underscores, stars in a sum and a # that belongs to a word are left alone');
+    const shown = html.keywordPage ? html.plainAnswer('**Lumen Dental** is named first.') : '';
+    assert(shown === 'Lumen Dental is named first.' && html.highlight(shown, { brand: 'Lumen Dental', aliases: [], domains: [], competitors: [] }) === '<mark>Lumen Dental</mark> is named first.', 'the brand is still marked in an answer whose bold marks were taken out');
+  }
+  {
     const a = require('../api/_lib/analyze');
     const proj = { brand: 'Lumen Dental', aliases: [], domains: ['lumendental.com'], competitors: [{ name: 'Bright Smile Clinic', domain: 'brightsmile.com' }] };
     const r = a.analyzeAnswer(proj, { text: 'Try Bright Smile Clinic or LUMEN-DENTAL in Antalya.', sources: [{ url: 'https://lumendental.com/x' }] });
