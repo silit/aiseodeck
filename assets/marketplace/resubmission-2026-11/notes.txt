@@ -1,0 +1,39 @@
+Resubmission after the review of 23 November 2026 (ticket #1221544). Summary. The full notes, with the evidence for every line, are in REVIEW.md of the public repository: https://github.com/silit/aiseodeck/blob/main/REVIEW.md
+
+THE FIVE FINDINGS
+1. Site audit outside the Webflow API: removed. Site health and every suggestion are built only on GET /v2/sites/{site_id}/pages and GET /v2/pages/{page_id}/dom. The code that requested published websites is deleted. The app requests no customer website, and a test fails if it does.
+2. Beta endpoints: every schema-markup feature is removed, in the web app and in the panel. One call outside /v2 remains, for identity only: POST /beta/token/resolve, which resolves the Designer's ID token.
+3. Domains typed by users: setup and Settings show the site's addresses as read from GET /v2/sites/{site_id}, read-only, with the time they were read and a Refresh button. No screen asks for a website address.
+4. Listing description: rewritten. What the app does, each feature, what is needed first, what setup asks, prices in USD with yearly amounts and trial terms, and the documentation by name.
+5. Documentation: the guide at /docs covers the whole app, with sections on the panel in the Designer and on what is needed in Webflow (no particular plan).
+
+THE APP
+Hybrid: a Data Client (server side) and a Designer Extension in plain HTML, CSS and JavaScript with no build step, so there are no source maps. The review ZIP holds the seven files of the bundle byte for byte plus a README. No code on customer sites: no script, no Custom Code API, no element added. The Install URL, https://aiseodeck.silitlabs.com/auth, creates a one-time state bound to the browser and redirects to Webflow. /callback refuses a missing, changed, repeated, expired or foreign state. Redirect URI: https://aiseodeck.silitlabs.com/callback.
+
+TOKENS
+Encrypted at rest (AES-256-GCM), stored server side only, deleted on uninstall or revocation and when the account is deleted. The app never calls /oauth/revoke_authorization.
+
+WRITES TO WEBFLOW
+Only when the user presses Apply. PUT /v2/pages/{page_id}: SEO title and description; the screen shows "Now in Webflow" next to the suggestion, and the page is read again just before writing. POST /v2/collections/{collection_id}/items with isDraft true. The app publishes and deletes nothing. The server reads and writes the primary locale only.
+
+THE PANEL
+Designer API: getSiteInfo, getCurrentPage and the page getters, page.setTitle and page.setDescription (only in the click handler of "Apply to this page"), getIdToken, setExtensionSize, subscribe('currentpage'), notify. It calls one server, https://aiseodeck.silitlabs.com/ext/, with a fresh ID token for every request. The server resolves the token and answers only for that same site. CORS on /ext/* names the extension's own origin.
+
+DISCONNECT AND UNINSTALL
+Disconnect deletes what the app keeps about a site and leaves the authorization alone; Connect brings the site back with no Webflow screen. After Uninstall App the next Webflow call gets a 401, GET /v2/token/authorized_by settles it, and the app deletes the token and the sites of that authorization: at the next user action, and at the latest within a day (hourly job). A 401 is never retried. A 429 waits for Retry-After.
+
+HOW TO TEST
+1. Open the Install URL. Cancel once (denied path), then approve for a site.
+2. Setup: brand, rivals by name, keywords. Save starts the first check (about 3 minutes).
+3. Keywords: open one, then "What AI said".
+4. Site health: "Read my pages from Webflow". Fix on a page, "Write a suggestion with AI", "Apply to Webflow".
+5. Keyword page: "Write the fixes", tick the CMS box, "Apply to Webflow".
+6. Designer: Apps, AI SEO Deck. Fix, "Write with AI", "Apply to this page".
+7. Site Settings: "Disconnect this site". Then Sites: "Add a site", Connect.
+8. Uninstall App in Webflow: Site settings, Apps & Integrations, Connected Apps, View details.
+
+ACCESS AND PRICES
+An account with an @webflow.com email gets the Agency plan (the highest) with no card, for as long as the account exists. Prices in USD: Free 0. Solo 19 a month or 190 a year. Studio 49 or 490. Agency 149 or 1,490. Paid plans start with a 7-day free trial: Polar takes a card and charges on day 8.
+
+CHECKS ON THIS BUILD
+node test/app.js 435 passed, test/panel.js 63 passed, test/contrast.js 81 passed. End-to-end on the live app with the test site, 24 November 2026: all eight steps passed. App Review Preflight on the submitted bundle.zip and review.zip: 0 security blockers, 0 required updates, 1 suggested update ("External API Calls": the one call of the panel, to our own server over HTTPS, with no credential header). The run reads "Runtime test needed" because the app loads no JavaScript on published sites, so there is no runtime file to pin.

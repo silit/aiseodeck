@@ -1,0 +1,303 @@
+[
+ {
+  "sec": 4,
+  "title": "AI SEO Deck",
+  "logo": "assets/marketplace/ai-seo-deck-logo.png",
+  "text": "Demo for the Webflow Marketplace review\nRecorded on the live app, 24 November 2026"
+ },
+ {
+  "img": "frames/D00.png",
+  "sec": 6.5,
+  "ch": "Install",
+  "text": "AI SEO Deck shows whether AI assistants name your brand. Install URL: aiseodeck.silitlabs.com/auth"
+ },
+ {
+  "img": "frames/D01.png",
+  "sec": 7.5,
+  "ch": "Install",
+  "text": "Webflow's authorization screen opens. Six scopes: authorized user read, sites read, pages read and write, CMS read and write."
+ },
+ {
+  "img": "frames/D02.png",
+  "sec": 4,
+  "ch": "Install, denied",
+  "text": "First the denied path: Cancel is pressed on Webflow's screen."
+ },
+ {
+  "img": "frames/D05.png",
+  "sec": 5,
+  "ch": "Install, denied",
+  "text": "The app says that it has no access and that nothing was stored."
+ },
+ {
+  "img": "frames/A03.png",
+  "sec": 4,
+  "ch": "Install, approved",
+  "text": "The Install URL again, this time to approve."
+ },
+ {
+  "img": "frames/A05.png",
+  "sec": 5,
+  "ch": "Install, approved",
+  "text": "One site is ticked, AI SEO Deck Demo, and Authorize App is pressed."
+ },
+ {
+  "img": "frames/D28.png",
+  "sec": 7,
+  "ch": "Setup",
+  "text": "Setup opens. It asks for no website address: the address of the site is read from Webflow and shown read-only."
+ },
+ {
+  "img": "frames/D33.png",
+  "sec": 5.5,
+  "ch": "Setup",
+  "text": "Brand name, other names, the country of the customers and the language of the keywords."
+ },
+ {
+  "img": "frames/A06.png",
+  "sec": 4,
+  "ch": "Setup",
+  "text": "Rivals are entered by name only."
+ },
+ {
+  "img": "frames/A08.png",
+  "sec": 5,
+  "ch": "Setup",
+  "text": "Suggest keywords from my site reads the home page through the Webflow API."
+ },
+ {
+  "img": "frames/A09.png",
+  "sec": 5,
+  "ch": "Setup",
+  "text": "The ideas arrive with their monthly searches. Five are ticked."
+ },
+ {
+  "img": "frames/A11.png",
+  "sec": 3,
+  "ch": "Setup",
+  "text": "Save and run the first check."
+ },
+ {
+  "img": "frames/A12.png",
+  "sec": 3.5,
+  "ch": "First check",
+  "text": "Each keyword is asked on six AI engines: ChatGPT, Google AI Overviews, AI Mode, Gemini, Claude and Grok."
+ },
+ {
+  "img": "frames/A17.png",
+  "sec": 3,
+  "ch": "First check",
+  "text": "Each keyword is asked on six AI engines: ChatGPT, Google AI Overviews, AI Mode, Gemini, Claude and Grok."
+ },
+ {
+  "img": "frames/A20.png",
+  "sec": 2.5,
+  "ch": "First check",
+  "text": "Each keyword is asked on six AI engines: ChatGPT, Google AI Overviews, AI Mode, Gemini, Claude and Grok."
+ },
+ {
+  "img": "frames/A22.png",
+  "sec": 6,
+  "ch": "First check",
+  "text": "After about three minutes: which engines name the brand for each keyword, and how visible it is."
+ },
+ {
+  "img": "frames/E00.png",
+  "sec": 7.5,
+  "ch": "Results",
+  "text": "Overview: how many AI answers name the brand, what to fix first, which rivals are named instead and which sites AI reads."
+ },
+ {
+  "img": "frames/E07.png",
+  "sec": 6,
+  "ch": "Results",
+  "text": "A keyword, What AI said: the answer of each engine, the searches it ran and the sites it cited."
+ },
+ {
+  "img": "frames/E12.png",
+  "sec": 5,
+  "ch": "Results",
+  "text": "An answer opened. A rival is marked where it is named."
+ },
+ {
+  "img": "frames/B10.png",
+  "sec": 7,
+  "ch": "Site health",
+  "text": "Site health reads the pages only when asked, and only through the Webflow Data API. Nothing is changed in Webflow."
+ },
+ {
+  "img": "frames/B13.png",
+  "sec": 8,
+  "ch": "Site health",
+  "text": "14 pages read with GET /v2/sites/{site_id}/pages and GET /v2/pages/{page_id}/dom. The published site is not requested."
+ },
+ {
+  "img": "frames/B16.png",
+  "sec": 5.5,
+  "ch": "Site health",
+  "crop_h": 698,
+  "text": "Each page gets a score and what to fix. /resources has no meta description."
+ },
+ {
+  "img": "frames/B18.png",
+  "sec": 7,
+  "ch": "Fix a page",
+  "crop_h": 698,
+  "text": "Left: Now in Webflow, the title and description as Webflow has them at this moment. Right: the new values."
+ },
+ {
+  "img": "frames/B21.png",
+  "sec": 7,
+  "ch": "Fix a page",
+  "crop_h": 698,
+  "text": "Write a suggestion with AI writes them from the text of the page. They are labelled as suggested and can be edited."
+ },
+ {
+  "img": "frames/B24.png",
+  "sec": 7,
+  "ch": "Fix a page",
+  "crop_h": 698,
+  "text": "Apply to Webflow sends PUT /v2/pages/{page_id}. The change arrives unpublished, and Now in Webflow shows it."
+ },
+ {
+  "img": "frames/B29.png",
+  "sec": 6,
+  "ch": "Fix a keyword",
+  "crop_h": 698,
+  "text": "The fix plan of a keyword names the best page for it, matched from the pages read through Webflow."
+ },
+ {
+  "img": "frames/B34.png",
+  "sec": 7,
+  "ch": "Fix a keyword",
+  "crop_h": 698,
+  "text": "Write the fixes suggests a title and description, and answers to the questions people ask, next to Now in Webflow."
+ },
+ {
+  "img": "frames/B37.png",
+  "sec": 5.5,
+  "ch": "Fix a keyword",
+  "crop_h": 698,
+  "text": "The answers can go to a CMS collection as draft items. The collection Posts is chosen."
+ },
+ {
+  "img": "frames/B41.png",
+  "sec": 7.5,
+  "ch": "Fix a keyword",
+  "crop_h": 698,
+  "text": "Apply to Webflow: the title and description are saved unpublished and five items are created as drafts. Nothing is published."
+ },
+ {
+  "img": "frames/C01.png",
+  "sec": 5,
+  "ch": "Designer panel",
+  "text": "The Designer Extension. In the Webflow Designer: Apps, AI SEO Deck, Launch App."
+ },
+ {
+  "img": "frames/C05.png",
+  "sec": 7,
+  "ch": "Designer panel",
+  "text": "The panel shows the page that is open: its keywords, which engines name the brand, and what to fix."
+ },
+ {
+  "img": "frames/C08.png",
+  "sec": 3,
+  "ch": "Designer panel",
+  "text": "Another page is opened in the Designer: Contact."
+ },
+ {
+  "img": "frames/C12.png",
+  "sec": 6,
+  "ch": "Designer panel",
+  "text": "The panel follows the page. The title of Contact has 7 characters. Fix opens the editor."
+ },
+ {
+  "img": "frames/C14.png",
+  "sec": 5,
+  "ch": "Designer panel",
+  "text": "The editor shows the values the page has now, read with the Designer API."
+ },
+ {
+  "img": "frames/C18.png",
+  "sec": 6,
+  "ch": "Designer panel",
+  "text": "Write with AI suggests a title and description. Nothing changes until Apply is pressed."
+ },
+ {
+  "img": "frames/C20.png",
+  "sec": 2.5,
+  "ch": "Designer panel",
+  "text": "Apply to this page sets the two values with page.setTitle and page.setDescription. Publishing stays with the user."
+ },
+ {
+  "img": "frames/C21.png",
+  "sec": 5.5,
+  "ch": "Designer panel",
+  "text": "Apply to this page sets the two values with page.setTitle and page.setDescription. Publishing stays with the user."
+ },
+ {
+  "img": "frames/C24.png",
+  "sec": 3,
+  "ch": "Designer panel",
+  "text": "The user publishes the site in Webflow."
+ },
+ {
+  "img": "frames/C26.png",
+  "sec": 2.5,
+  "ch": "Designer panel",
+  "text": "The user publishes the site in Webflow."
+ },
+ {
+  "img": "frames/D19.png",
+  "sec": 7,
+  "ch": "Disconnect",
+  "text": "Settings of the site. Disconnect this site says what is deleted and how to uninstall the app in Webflow."
+ },
+ {
+  "img": "frames/D22.png",
+  "sec": 3.5,
+  "ch": "Disconnect",
+  "text": "The box is ticked and Disconnect site is pressed."
+ },
+ {
+  "img": "frames/D24.png",
+  "sec": 8,
+  "ch": "Disconnect",
+  "text": "The data of the site is deleted from AI SEO Deck. Nothing changes in Webflow, and the site is still listed as authorized."
+ },
+ {
+  "img": "frames/D26.png",
+  "sec": 3,
+  "ch": "Connect again",
+  "text": "Connect is pressed."
+ },
+ {
+  "img": "frames/D29.png",
+  "sec": 6,
+  "ch": "Connect again",
+  "text": "Setup opens again and no Webflow screen appeared: disconnecting left the authorization alone."
+ },
+ {
+  "img": "frames/D37.png",
+  "sec": 4,
+  "ch": "Connect again",
+  "text": "The site is set up and checked again."
+ },
+ {
+  "img": "frames/F07.png",
+  "sec": 9,
+  "ch": "Uninstall",
+  "text": "To end access, the user presses Uninstall App here in Webflow. AI SEO Deck then deletes the sites of that authorization and what it kept about them."
+ },
+ {
+  "img": "frames/F02.png",
+  "sec": 8,
+  "ch": "Prices",
+  "text": "Prices in US dollars: Free USD 0, Solo USD 19, Studio USD 49, Agency USD 149 a month. Paid plans start with a 7-day free trial."
+ },
+ {
+  "sec": 5,
+  "title": "AI SEO Deck by Silit Labs",
+  "text": "Guide: aiseodeck.silitlabs.com/docs\nSupport: info@silitlabs.com"
+ }
+]
