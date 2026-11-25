@@ -8,7 +8,9 @@ Checked on 24 November 2026, on the branch `marketplace-rework`, against three s
 
 Each line says **Pass** with where it is shown, **N/A** with the reason, or **Sitting**: it can only be shown on Webflow itself, in the sitting where this build goes live and is run end to end on the test site. Nothing here is a promise of approval; it is the list of what was looked at and what the evidence is.
 
-`npm test` on this build: `test/app.js` 409 passed, `test/panel.js` 63 passed, `test/contrast.js` 81 passed. Every safeguard added in this pass was broken on purpose once to see a test fail.
+The sitting was on 24 and 25 November 2026, and the app was submitted on 25 November 2026 (`docs/listing.md`). The lines that said Sitting now say what was seen there; two things were not tried and are named as such (a second language in the Designer, and the console of the panel).
+
+`npm test` on the build that was submitted: `test/app.js` 435 passed, `test/panel.js` 63 passed, `test/contrast.js` 81 passed (409, 63 and 81 when this pass was written). Every safeguard added in this pass was broken on purpose once to see a test fail.
 
 ## What this pass changed
 
@@ -32,7 +34,7 @@ Found by reading the guidelines again, and fixed:
 
 | Item | Verdict | Where it is shown |
 | --- | --- | --- |
-| Runs end to end with no crashes on basic use | Sitting | `npm test` walks every flow against stand-ins for Webflow, the database, the AI engines, mail and billing. The run on the published test site is the last word. |
+| Runs end to end with no crashes on basic use | Pass | `npm test` walks every flow against stand-ins for Webflow, the database, the AI engines, mail and billing. On the live app with the published test site, 24 November 2026: the eight steps of "How to test" in `REVIEW.md` all passed. What the run showed and what it changed is in the log of `docs/marketplace-resubmission.md`. |
 | No placeholder content or test data visible to users | Pass | The texts were read page by page (home, guide, privacy, terms, every app screen, the panel). The screenshots use a made-up business and the listing says so. |
 | Backend live through the review window | Pass, with one thing to look at | Vercel Pro; cron jobs call with the `Authorization` header. The database is on Upstash's free tier: a quiet tick costs 7 commands (about 2,000 a day), the hourly token pass about 2 per account. Look at the usage graph in Upstash before submitting. |
 | Demo access is ready | Pass | No credentials: the reviewer installs with a Webflow account. `@webflow.com` gets Agency automatically; the access code covers any other address. Neither expires, and such accounts are not deleted by the 30-day rule. Tests: "the access code that opens the Agency plan for a reviewing account". |
@@ -51,7 +53,7 @@ Found by reading the guidelines again, and fixed:
 | No credential fields read from a published DOM | N/A | No published page is read. |
 | Data from official APIs | Pass | Data API and Designer API only. `test/app.js`: a stand-in for the customer's published site must receive no request during the whole run. |
 | Client Secret server-side only | Pass | Environment variable; not in the bundle, the script or the repository (tracked files were scanned for anything that looks like a key). |
-| Source readable, uploaded through the version manager | Pass / Sitting | Hand-written, formatted, commented. The upload is done in the sitting. |
+| Source readable, uploaded through the version manager | Pass | Hand-written, formatted, commented. The fourth version of the panel was published with Publish extension version on 24 November 2026, from the `bundle.zip` named in `docs/listing.md`. |
 | No source maps in `bundle.zip` | Pass | `scripts/package-extension.js` refuses a `.map` file or a `sourceMappingURL`. |
 | One `webflow.json`, real product name, no telemetry block | Pass | The script compares the bundled manifest with `{ name, apiVersion: "2", size, publicDir }` exactly. Webflow CLI 2.16.0 left the manifest untouched. |
 | The artifact verified is the artifact uploaded | Pass | The script checks the files inside `bundle.zip`, byte for byte against `extension/`, and builds the review ZIP from the bundle itself. |
@@ -67,7 +69,7 @@ Found by reading the guidelines again, and fixed:
 | Object-level authorization, non-enumerating failure | Pass | Same tests; "other sites are not reachable"; "a page of another site is refused whatever id the panel sends". |
 | No reusable secret returned | Pass | The token never leaves the server. The panel gets no credential. |
 | Outbound destinations from a server-side list, HTTPS, no user-supplied hosts | Pass | Fixed addresses only. `test/app.js`: "where the requests of the whole run went". |
-| CORS names production origins, never `*` | Pass / Sitting | `/ext/*` answers one origin, the extension's own: the Designer Extension URI of the app's settings, `https://6af730d2ef364c450fd995ce.webflow-ext.com`, read there on 24 November and written out in `api/_lib/webflow.js`. Tests: "the panel can call the app from its own address", "an address made from the OAuth client id is not the panel's". Sitting: the panel shows its data in the real Designer (a refused origin leaves one log line). |
+| CORS names production origins, never `*` | Pass | `/ext/*` answers one origin, the extension's own: the Designer Extension URI of the app's settings, `https://6af730d2ef364c450fd995ce.webflow-ext.com`, read there on 24 November and written out in `api/_lib/webflow.js`. Tests: "the panel can call the app from its own address", "an address made from the OAuth client id is not the panel's". In the real Designer the panel showed its data on 24 November 2026. The server log of that day has every call of the panel answered with 200 and each preflight request with 204; the only refused requests to `/ext/` are two that were sent on purpose with no origin. |
 | Credentials encrypted at rest, per tenant | Pass | AES-256-GCM (`api/_lib/crypto.js`), one token per authorization. |
 | No privileged decision trusts browser storage | Pass | The panel stores nothing. |
 | Values put into scripts or markup are serialized and escaped | Pass | `esc()` for markup, `jsValue()` for the two values in inline scripts. |
@@ -108,7 +110,7 @@ Found by reading the guidelines again, and fixed:
 
 | Item | Verdict | Where it is shown |
 | --- | --- | --- |
-| Listing, screenshots and video match the behavior | Pass / Sitting | Listing and screenshots were made from this build. The video is recorded after the end-to-end run. |
+| Listing, screenshots and video match the behavior | Pass | Listing and screenshots were made from this build. The video was made on 24 November 2026 from captures of the live app, taken after the last change to a screen it shows. |
 | Fees are disclosed | Pass | Prices in USD with the yearly amounts and the trial terms, in the listing, the guide, the terms, the home page and the app. |
 | No impersonation; affiliations stated | Pass | "Not affiliated with or endorsed by Webflow, OpenAI, Google, Anthropic or xAI" in the listing and the terms. |
 | Contact information | Pass | info@silitlabs.com |
@@ -122,7 +124,7 @@ Found by reading the guidelines again, and fixed:
 | Logo 900 x 900, a mark without text | Pass | `assets/marketplace/ai-seo-deck-logo.png` |
 | Avatar 512 x 512 | Pass | `assets/marketplace/ai-seo-deck-avatar-512.png`, the same mark, for a field that asks for it. |
 | 3 to 5 screenshots at 1280 x 846, under 2 MB | Pass | Five and a spare in `assets/marketplace/screenshots/`, each under 350 KB. All were made again after the panel's new design and the color fixes. |
-| Demo video, 2 to 5 minutes, approve and deny | Sitting | Recorded by the owner after the end-to-end run; captions in English. |
+| Demo video, 2 to 5 minutes, approve and deny | Pass | 4 minutes 26 seconds, 1920 x 1080, captions in English: the install denied and then approved, and every step of "How to test". Built from captures of the live app with `scripts/demo-video/build_stills.py`. Unlisted on YouTube; it plays for a viewer who is not signed in (checked on 25 November 2026). |
 | Homepage over HTTPS | Pass | `https://aiseodeck.silitlabs.com` |
 
 ## Account
@@ -135,7 +137,7 @@ Found by reading the guidelines again, and fixed:
 
 | Item | Verdict | Where it is shown |
 | --- | --- | --- |
-| Style, type and color follow Webflow's design guidelines | Pass / Sitting | Webflow's tokens, Inter, 11.5px and 13px, 4px corners. `test/panel.js`: section "the look". Sitting: that the Designer provides its variables to the panel (then it follows Appearance; if not, it shows the default dark theme). |
+| Style, type and color follow Webflow's design guidelines | Pass | Webflow's tokens, Inter, 11.5px and 13px, 4px corners. `test/panel.js`: section "the look". In the real Designer, 24 November 2026: the Designer was in its light appearance and the panel was light as well, so the Designer does provide its variables (the panel's own fallback is the dark theme). |
 | Clear navigation and labels, little input | Pass | One page view and one editor; two fields. |
 | No keyboard shortcuts | Pass | No key handler. `test/app.js`: "has no keyboard shortcuts". |
 | Alt text, keyboard, contrast | Pass | Every control and mark has a name; native controls with a focus ring; contrast measured in both themes. The web app and the public pages are measured the same way by `test/contrast.js`. |
@@ -151,7 +153,7 @@ Found by reading the guidelines again, and fixed:
 | Rate limits: backoff with a maximum number of tries | Pass | `Retry-After` is honoured, else 2, 4, 8 seconds; three more tries at most. |
 | Webflow stays the source of truth; fetched data shows when it was read and can be refreshed | Pass | Setup, Settings, Site health, each fix and the panel say when their Webflow data was read and have a refresh. |
 | Derived data is kept apart from Webflow data; nothing is overwritten silently | Pass | "Now in Webflow" next to "Suggested"; "Suggested by AI" labels; the page is read again just before a write, and a changed page stops the write. |
-| Localization: no localized content overwritten without the user knowing; locale on writes | Pass / Sitting | The server writes the primary locale (Webflow refuses a primary locale id on these calls, so none is named, and it is tested). The panel says what Apply does on a site with more than one language. Sitting, if the test site gets a second language: what the Designer does with `setTitle` in a secondary locale. |
+| Localization: no localized content overwritten without the user knowing; locale on writes | Pass | The server writes the primary locale (Webflow refuses a primary locale id on these calls, so none is named, and it is tested). The panel says what Apply does on a site with more than one language. Not tried in the sitting: what the Designer does with `setTitle` while a secondary locale is shown. The panel tells the user to check which language is open before Apply. |
 | Three attestations on the OAuth token | Pass | Review notes, "Tokens: the three attestations". |
 | Review account on the highest plan, not expiring, kept after approval | Pass | See "Demo access". |
 | Cross-origin pages cannot read or change authenticated answers | Pass | Session cookie is `SameSite=Lax`, `HttpOnly`, `Secure`; every POST under `/app` and the sign-in link check the origin; no CORS headers outside `/ext/*`. Tests: "cross-site posts are blocked", "another origin gets no permission to call the panel routes". |
@@ -161,11 +163,11 @@ Found by reading the guidelines again, and fixed:
 In the order they come up:
 
 1. Done on 24 November, by reading the app's settings: the redirect URI is `https://aiseodeck.silitlabs.com/callback`, the permissions are the six scopes, and the Designer Extension URI is `https://6af730d2ef364c450fd995ce.webflow-ext.com`, the address the server now expects. The Install URL has no field there; it goes into the form.
-2. `COMPLIMENTARY_CODE` is set in Vercel (16 characters or more), and the same value is ready for the form's access field.
-3. The new bundle goes up with **Publish extension version** (distribution: internal testing; the notes are in `docs/listing.md`). The panel published now is the one of 15 November: it does not work with the new server, so this is done in the same sitting as the deploy.
-4. The app is installed on no site at the moment (the app's row says 0 installs). Install it on the test site from the Install URL.
-5. In the Designer: the panel opens and shows the page's data (this is the check of the address in item 1), its text is Inter, and its colors follow the Appearance setting (try the light theme). No error in the browser console of the panel.
-6. `POST /beta/token/resolve` answers with `siteId`; a cancelled authorization comes back with `error=access_denied`.
-7. App Review Preflight on the final `bundle.zip` and `review.zip`. Preflight is installed in the Workspace (authorized on 15 November), so it needs no new authorization. The bundle now holds two font files and their license text: if Preflight asks about them, they are the Inter typeface the design guidelines name, and the README in the review ZIP says so.
-8. The usage graph of the database in Upstash.
-9. The demo video and the form. The form at developers.webflow.com/submit shows nothing until **Sign in with Webflow** is pressed there (the owner does it; on Webflow's screen the Workspace is chosen, not a site). Read every field of the live form then, against `docs/listing.md`.
+2. Done. The owner set `COMPLIMENTARY_CODE` in Vercel on 24 November at 15:38. On 25 November the code form of the Account page answered "That access code is not valid." to a wrong code on the live app, which it does only when a code of 16 characters or more is set (with none it answers "Not found"). The owner typed the code into the form's access field himself.
+3. Done on 24 November: the panel's fourth version was published with **Publish extension version** (distribution: internal testing; the notes are in `docs/listing.md`). On 25 November, after the submission, the other distribution was still greyed out ("Submit an App before publishing a Designer Extension for review").
+4. Done on 24 November: the app was installed on the test site from the Install URL, once denied and then approved for that site alone.
+5. Done on 24 November: in the Designer the panel opened, showed the data of the open page (the check of the address in item 1), followed the page when another was opened and applied a title and description. The Designer was in its light appearance and so was the panel. Not done: the browser console of the panel was not read.
+6. Done on 24 November, as far as it shows from outside: the calls of the panel were answered with 200, which happens only when `POST /beta/token/resolve` names the same site; a cancelled authorization ended on the page that says nothing was stored.
+7. Done on 24 November by the owner: App Review Preflight on the final `bundle.zip` and `review.zip`. 0 security blockers, 0 required updates, 1 suggested update ("External API Calls", the panel's one call to our own server). The run is listed as "Runtime test needed" because the app loads no JavaScript on published sites. Receipt `wfpre_ac0fe18c274fefca44b42bbe32f422bb`. It raised nothing about the font files.
+8. Open: the usage graph of the database in Upstash was not looked at.
+9. Done. The demo video was made on 24 November (`docs/listing.md`, Support info). The form was filled on the night of 24 November and submitted on 25 November at 10:49; what the form checks by itself is written down in `docs/listing.md`.

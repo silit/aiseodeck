@@ -1,26 +1,46 @@
 # Marketplace submission: what goes into each field of the form
 
-The form is at developers.webflow.com/submit (sign in to Webflow first). The fields below are in the order the form had on 16 November 2026; Webflow changed the form since, so read every field of the live form and tell Claude about any that is not here. Text fields are saved by the form as you type; files are not.
+**Submitted on 25 November 2026 at 10:49 (Europe/Istanbul).** Webflow's answer: "Thank you! Your submission has been received.", Reference ID `c9a4039e-4b94-4ad1-81a1-10cc77f4c3a8`, and by email ticket #1225904 ("No action required at the moment"). The review and its outcome come on that email thread, in the info@silitlabs.com mailbox. The page names 10 to 15 business days.
 
-Every statement here was checked against the build on `marketplace-rework`. Change this file only together with the app. Limits: app name 30 characters, short description 100, long description 10,000 (Markdown, no links), 5 features.
+The form is at developers.webflow.com/submit. That page shows `https://webflow-app-form.webflow.io/app-form/complete-form` in a frame, and the form can be opened at that address itself. "Sign in with Webflow" opens Webflow's authorize screen for its own app "Marketplace Submission Form" (it reads the authorized user and the sites); the Silit Labs Workspace was chosen there. The fields below are the ones the form had on 25 November 2026, with the values entered for this resubmission. The form keeps the text as a draft in the browser. It does not keep files: after a reload, "Resume draft" brings the text back and the five screenshots and the review ZIP are uploaded again.
 
-Fields marked `[to fill]` wait for the last steps: the end-to-end run, the final bundle, Preflight, the video and the screenshots.
+Every statement here was checked against the build on `main`. Change this file only together with the app. Limits read in the form: short description 100 characters, long description 10,000, the alt text of a screenshot 256, notes 5,000, access credentials 2,000, backend runtime version 40, five features, four to five screenshots of 1280 x 846 and at most 2 MB each, an icon of 900 x 900 as a PNG of at most 50 KB.
+
+The texts as they were entered are in `assets/marketplace/resubmission-2026-11/`: the long description, the notes and the access text (with a placeholder where the access code goes).
+
+### What the form checks by itself
+
+Learned while filling it on 24 and 25 November 2026:
+
+- **Client ID.** With "New App" the check answers "Client ID taken. Please submit an update." Webflow knows the client ID of the app from the first submission, so this resubmission is an **App Update** of the kind **App functionality, permissions, or bundle**. "Load Existing App Data" then fills the form with the first listing, and every part of the form has a switch that says whether the update changes it.
+- **Lists.** The lists of the first listing's long description did not come back with the existing data. The description is entered as paragraphs, with "• " at the start of a list line, and with no list markup.
+- **"Agency".** The words "your agency" or "our agency" in the long description bring up a warning that the listing may read like agency or consulting services. The name of the plan, Agency, does not. The description therefore says "your business name" where the app's field is called "Agency name on client report links".
+- **"Checkout".** The word "checkout" in the access credentials brings up a blocker ("Reviewers will not pay, subscribe, or enter a card"), and Submit stays off until the list of items to fix is empty. "Card", "plan" and "access code" do not bring it up. The access text does not use the word.
+- **Runtime version.** The form asks for the version of the backend runtime. The server writes it to the log at each cold start (`[aiseodeck] start, Node.js v26.13.1`, read in Vercel on 25 November 2026).
 
 ## App info
 
 | Field | Value |
 | --- | --- |
-| App Review Preflight receipt | `[to fill: wfpre_... from the run on the final bundle.zip and review.zip]` |
-| Submission type | New App. The app was never approved, so this is not an App Update. If the form offers a choice for a resubmission after a review, take that one. |
-| App name | AI SEO Deck |
-| App Client ID | Copy it in Webflow: Silit Labs Workspace, Apps & Integrations, Develop, the menu on the AI SEO Deck row, Edit App, Building blocks, Data Client, Client ID, Copy. Close the window with Cancel. |
+| App Review Preflight receipt | `wfpre_ac0fe18c274fefca44b42bbe32f422bb`, from the run of 24 November 2026 on the `bundle.zip` and `review.zip` named under App details |
+| Submission type | App Update (see "What the form checks by itself") |
+| What kind of app update | App functionality, permissions, or bundle |
+| App name | AI SEO Deck. The field is locked in an update. |
+| App Client ID | Copy it in Webflow: Silit Labs Workspace, Apps & Integrations, Develop, the menu on the AI SEO Deck row, Edit App, Building blocks, Data Client, Client ID, Copy. Close the window with Cancel. "Check Client ID" answers "Client ID successfully verified". |
+| Update App Capabilities & Install URL | On |
 | App capabilities | Hybrid |
 | Install URL | `https://aiseodeck.silitlabs.com/auth` |
-| Scopes | Authorized user: read. Sites: read. Pages: read and write. CMS: read and write. Nothing else. |
-| App icon image | `assets/marketplace/ai-seo-deck-logo.png` (900 x 900) |
-| App icon image alt text | AI SEO Deck logo |
-| Payment type | Free and Paid (tick both) |
-| Marketplace visibility | Public |
+| Scopes | Authorized user: read-only. Sites: read-only. Pages: read and write. CMS: read and write. Nothing else. |
+| Does the app run server-side code | Yes |
+| Backend hosting model | Serverless / PaaS |
+| Backend runtime | Node.js |
+| Backend runtime version | 26.13 (the project's Node.js Version setting in Vercel is 26.x; the log line of a cold start gave v26.13.1) |
+| Backend hosting provider | Vercel |
+| Backend frameworks | No framework |
+| Backend web servers and proxies | Managed by hosting platform |
+| Does this update include a new or changed app bundle | Yes |
+| Update App Icon | Off. The icon Webflow has on file is `assets/marketplace/AI SEO Deck logo.png` (900 x 900, a solid background, alt text "AI SEO Deck logo"). If the icon is ever uploaded again, take that file: the form asks for a PNG with no transparent areas and takes the name of the file as the alt text. `ai-seo-deck-logo.png` has transparent corners and is not for the form. |
+| Update Payment Type & Visibility | Off. On file: Free and Paid; Public. |
 
 The Install URL is the address above and never a `webflow.com/oauth/authorize...` address. It is given in this form and nowhere else: the app's settings in Webflow have no field for it (read on 24 November 2026: App info holds the name, the description, the icon, the homepage and the site restriction; Building blocks holds the Designer Extension URI, the client id and secret, the redirect URI and the scopes). The first submission had the authorize address here; that is one of the things a review now refuses.
 
@@ -39,24 +59,28 @@ Read in the app's settings on 24 November 2026, and as this build expects: redir
 
 | Field | Value |
 | --- | --- |
-| Creator name | Silit Labs |
-| Webflow account email | The email you sign in to Webflow with |
-| Contact email | info@silitlabs.com |
+| Update Creator Information | Off. On file from the first submission: Silit Labs, the email of the Webflow account, and info@silitlabs.com as the contact email. The form does not show the two email addresses of an existing listing. |
 
 ## App details
 
 | Field | Value |
 | --- | --- |
-| App category | AI and SEO (the form took two). If it takes more: Marketing, Analytics. |
+| Update App Category | Off. On file: AI and SEO. |
+| Update App Descriptions | On |
 | App preview description (short) | See if ChatGPT, Gemini, Claude, Grok and Google AI name your brand, keyword by keyword. |
-| App detail description | The text under "Long description" below, between the two rules. |
-| App promo video URL | Leave empty (optional). |
+| App detail description | The text under "Long description" below, between the two rules, entered as paragraphs (7,309 characters with its markup). |
+| App promo video URL | Empty (optional). |
+| Update App Screenshots | On |
 | App screenshots | The five pictures under "Screenshots" below, in that order, each with its alt text. |
+| Update Features Overview | On, with the five lines under "Features overview" below. |
 | Source map artifact | `extension/review.zip`, made by `node scripts/package-extension.js` from the final `bundle.zip`. Built on 24 November 2026: `bundle.zip` 137,756 bytes, SHA-256 `a2d5856f28cedb96e77c95a86ae3084f05b9b03387407a50c8c1082b7dd1fe97`; `review.zip` 140,346 bytes, SHA-256 `06d32b2fce8890b3612b4897143e655ff4d806c912e225c6f054287e02d715e3`. The two files are kept on the owner's computer in `Downloads\aiseodeck-submission`; a new run of the bundler gives a file with another checksum, so these are the ones to upload. |
+| Update URLs & Developer Notes | On |
 | Website URL | https://aiseodeck.silitlabs.com |
-| Additional notes | The text of `REVIEW.md`, from "The app" to the end, with its `[to fill]` fields filled. |
-| App access credentials | No sign-in credentials are needed: reviewers install with their own Webflow account through the Install URL. An account with an @webflow.com email gets the Agency plan (the highest) automatically, with no checkout and no card, for as long as the account exists, so every feature is open. For a reviewing account on another address: Account, Plan, Access code, and enter `[to fill: the access code, the value of COMPLIMENTARY_CODE in Vercel]`. It opens the same Agency access on that account and it stays. |
-| Published testing site | https://aiseodeck-demo.webflow.io `[to confirm after the end-to-end run: this build is installed on it]` |
+| Developer notes | A summary of `REVIEW.md` in 4,829 characters (the field takes 5,000), which starts by linking to `REVIEW.md` in the public repository for the detail and the evidence. The text is in `assets/marketplace/resubmission-2026-11/notes.txt`. |
+| Published testing site | https://aiseodeck-demo.webflow.io (this build is installed on it and the site is connected; the form checks the address) |
+| Update App Access Credentials | On |
+| App access credentials | The text in `assets/marketplace/resubmission-2026-11/credentials.txt` (935 characters before the code): no login is needed, because reviewers install with their own Webflow account from the Install URL; an account on an @webflow.com address is on the Agency plan, the highest, automatically and for as long as it exists; a reviewing account on another address opens Account and, under Plan, enters the access code in the field "Access code"; coming back later is by "Sign in" and a one-time link; and the test site. The access code is the value of `COMPLIMENTARY_CODE` in Vercel. The owner types it into the form himself; it is written nowhere else. |
+| I confirm that the provided information above is accurate ... and will remain valid permanently | Ticked by the owner. This is a promise: the value of `COMPLIMENTARY_CODE` in Vercel stays as it is for as long as the app is listed. A changed or removed value closes the reviewers' access and pauses a review. |
 
 ### Screenshots (1280 x 846, in `assets/marketplace/screenshots/`)
 
@@ -82,7 +106,8 @@ A sixth picture is ready in case one is swapped: `extra-site-health.png`. Alt te
 
 | Field | Value |
 | --- | --- |
-| Review team demo video URL | `[to fill: the new recording, 2 to 5 minutes, with the install approved and denied]` |
+| Update Support Information | On |
+| Review team demo video URL | https://youtu.be/C_RxaD_-Rz4 (unlisted, 4 minutes 26 seconds, 1920 x 1080, recorded on the live app on 24 November 2026, with the install denied and approved). It plays for a viewer who is not signed in; checked on 25 November 2026. |
 | Documentation URL | https://aiseodeck.silitlabs.com/docs |
 | Privacy policy URL | https://aiseodeck.silitlabs.com/privacy |
 | How can users reach support? | By email at info@silitlabs.com, answered within one business day. The address is on the website and in the AI SEO Deck guide. |
@@ -91,11 +116,13 @@ A sixth picture is ready in case one is swapped: `extra-site-health.png`. Alt te
 
 ## Acknowledgements
 
-Tick the box yourself, check "Review your submission", then submit. Claude does not submit.
+The last box of the form: "By checking this box, you agree to Webflow's Privacy Policy, Terms of Service, and Developer Terms of Service." Claude filled the form and read "Review your submission" until it listed nothing to fix. On 25 November 2026 the owner typed the access code and ticked the two boxes himself, and Claude pressed Submit.
+
+The session of "Sign in with Webflow" does not last a night: a Submit on the morning after the sign-in was answered with 401 and the form asked to sign in again. Signing in again in another tab and pressing "I have signed in" brought the form back with every value and file, and the second Submit went through. Sign in on the day of the submission.
 
 ## Long description
 
-Copy everything between the two rules below into "App detail description". Section titles are bold lines and there are no links, because the field takes Markdown without links.
+The text between the two rules below is the "App detail description". The field is a rich text editor: section titles are bold lines, a list line starts with "• " and is a paragraph of its own (see "What the form checks by itself"), and there are no links. The text exactly as it was entered, with its markup, is `assets/marketplace/resubmission-2026-11/long-description.html`.
 
 ---
 
@@ -113,7 +140,7 @@ AI SEO Deck shows whether AI assistants name and cite your brand when people ask
 
 **Works inside the Designer.** Open AI SEO Deck from the Apps panel to see the keyword of the page you are on, which engines name you and what to fix. Write a title and description with AI and, on a paid plan, set them on the page with one click.
 
-**Sends a report after every scheduled check.** You get an email with your visibility and your keywords, and you can turn it off. You can also create a read-only report link for a client; on the Studio and Agency plans it shows your agency name.
+**Sends a report after every scheduled check.** You get an email with your visibility and your keywords, and you can turn it off. You can also create a read-only report link for a client; on the Studio and Agency plans it shows your business name.
 
 **What you need before you start**
 
@@ -143,7 +170,7 @@ All prices are in US dollars (USD). Taxes may be added at checkout.
 
 - **Free, USD 0:** 3 keywords on 1 site, checked once a month on ChatGPT, Google AI Overviews and Gemini. Site health for 20 pages. Suggestions to copy, no Apply.
 - **Solo, USD 19 a month or USD 190 a year:** 10 keywords on 1 site, checked every week on all six engines. Apply to Webflow. 10 keyword checks on demand a month. Site health for 100 pages.
-- **Studio, USD 49 a month or USD 490 a year:** 30 keywords across 5 sites. Everything in Solo, 30 keyword checks on demand a month, your agency name on client report links. Site health for 150 pages.
+- **Studio, USD 49 a month or USD 490 a year:** 30 keywords across 5 sites. Everything in Solo, 30 keyword checks on demand a month, your business name on client report links. Site health for 150 pages.
 - **Agency, USD 149 a month or USD 1,490 a year:** 100 keywords across 20 sites. Everything in Studio, 100 keyword checks on demand a month. Site health for 250 pages.
 
 Every paid plan starts with a 7-day free trial, once per customer across the products of Silit Labs. Polar, our payment provider, takes a card at the start and charges nothing during the trial. Cancel within the 7 days and you pay nothing. Otherwise the price of the plan is charged on day 8, and then every month or every year until you cancel. The free plan needs no card and has no time limit. There are no other fees, and no other account or subscription is needed.
@@ -162,11 +189,11 @@ AI SEO Deck is made by Silit Labs. It is not affiliated with or endorsed by Webf
 
 ---
 
-## Before this text is entered
+## What was checked before this text was entered
 
-- Checked at Polar on 23 November 2026: a monthly and a yearly product exist for Solo, Studio and Agency at these prices; "Trial conversion reminder" is on under Customer Notifications (Polar sends it 3 days before a 7-day trial ends); "Prevent trial abuse" is on under Subscriptions, and it counts a trial of any Silit Labs product, which is why the texts say one trial per customer across our products. Look again on the day of the submission.
-- The demo video has to show this build: the install approved and denied, Site health reading from Webflow, a fix with "Now in Webflow" next to the suggestion, the panel in the Designer, Disconnect and connecting again.
-- The logo: a logomark at 900x900, no text.
+- Checked at Polar on 23 November 2026: a monthly and a yearly product exist for Solo, Studio and Agency at these prices; "Trial conversion reminder" is on under Customer Notifications (Polar sends it 3 days before a 7-day trial ends); "Prevent trial abuse" is on under Subscriptions, and it counts a trial of any Silit Labs product, which is why the texts say one trial per customer across our products.
+- The demo video shows this build: the install denied and approved, setup, the first check, Site health reading from Webflow, a page fix and a keyword fix with "Now in Webflow" next to the suggestion, the panel in the Designer, Disconnect and connecting again, where to uninstall, and the prices. Its scenes and captions are in `assets/marketplace/resubmission-2026-11/demo-video-scenes.json`.
+- The logo: a logomark at 900 x 900, no text, on a solid background.
 
 ## The new version of the panel (Publish extension version)
 

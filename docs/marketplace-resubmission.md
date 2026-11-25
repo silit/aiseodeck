@@ -1,5 +1,7 @@
 # Webflow Marketplace: the rejection of 23 November 2026 and the way to an approval
 
+**Resubmitted on 25 November 2026 at 10:49 (Europe/Istanbul).** Reference ID `c9a4039e-4b94-4ad1-81a1-10cc77f4c3a8`; Webflow's ticket for this submission is #1225904 (email of 10:51 to info@silitlabs.com: "No action required at the moment"). The review and its outcome come on that thread. What follows is the record of how the build got there; the end of the log and "Where it stands" say what is open.
+
 Working notes for the resubmission of AI SEO Deck. Everything here was read on 23 November 2026: the review email (ticket #1221544, in the info@silitlabs.com mailbox), the Marketplace Guidelines, the submission requirements and the API reference. Read the sources again before resubmitting: Webflow says the guidelines and the form changed recently.
 
 The owner's instruction: the next submission has to be approved. Every item below is done in full, tested, and checked against the rule it answers before the form is sent.
@@ -242,14 +244,48 @@ Done
   - Vercel asks for a six-digit code before a Redeploy from its dashboard. A push to main deploys without it.
   - To show Site health and a fix on real findings, three pages of the test site were given gaps on purpose through the API: `/resources` has no meta description, `/contact` has the title "Contact", `/pricing` a title of 104 characters. Site health then read 97/100 with exactly these findings.
 
+- 24 Nov, afternoon and evening: the end-to-end run on the live app with the published test site, the eight steps of "How to test" in `REVIEW.md`, not in their order. All eight passed. What the run showed, and what was changed because of it (each change tested and deployed before the run went on):
+  - The install was denied once (the app says it has no access and that nothing was stored) and then approved for the test site alone. Setup showed the site's address read-only, suggested keywords from the home page through the API, and the first check ran with all six engines answering.
+  - Site health read 14 pages. A title and description applied from a page fix were found in Webflow, unpublished. A keyword fix created five draft items in the collection Posts.
+  - In the Designer the panel opened, followed the open page, wrote a suggestion and applied a title and description. The Designer was in its light appearance and the panel was light as well: the Designer provides its variables. The server log has the panel's calls at 16:44 to 16:47, each answered with 200 and each preflight request with 204.
+  - Disconnect deleted what was kept about the site; Connect brought it back with no Webflow screen. After Uninstall App in Webflow the next read was refused, the site was deleted and the Sites page said so. The test site was left with the app installed and connected, and five keywords checked.
+  - #16: the notice after an uninstall said "about them" for one site.
+  - #17: "What AI said" showed the Markdown marks of an answer. An answer is shown as plain text now.
+  - #18: the texts on uninstalling name the place in the words of Webflow's own screens (Site settings, Apps & Integrations, Connected Apps, View details, Uninstall App). A table in an answer is shown as rows.
+  - #19: an answer is kept up to 1,500 characters, and a longer one was shown under "Full answer". It is labelled "First 1,500 characters of the answer" now, cut at its last whole word; the number is one constant and the privacy policy names the same one.
+  - #20: the excerpt of an answer keeps the answer's line breaks.
+- 24 Nov, 17:16: the owner ran App Review Preflight in the Designer of the test site on the final `bundle.zip` and `review.zip`. 0 security blockers, 0 required updates, 1 suggested update: "External API Calls", one place, the panel's `fetch` to `https://aiseodeck.silitlabs.com/ext/` (`app.js`, line 209). The run is listed as "Runtime test needed", as the run of 15 November was: the test of a published runtime was not prepared, because the app loads no JavaScript on published sites. The advisory boot test answered "The boot test runner could not start inside the secure sandbox" on three tries. Receipt: `wfpre_ac0fe18c274fefca44b42bbe32f422bb`. The changes #19 to #21 came after this run and touch the server only; the bundle is the one Preflight read.
+- 24 Nov, evening: the demo video. 49 scenes with English captions, 4 minutes 26 seconds, 1920 x 1080, built by `scripts/demo-video/build_stills.py` from captures of the live app (captures that showed a text changed later by #17 to #20 were left out, and newer ones used). The owner said yes to an unlisted upload to his YouTube channel: https://youtu.be/C_RxaD_-Rz4
+- 24 Nov, night: the form. Its page shows nothing until "Sign in with Webflow"; the owner said yes to authorizing Webflow's own "Marketplace Submission Form" for the Silit Labs Workspace. What the form turned out to be, and what it checks by itself, is written down in `docs/listing.md`: the client ID is known, so this is an App Update; lists do not survive in the description; "your agency" and "checkout" set off its detectors; the notes take 5,000 characters, so they are a summary that links to `REVIEW.md`; it asks for the backend's runtime version.
+  - #21 (25 Nov, 00:26): the server writes one line at each cold start with its Node.js version, because the form asks for it. Read in Vercel: `[aiseodeck] start, Node.js v26.13.1`.
+  - #22 (25 Nov, 02:40): `REVIEW.md` with the results of the sitting.
+- `npm test`: `test/app.js` 435, `test/panel.js` 63, `test/contrast.js` 81.
+
+- 25 Nov, morning: the last checks and the submission.
+  - Every value of the form was compared with `docs/listing.md` and the saved texts (the description, the notes, the five alt texts and the features, character for character).
+  - The access code is live: the code form of the Account page answered "That access code is not valid." to a wrong code, which it does only when `COMPLIMENTARY_CODE` holds 16 characters or more.
+  - The link in the notes opens `REVIEW.md` on `main` with nothing left to fill. The demo video plays for a viewer who is not signed in.
+  - 10:46: the owner typed the access code into the form and ticked the two boxes himself (the information stays valid permanently; Webflow's Privacy Policy, Terms of Service and Developer Terms of Service).
+  - The first Submit was answered with 401: the form's sign-in of the night before had run out, and the form asked to sign in again. With the owner's yes the Workspace was authorized again in another tab; "I have signed in" brought the form back with every value and all six files.
+  - 10:49: Submit. "Thank you! Your submission has been received." Reference ID `c9a4039e-4b94-4ad1-81a1-10cc77f4c3a8`. The page names 10 to 15 business days, and says that feedback and the decision come by email on this submission's thread.
+  - 10:51: Webflow's email to info@silitlabs.com, ticket #1225904: "No action required at the moment, but please keep an eye on this email thread". Nothing was written to the old thread (#1221544): its review ends with "Submit through the App submission form", which is what was done, and the notes of the form name that ticket in their first sentence.
+  - In the app's settings, after the submission: Publish extension version still offers internal testing only. If the review asks for changes, the page of the form says how they go in: a new bundle with "Publish > Upload Bundle for Review" in the app's settings, and the review continues on the same thread.
+
 Where it stands, and who does what next
 1. Done on 24 November: the report's repository, its Vercel project and the database connection exist.
 2. Done on 24 November: the owner entered the eleven values and added the report's webhook at Polar; `/health` says "ok" and `/health/keys` says "keys ok" there.
-3. Done on 24 November: the three rewrites of silitlabs.com lead to the new project; landing page, sample, an older check link and a free check were checked live. Still to do there: the owner's test purchase.
-4. Owner says "yayınla"; Claude merges this branch to main. The same sitting: the new bundle is uploaded with Publish extension version. Owner: add `COMPLIMENTARY_CODE` in Vercel before that deploy (a long random value; the same value goes into the form's access field).
-5. Claude and owner: the end-to-end run on the published test site (section 7), with the checks of 5a and the list "For the sitting" at the end of `docs/quality-gate.md` (the panel's fonts and colors in the real Designer among them).
-6. Claude: final `bundle.zip` and `review.zip` with their checksums, the scene list and captions of the demo video, the `[to fill]` fields.
-7. Owner: App Review Preflight on the final files, the new demo video, the form (two-factor authentication on the Workspace admin is on, read on 24 November). Claude does not submit.
+3. Done on 24 November: the three rewrites of silitlabs.com lead to the new project; landing page, sample, an older check link and a free check were checked live, and the owner's test purchase went through (see the log).
+4. Done on 24 November: the branch was merged (#14) and is in production, the panel's fourth version was published, and the owner set `COMPLIMENTARY_CODE` in Vercel.
+5. Done on 24 November: the end-to-end run on the live app with the published test site, and the list "For the sitting" of `docs/quality-gate.md` (one item is open there: the usage graph of the database).
+6. Done on 24 November: the final `bundle.zip` and `review.zip` with their checksums, the demo video, every field that waited for the sitting.
+7. Done: App Review Preflight (the owner, 24 November), the form (filled by Claude; the owner typed the access code and ticked the two boxes), and the submission on 25 November 2026 at 10:49.
+8. Now: Webflow reviews. Its answer comes by email on ticket #1225904, to info@silitlabs.com; the page of the form names 10 to 15 business days. Until then:
+   - `COMPLIMENTARY_CODE` in Vercel stays as it is. The form made the owner confirm that the access stays valid permanently; a changed or removed value closes the reviewers' way in.
+   - The repository stays public and `REVIEW.md` stays where it is: the notes of the form link to it.
+   - The test site stays published, with the app installed and connected, and with the pages and draft items the demo video shows.
+   - The panel is not published again, and the app's screens and texts are not changed: the review checks the listing, the notes and the video against what it finds. A fix that cannot wait is tested, deployed and written down here.
+   - If the review asks for changes: answer on the same thread, and send the new bundle the way the page of the form names ("Publish > Upload Bundle for Review" in the app's settings; on 25 November that choice was still greyed out there, so read the settings again then).
+9. Open, none of it in the way of the review: the usage graph of the database in Upstash; `POLAR_ACCESS_TOKEN`, a readable value in this project's Vercel settings when last read, saved again as a secret; the `COMPLIMENTARY_CODE` that was entered in the report's project by mistake (it does nothing there and can be removed); the branch `report-standalone` (to delete with the owner's yes); two-factor authentication on the GitHub account before 13 December 2026.
 
 The steps as they were planned (1 to 5 are done)
 1. Domains and rivals (finding 3).

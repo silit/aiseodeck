@@ -2,7 +2,7 @@
 
 Reply to the review of 23 November 2026 (ticket #1221544). The notes field of the submission form takes 5,000 characters, so the form carries a summary of this file and links here for the detail and the evidence. Everything in this file describes the build that is live at aiseodeck.silitlabs.com since 24 November 2026 (the branch `main`).
 
-Status: **READY FOR REVIEW.** All five findings are addressed. The build is in production (the AI Visibility Report runs from its own project since 24 November). The end-to-end run on the live app with the published test site passed on 24 November. App Review Preflight ran on the final bundle and review ZIP. The demo video and the screenshots show this build. The submission is filed as an App Update of the kind "App functionality, permissions, or bundle": the form knows the client ID of the app from the first submission and takes it as an update.
+Status: **SUBMITTED FOR REVIEW on 25 November 2026** (Webflow ticket #1225904, reference ID `c9a4039e-4b94-4ad1-81a1-10cc77f4c3a8`). All five findings are addressed. The build is in production (the AI Visibility Report runs from its own project since 24 November). The end-to-end run on the live app with the published test site passed on 24 November. App Review Preflight ran on the final bundle and review ZIP. The demo video and the screenshots show this build. The submission is filed as an App Update of the kind "App functionality, permissions, or bundle": the form knows the client ID of the app from the first submission and takes it as an update.
 
 ## The app
 
